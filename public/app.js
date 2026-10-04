@@ -572,6 +572,7 @@ function initRoom(roomId) {
     $('.stage').classList.toggle('karaoke-on', karaoke);
     document.body.classList.toggle('karaoke-on', karaoke);
     $('#karaokeBox').hidden = !karaoke;
+    $('#navKaraoke').hidden = !karaoke;
     $('#karaokeBtn').classList.toggle('on', karaoke);
     if (karaoke) renderKaraoke();
     renderFilters(spinning || Boolean(duel));
@@ -713,7 +714,9 @@ function initRoom(roomId) {
       : '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>';
     $('#kToggle').title = m?.pausedAt != null ? 'Продолжить у всех' : 'Пауза у всех';
     const nx = q[0];
-    $('#kUpNext').innerHTML = nx ? `<span>Далее</span><b>${esc(nx.singer || nx.by)}</b><em>${esc(nx.title)}</em>` : '';
+    $('#kUpNext').innerHTML = nx ? `<span>Далее</span><b>${esc(nx.singer || nx.by)}</b>` : '';
+    $('#kUpNext').title = nx ? `Далее: ${nx.singer || nx.by}, ${nx.title}` : '';
+    $('#kEq').parentElement.classList.toggle('playing', Boolean(m) && m.pausedAt == null);
     renderLyrics(m);
     $('#kSingerIn').placeholder = `Кто поёт (по умолчанию ${me.name || 'вы'})`;
 
@@ -763,7 +766,7 @@ function initRoom(roomId) {
     if (!m) { box.innerHTML = ''; return; }
     const head = L && !L.loading && !L.none ? `<div class="k-lyr-head">
         <span>${esc(L.artist)}${L.artist && L.track ? ', ' : ''}${esc(L.track)}${L.synced ? '' : ' <em>без таймингов</em>'}</span>
-        ${L.synced ? `<span class="k-offset"><button type="button" class="nav-icon" data-loff="-0.5" title="Текст раньше на 0,5 с">−</button><b id="kOffset">${L.offset > 0 ? '+' : ''}${String(L.offset || 0).replace('.', ',')} с</b><button type="button" class="nav-icon" data-loff="0.5" title="Текст позже на 0,5 с">+</button></span>` : ''}
+        ${L.synced ? `<span class="k-offset" title="Сдвиг текста относительно видео, общий для всей комнаты"><button type="button" class="nav-icon wide" data-loff="-5" title="Текст раньше на 5 с">−5</button><button type="button" class="nav-icon" data-loff="-0.5" title="Текст раньше на 0,5 с">−</button><b id="kOffset">${L.offset > 0 ? '+' : ''}${String(L.offset || 0).replace('.', ',')} с</b><button type="button" class="nav-icon" data-loff="0.5" title="Текст позже на 0,5 с">+</button><button type="button" class="nav-icon wide" data-loff="5" title="Текст позже на 5 с">+5</button></span>` : ''}
         <button type="button" class="link-btn" data-lfind>Не тот текст</button>
       </div>` : '';
     const search = `<form class="k-lyr-search" id="kLyrSearch"><input placeholder="Исполнитель и название" value="${esc(L?.none ? L.q : (L?.artist ? L.artist + ' ' : '') + (L?.track || ''))}"><button class="btn btn-ghost" type="submit">Найти текст</button></form><div class="k-lyr-results" id="kLyrResults"></div>`;

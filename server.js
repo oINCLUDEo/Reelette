@@ -840,7 +840,7 @@ async function api(req, res, url) {
       pushState(r); return json(res, 200, { ok: true });
     }
     if (action === 'lyrics' && parts[4] === 'offset') {
-      if (r.music.lyrics?.synced) r.music.lyrics.offset = Math.max(-30, Math.min(30, Math.round(((r.music.lyrics.offset || 0) + num(b.delta, 0)) * 10) / 10));
+      if (r.music.lyrics?.synced) r.music.lyrics.offset = Math.max(-60, Math.min(60, Math.round(((r.music.lyrics.offset || 0) + num(b.delta, 0)) * 10) / 10));
       pushState(r); return json(res, 200, { ok: true });
     }
     if (action === 'next') { advanceMusic(r); return json(res, 200, { ok: true }); }
