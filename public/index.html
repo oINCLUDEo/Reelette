@@ -6,6 +6,8 @@
 <title>Reelette</title>
 <meta name="description" content="Колесо для выбора фильма на киновечер с друзьями">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="theme-color" content="#07060C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Wix+Madefor+Display:wght@600;700;800&display=swap" rel="stylesheet">
@@ -16,7 +18,7 @@
   <symbol id="arr" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></symbol>
   <symbol id="discord" viewBox="0 0 24 24"><path fill="currentColor" d="M19.3 5.3A17 17 0 0 0 15 4l-.5 1a16 16 0 0 0-5 0L9 4a17 17 0 0 0-4.3 1.3C2 9.4 1.3 13.4 1.6 17.3a17 17 0 0 0 5.3 2.7l1.1-1.8a11 11 0 0 1-1.7-.8l.4-.3a12 12 0 0 0 10.6 0l.4.3-1.7.8 1.1 1.8a17 17 0 0 0 5.3-2.7c.4-4.5-.7-8.5-3.1-12ZM8.7 14.9c-1 0-1.9-1-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1Zm6.6 0c-1 0-1.9-1-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1Z"/></symbol>
   <symbol id="plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
-  <symbol id="logo" viewBox="0 0 32 32"><path fill="currentColor" fill-rule="evenodd" d="M16 1a15 15 0 1 1 0 30 15 15 0 0 1 0-30Zm0 3.2a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm0 16.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM7.8 12.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm16.4 0a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM16 14.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6Z"/></symbol>
+  <symbol id="logo" viewBox="0 0 32 32"><circle cx="16" cy="17" r="13.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M16 17L16.00 7.00A10 10 0 0 1 23.07 9.93Z" fill="currentColor"/><path d="M16 17L26.00 17.00A10 10 0 0 1 23.07 24.07Z" fill="currentColor"/><path d="M16 17L16.00 27.00A10 10 0 0 1 8.93 24.07Z" fill="currentColor"/><path d="M16 17L6.00 17.00A10 10 0 0 1 8.93 9.93Z" fill="currentColor"/><circle cx="16" cy="17" r="3.4" fill="currentColor"/><circle cx="16" cy="17" r="1.4" fill="#0C0B12"/><path d="M16 9.5 13.6 3.8a2.7 2.7 0 1 1 4.8 0Z" fill="currentColor"/></symbol>
 </svg>
 
 <!-- ===== Главная ===== -->
@@ -104,7 +106,7 @@
 
       <div class="field">
         <span class="label">Длительность <b id="durVal">12 с</b></span>
-        <input type="range" id="duration" min="4" max="40" value="12">
+        <input type="range" id="duration" min="0" max="40" value="12">
       </div>
 
       <div class="field">
@@ -151,8 +153,15 @@
       <div id="searchResults" class="results"></div>
     </div>
     <div data-pane="list" hidden>
-      <textarea id="bulkInput" rows="8" placeholder="По одному фильму на строку&#10;Интерстеллар&#10;Джанго освобождённый&#10;Субмарина"></textarea>
-      <button id="bulkBtn" class="btn btn-primary btn-block">Добавить всё</button>
+      <div id="bulkEdit" class="bulk-edit">
+        <textarea id="bulkInput" rows="8" placeholder="По одному фильму на строку&#10;Интерстеллар&#10;Джанго освобождённый&#10;Субмарина"></textarea>
+        <button id="bulkBtn" class="btn btn-primary btn-block">Найти фильмы</button>
+      </div>
+      <div id="bulkReview" class="bulk-review" hidden>
+        <div class="bulk-head"><span id="bulkSummary"></span><button id="bulkBack" class="link-btn">Изменить список</button></div>
+        <div id="bulkRows" class="bulk-rows"></div>
+        <button id="bulkAdd" class="btn btn-primary btn-block">Добавить</button>
+      </div>
     </div>
   </div>
 </div>

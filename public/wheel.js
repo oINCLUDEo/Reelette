@@ -98,7 +98,7 @@ class Wheel {
     const from = fromAngle;
     const delta = ((target - from) % 1 + 1) % 1;
     const to = from + spin.turns + delta;
-    const dur = spin.duration * 1000;
+    const dur = Math.max(1, spin.duration * 1000); // при нулевой длительности колесо встаёт сразу
     if (elapsedMs >= dur) { this.rot = target; this.anim = null; done?.(); return; }
     this.rot = from;
     this.anim = { from, to, dur, start: performance.now() - elapsedMs, done };

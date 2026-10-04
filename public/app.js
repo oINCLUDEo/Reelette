@@ -541,26 +541,125 @@ function initRoom(roomId) {
     } catch (err) { toast(err.message, true); }
   });
 
+  // ---- добавление списком: поиск по каждой строке, затем проверка ----
+  // choice: индекс найденного варианта, 'raw' (как есть) или 'skip' (не добавлять)
+  let bulk = [];
+
+  async function addFilms(films) {
+    const r = await api(`/rooms/${roomId}/films`, { method: 'POST', body: { films, by: me.name } });
+    toast(`Добавлено: ${r.added.length}${r.merged.length ? `, уже были: ${r.merged.length}` : ''}`);
+  }
+  async function findFilm(q) {
+    try { return (await api('/search?q=' + encodeURIComponent(q))).results.slice(0, 6); } catch { return []; }
+  }
+  function showBulkReview(on) {
+    $('#bulkEdit').hidden = on;
+    $('#bulkReview').hidden = !on;
+  }
+
   $('#bulkBtn').addEventListener('click', async () => {
     const lines = [...new Set($('#bulkInput').value.split('\n').map(s => s.trim()).filter(Boolean))].slice(0, 60);
     if (!lines.length) return;
-    const btn = $('#bulkBtn'); btn.disabled = true;
-    const films = [];
-    for (const [i, title] of lines.entries()) {
-      btn.textContent = `Ищу постеры: ${i + 1} из ${lines.length}`;
-      let found = null;
-      if (provider !== 'none') {
-        try { found = (await api('/search?q=' + encodeURIComponent(title))).results[0]; } catch {}
-      }
-      films.push(found || { title });
+    const btn = $('#bulkBtn');
+    if (provider === 'none') {
+      try { await addFilms(lines.map(title => ({ title }))); $('#bulkInput').value = ''; closeModal('#addModal'); }
+      catch (err) { toast(err.message, true); }
+      return;
     }
+    btn.disabled = true;
+    bulk = lines.map(query => ({ query, results: [], choice: 'raw', open: false }));
+    let done = 0, next = 0;
+    btn.textContent = `Ищу: 0 из ${lines.length}`;
+    // по четыре запроса параллельно
+    await Promise.all(Array.from({ length: Math.min(4, bulk.length) }, async () => {
+      while (next < bulk.length) {
+        const it = bulk[next++];
+        it.results = await findFilm(it.query);
+        it.choice = it.results.length ? 0 : 'raw';
+        it.open = !it.results.length;
+        btn.textContent = `Ищу: ${++done} из ${lines.length}`;
+      }
+    }));
+    btn.disabled = false; btn.textContent = 'Найти фильмы';
+    renderBulk();
+    showBulkReview(true);
+  });
+
+  function renderBulk() {
+    const missing = bulk.filter(it => !it.results.length).length;
+    const count = bulk.filter(it => it.choice !== 'skip').length;
+    $('#bulkSummary').innerHTML = `Будет добавлено <b>${count}</b> из ${bulk.length}${missing ? `, <span class="warn">не нашлось: ${missing}</span>` : ''}`;
+    $('#bulkAdd').disabled = !count;
+    $('#bulkAdd').textContent = count ? `Добавить ${count} ${plural(count, 'фильм', 'фильма', 'фильмов')}` : 'Нечего добавлять';
+    $('#bulkRows').innerHTML = bulk.map((it, i) => {
+      const pick = typeof it.choice === 'number' ? it.results[it.choice] : null;
+      const skip = it.choice === 'skip';
+      const title = pick ? pick.title : it.query;
+      const sub = skip ? 'Не будет добавлен'
+        : pick ? [pick.year, pick.original, pick.title.toLowerCase() !== it.query.toLowerCase() && `по запросу «${it.query}»`].filter(Boolean).map(esc).join(', ')
+        : it.results.length ? 'Как есть, без постера' : 'Не нашлось. Добавить как есть, поискать иначе или пропустить?';
+      return `<div class="bulk-row${it.results.length ? '' : ' missing'}${skip ? ' skip' : ''}${it.open ? ' open' : ''}" data-i="${i}">
+        <div class="bulk-line">
+          <i style="${pick?.poster ? `background-image:url('${esc(pick.poster)}')` : ''}">${pick?.poster ? '' : initial(it.query)}</i>
+          <div class="bulk-main"><b>${esc(title)}</b><span>${sub}</span></div>
+          <button class="ghost sm" data-toggle>${it.open ? 'Свернуть' : 'Изменить'}</button>
+        </div>
+        ${it.open ? `<div class="bulk-opts">
+          ${it.results.map((r, j) => `<button class="bulk-alt${it.choice === j ? ' on' : ''}" data-pick="${j}">
+            <i style="${r.poster ? `background-image:url('${esc(r.poster)}')` : ''}"></i>
+            <span><b>${esc(r.title)}</b>${[r.year, r.original].filter(Boolean).map(esc).join(', ')}</span></button>`).join('')}
+          <div class="bulk-actions">
+            <button class="btn btn-ghost${it.choice === 'raw' ? ' on' : ''}" data-raw>Добавить как есть</button>
+            <button class="btn btn-ghost${skip ? ' on' : ''}" data-skip>Не добавлять</button>
+          </div>
+          <div class="bulk-search"><input value="${esc(it.query)}" placeholder="Другое название"><button class="btn btn-ghost" data-research>Искать</button></div>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  async function researchBulk(i, row) {
+    const it = bulk[i];
+    const q = row.querySelector('.bulk-search input').value.trim();
+    if (q.length < 2) return;
+    row.querySelector('[data-research]').textContent = 'Ищу…';
+    it.query = q;
+    it.results = await findFilm(q);
+    it.choice = it.results.length ? 0 : 'raw';
+    renderBulk();
+  }
+
+  $('#bulkRows').addEventListener('click', e => {
+    const row = e.target.closest('.bulk-row');
+    if (!row) return;
+    const it = bulk[row.dataset.i];
+    const t = e.target.closest('button');
+    if (!t) return;
+    if (t.matches('[data-toggle]')) it.open = !it.open;
+    else if (t.matches('[data-pick]')) { it.choice = Number(t.dataset.pick); it.open = false; }
+    else if (t.matches('[data-raw]')) { it.choice = 'raw'; it.open = false; }
+    else if (t.matches('[data-skip]')) { it.choice = 'skip'; it.open = false; }
+    else if (t.matches('[data-research]')) return researchBulk(row.dataset.i, row);
+    renderBulk();
+  });
+  $('#bulkRows').addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || !e.target.closest('.bulk-search input')) return;
+    e.preventDefault();
+    const row = e.target.closest('.bulk-row');
+    researchBulk(row.dataset.i, row);
+  });
+  $('#bulkBack').addEventListener('click', () => showBulkReview(false));
+  $('#bulkAdd').addEventListener('click', async () => {
+    const films = bulk.filter(it => it.choice !== 'skip').map(it => (typeof it.choice === 'number' ? it.results[it.choice] : { title: it.query }));
+    if (!films.length) return;
+    $('#bulkAdd').disabled = true;
     try {
-      const r = await api(`/rooms/${roomId}/films`, { method: 'POST', body: { films, by: me.name } });
-      toast(`Добавлено: ${r.added.length}${r.merged.length ? `, повторов: ${r.merged.length}` : ''}`);
+      await addFilms(films);
+      bulk = [];
       $('#bulkInput').value = '';
+      showBulkReview(false);
       closeModal('#addModal');
-    } catch (err) { toast(err.message, true); }
-    btn.disabled = false; btn.textContent = 'Добавить всё';
+    } catch (err) { toast(err.message, true); $('#bulkAdd').disabled = false; }
   });
 
   // ---- управление ----
@@ -581,7 +680,7 @@ function initRoom(roomId) {
   function setDur(v) {
     settings.duration = v; ls.set('dur', v);
     dur.value = v;
-    $('#durVal').textContent = `${v} с`;
+    $('#durVal').textContent = v ? `${v} с` : 'сразу';
     dur.style.setProperty('--p', `${(v - dur.min) / (dur.max - dur.min) * 100}%`);
   }
   dur.addEventListener('input', () => setDur(Number(dur.value)));

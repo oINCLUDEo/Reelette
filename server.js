@@ -110,7 +110,7 @@ function startSpin(r, { mode, duration, auto, by, delay }) {
   const list = activeFilms(r);
   if (list.length < 2) return 'Нужно хотя бы два фильма в колесе';
   mode = mode === 'elimination' ? 'elimination' : 'normal';
-  duration = Math.min(60, Math.max(3, num(duration, 12)));
+  duration = Math.min(60, Math.max(0, num(duration, 12))); // 0 — сразу результат, без вращения
   delay = Math.min(15, Math.max(0, Math.round(num(delay, 0))));
   const rt = runtime(r);
 
@@ -130,7 +130,7 @@ function startSpin(r, { mode, duration, auto, by, delay }) {
     snapshot: list.map(f => ({ id: f.id, weight: f.weight })),
     filmId: landed.id,
     offset: 0.12 + (crypto.randomInt(0, 1000) / 1000) * 0.76,
-    turns: Math.max(3, Math.round(duration * 0.9)),
+    turns: duration ? Math.max(2, Math.round(duration * 0.9)) : 0,
   };
   rt.series = r.spin.auto;
   broadcast(r.id, { type: 'spin', spin: r.spin, now: Date.now() });
