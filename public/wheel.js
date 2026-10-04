@@ -1,6 +1,7 @@
 // Колесо на canvas. Угол хранится в оборотах: rot ≡ −(позиция под стрелкой).
 class Wheel {
-  constructor(canvas, { onTick, onCurrent, idleSpeed = 0 } = {}) {
+  constructor(canvas, { onTick, onCurrent, idleSpeed = 0, hubButton = false } = {}) {
+    this.hubButton = hubButton; // центр закрыт DOM-кнопкой, рисовать его не нужно
     this.cv = canvas;
     this.ctx = canvas.getContext('2d');
     this.cache = document.createElement('canvas');
@@ -158,7 +159,7 @@ class Wheel {
     const S = this.cv.width;
     const c = S / 2;
     const R = c * 0.9;
-    return { S, c, R, hub: R * 0.2 };
+    return { S, c, R, hub: R * (this.hubButton ? 0.27 : 0.2) };
   }
 
   buildCache() {
@@ -293,6 +294,8 @@ class Wheel {
       x.fill();
     }
     x.shadowBlur = 0;
+
+    if (this.hubButton) return;
 
     // центр
     const hg = x.createRadialGradient(c, c - hub * 0.4, hub * 0.1, c, c, hub);

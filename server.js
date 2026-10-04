@@ -1,4 +1,4 @@
-// Киноколесо — сервер без зависимостей: статика, JSON API, SSE для синхронизации комнат.
+// Reelette — сервер без зависимостей: статика, JSON API, SSE для синхронизации комнат.
 'use strict';
 const http = require('node:http');
 const fs = require('node:fs');
@@ -165,14 +165,14 @@ async function postWebhook(r, film) {
     description: (film.overview || '').slice(0, 600) || undefined,
     url: film.url || undefined,
     color: 0xf59e0b,
-    footer: { text: `Киноколесо · ${r.name}` },
+    footer: { text: `Reelette · ${r.name}` },
   };
   if (film.poster) embed.thumbnail = { url: film.poster };
   if (film.rating) embed.fields = [{ name: 'Рейтинг', value: String(film.rating), inline: true }];
   await fetch(r.webhook, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'Киноколесо', content: 'Колесо выбрало фильм', embeds: [embed] }),
+    body: JSON.stringify({ username: 'Reelette', content: 'Колесо выбрало фильм', embeds: [embed] }),
   });
 }
 
@@ -383,4 +383,4 @@ http.createServer(async (req, res) => {
     console.error(e);
     if (!res.headersSent) json(res, 400, { error: e.message });
   }
-}).listen(PORT, () => console.log(`Киноколесо: http://localhost:${PORT}  (поиск фильмов: ${PROVIDER})`));
+}).listen(PORT, () => console.log(`Reelette: http://localhost:${PORT}  (поиск фильмов: ${PROVIDER})`));

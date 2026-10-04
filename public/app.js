@@ -20,7 +20,7 @@ function applyPalette(p) {
   if (!PALS.includes(p)) p = 'night';
   document.documentElement.dataset.pal = p;
   ls.set('pal', p);
-  window.setNebulaColors?.();
+  window.setBackdropColors?.();
   wheel?.readColors();
   demo?.readColors();
   $$('#pals button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
@@ -145,6 +145,7 @@ function initRoom(roomId) {
   }
 
   wheel = new Wheel($('#wheel'), {
+    hubButton: true,
     onTick: tick,
     onCurrent: it => {
       $('#currentTitle').textContent = it ? it.title : ' ';
@@ -166,7 +167,7 @@ function initRoom(roomId) {
     if (msg.now) serverOffset = msg.now - Date.now();
     if (msg.type === 'state') {
       state = msg.state;
-      document.title = `${state.name} — Киноколесо`;
+      document.title = `${state.name} — Reelette`;
       remember();
       if (state.spin && state.spin.sid !== spinningSid) runSpin(state.spin);
       if (!state.spin && !spinningSid) { syncWheel(); wheel.setAngle(state.angle); }
@@ -199,6 +200,7 @@ function initRoom(roomId) {
     $$('.modal.winner').forEach(m => (m.hidden = true));
     wheel.spin(spin, state.angle, elapsed, () => {
       spinningSid = null;
+      window.setBackdropActive?.(false);
       if (!state.spin || state.spin.sid === spin.sid) {
         state.angle = Wheel.endAngle(spin);
         // если итог уже пришёл (вкладка была свёрнута), сразу показываем актуальное колесо
@@ -206,6 +208,7 @@ function initRoom(roomId) {
       }
       render();
     });
+    window.setBackdropActive?.(true);
     $('#stageStatus').textContent = spin.by ? `Крутит ${spin.by}` : 'Колесо крутится';
     render();
   }
@@ -294,7 +297,8 @@ function initRoom(roomId) {
     const btn = $('#spinBtn');
     btn.disabled = spinning || active.length < 2;
     btn.classList.toggle('busy', spinning);
-    btn.querySelector('.tx').textContent = spinning ? 'Крутится…' : settings.mode === 'elimination' && state.eliminated.length ? 'Крутить дальше' : 'Крутить';
+    $('#spinBtn .hub-label').textContent = spinning ? 'Крутится' : settings.mode === 'elimination' && state.eliminated.length ? 'Дальше' : 'Крутить';
+    $('#hubSub').textContent = spinning ? '' : active.length < 2 ? 'нужно 2 фильма' : `${active.length} ${plural(active.length, 'фильм', 'фильма', 'фильмов')}`;
     $('#resetBtn').hidden = !state.eliminated.length || spinning;
     $('#addBtn').disabled = spinning;
 
@@ -302,7 +306,7 @@ function initRoom(roomId) {
       $('#stageStatus').textContent = active.length < 2
         ? (state.eliminated.length && active.length === 1 ? 'Остался один фильм. Чтобы начать заново, верните выбывших.'
           : state.films.length ? 'Для прокрута нужно хотя бы два фильма' : '')
-        : settings.mode === 'elimination' && state.eliminated.length ? `В колесе осталось ${active.length}` : matchMedia('(hover: hover)').matches ? 'Пробел или кнопка «Крутить»' : '';
+        : settings.mode === 'elimination' && state.eliminated.length ? `В колесе осталось ${active.length}` : 'Нажмите на центр колеса или пробел';
     }
   }
 

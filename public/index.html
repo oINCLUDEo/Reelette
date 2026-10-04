@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Киноколесо</title>
+<title>Reelette</title>
 <meta name="description" content="Колесо для выбора фильма на киновечер с друзьями">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,17 +15,17 @@
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="arr" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></symbol>
   <symbol id="plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
-  <symbol id="logo" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 16 16 2A14 14 0 0 1 28.1 9Z" fill="currentColor"/><path d="M16 16 3.9 23A14 14 0 0 1 3.9 9Z" fill="currentColor" opacity=".45"/><circle cx="16" cy="16" r="3.2" fill="currentColor"/></symbol>
+  <symbol id="logo" viewBox="0 0 32 32"><path fill="currentColor" fill-rule="evenodd" d="M16 1a15 15 0 1 1 0 30 15 15 0 0 1 0-30Zm0 3.2a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm0 16.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM7.8 12.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm16.4 0a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM16 14.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6Z"/></symbol>
 </svg>
 
 <!-- ===== Главная ===== -->
 <div id="home" hidden>
   <header class="nav"><div class="bar">
-    <a class="brand" href="/"><svg><use href="#logo"/></svg>Киноколесо</a>
+    <a class="brand" href="/"><svg><use href="#logo"/></svg>Reelette</a>
   </div></header>
 
   <section class="sheet hero grainy">
-    <canvas class="neb" aria-hidden="true"></canvas>
+    <canvas class="backdrop" aria-hidden="true"></canvas>
     <span class="shade"></span>
     <div class="in hero-in">
       <div class="hero-copy">
@@ -53,7 +53,7 @@
 <!-- ===== Комната ===== -->
 <div id="room" hidden>
   <header class="nav"><div class="bar">
-    <a class="brand" href="/"><svg><use href="#logo"/></svg><span class="brand-name">Киноколесо</span></a>
+    <a class="brand" href="/"><svg><use href="#logo"/></svg><span class="brand-name">Reelette</span></a>
     <button id="roomTitle" class="room-title" title="Переименовать"></button>
     <div class="act">
       <div id="people" class="people"></div>
@@ -75,17 +75,14 @@
     </aside>
 
     <section class="sheet stage grainy">
-      <canvas class="neb" aria-hidden="true"></canvas>
+      <canvas class="backdrop" aria-hidden="true"></canvas>
       <span class="shade"></span>
       <div class="stage-in">
         <div class="current"><span id="currentTitle">&nbsp;</span></div>
         <div class="wheel-box" id="wheelBox">
           <canvas id="wheel"></canvas>
+          <button id="spinBtn" class="hub-btn" title="Крутить (пробел)"><span class="hub-label">Крутить</span><span class="hub-sub" id="hubSub"></span></button>
           <div class="pointer" id="pointer"><svg viewBox="0 0 40 52"><path d="M20 50 3 14A18 18 0 1 1 37 14Z"/></svg></div>
-        </div>
-        <div class="spin-row">
-          <button id="spinBtn" class="sweep"><span class="sq"></span><span class="ar"><svg><use href="#arr"/></svg></span><span class="tx">Крутить</span></button>
-          <button id="resetBtn" class="ghost" hidden>Вернуть выбывших</button>
         </div>
         <div class="stage-status" id="stageStatus"></div>
       </div>
@@ -111,6 +108,8 @@
         <label class="check" id="autoWrap"><input type="checkbox" id="autoSpin"><span class="box"></span>Крутить до победителя без остановок</label>
         <label class="check"><input type="checkbox" id="soundOn" checked><span class="box"></span>Звук щелчков</label>
       </div>
+
+      <button id="resetBtn" class="btn btn-ghost btn-block" hidden>Вернуть выбывших в колесо</button>
 
       <div class="history">
         <h3>Уже выпадало</h3>
@@ -191,7 +190,7 @@
 
 <div id="toasts" class="toasts"></div>
 
-<script src="/bg.js"></script>
+<script src="/backdrop.js"></script>
 <script src="/wheel.js"></script>
 <script src="/app.js"></script>
 </body>

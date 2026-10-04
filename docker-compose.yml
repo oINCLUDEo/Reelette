@@ -1,7 +1,7 @@
 services:
-  kinokoleso:
+  reelette:
     build: .
-    container_name: kinokoleso
+    container_name: reelette
     restart: unless-stopped
     env_file:
       - path: .env

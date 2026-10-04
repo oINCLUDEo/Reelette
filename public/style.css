@@ -59,8 +59,8 @@ p { margin: 0; }
 .h2 { font: 800 clamp(1.8rem, 3.6vw, 2.8rem)/1.06 var(--f-head); letter-spacing: -.035em; }
 .h2 .m { color: var(--tx3); }
 
-/* шейдер внутри листа */
-.neb { position: absolute; inset: -30px; width: calc(100% + 60px); height: calc(100% + 60px); z-index: 0; display: block; filter: blur(10px); }
+/* фон листа: световое кольцо вокруг колеса (backdrop.js) */
+.backdrop { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; display: block; }
 .shade { position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, transparent 55%, var(--hero)); opacity: .75; pointer-events: none; }
 
 /* ---------- кнопки ---------- */
@@ -126,7 +126,7 @@ input::placeholder, textarea::placeholder { color: var(--tx3); }
 /* ---------- главная ---------- */
 .hero { background: var(--hero); padding-block: clamp(40px, 6vw, 80px); min-height: calc(100vh - 86px); display: flex; align-items: center; }
 .hero-in { display: grid; grid-template-columns: 1.05fr 1fr; gap: clamp(28px, 5vw, 72px); align-items: center; width: 100%; }
-.hero h1 { font: 800 clamp(2.5rem, 5.4vw, 4.6rem)/1 var(--f-head); letter-spacing: -.05em; }
+.hero h1 { font: 800 clamp(2.3rem, 4.3vw, 4rem)/1.02 var(--f-head); letter-spacing: -.05em; }
 .g { background: linear-gradient(180deg, var(--h1a) 30%, var(--h1b) 125%); -webkit-background-clip: text; background-clip: text; color: transparent; padding-bottom: .06em; }
 .hero h1 .m { color: var(--tx3); }
 .create { display: flex; gap: 10px; margin-top: 34px; max-width: 620px; }
@@ -175,15 +175,31 @@ input::placeholder, textarea::placeholder { color: var(--tx3); }
 .stage-in { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 16px 26px; min-width: 0; }
 .current { font: 800 clamp(24px, 2.8vw, 40px)/1.1 var(--f-head); letter-spacing: -.045em; text-align: center; max-width: 100%; padding: 14px 32px; margin: -14px 0 -2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .current span { background: linear-gradient(180deg, var(--h1a) 30%, var(--h1b) 125%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 22px var(--glow)); }
-.spin-row { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; justify-content: center; }
-.spin-row .sweep { min-width: 230px; }
-.stage-status { margin-top: 12px; color: var(--tx2); font-size: 14px; min-height: 21px; text-align: center; }
+.stage-status { margin-top: 22px; color: var(--tx2); font-size: 14px; min-height: 21px; text-align: center; }
 
-.wheel-box { position: relative; width: min(100%, calc(100vh - 280px)); min-width: 260px; aspect-ratio: 1; }
+.wheel-box { position: relative; width: min(88%, calc(100vh - 300px)); min-width: 300px; aspect-ratio: 1; container-type: inline-size; }
 .wheel-box canvas { width: 100%; height: 100%; display: block; }
 .pointer { position: absolute; top: -2.4%; left: 50%; width: 6.5%; min-width: 26px; transform: translateX(-50%); transform-origin: 50% 30%; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)) drop-shadow(0 0 14px var(--glow)); z-index: 2; }
 .pointer svg { width: 100%; height: auto; display: block; fill: var(--btn); stroke: none; }
 .pointer.tick { animation: tick .14s ease-out; }
+
+/* кнопка «Крутить» в центре колеса */
+.hub-btn { position: absolute; left: 50%; top: 50%; width: 24.3%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; z-index: 3;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3cqw;
+  background: radial-gradient(circle at 50% 30%, #fff, color-mix(in srgb, var(--btn) 86%, var(--acc)) 75%);
+  color: var(--btn-tx); box-shadow: 0 0 0 .55cqw var(--sheetA), 0 0 0 .9cqw color-mix(in srgb, var(--acc-hi) 55%, transparent), 0 1.2cqw 3cqw rgba(0,0,0,.55), 0 0 5cqw var(--glow);
+  transition: transform .45s var(--spring), box-shadow .4s, background .4s, color .4s; }
+.hub-btn::before { content: ""; position: absolute; inset: -.9cqw; border-radius: 50%; border: .35cqw solid var(--acc-hi); opacity: 0; pointer-events: none; }
+.hub-btn:not(:disabled)::before { animation: ping 2.6s var(--ease) infinite; }
+@keyframes ping { 0% { transform: scale(1); opacity: .55; } 70%, 100% { transform: scale(1.35); opacity: 0; } }
+.hub-btn:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.06); box-shadow: 0 0 0 .55cqw var(--sheetA), 0 0 0 1.1cqw var(--acc), 0 1.2cqw 3cqw rgba(0,0,0,.55), 0 0 8cqw var(--glow); }
+.hub-btn:active:not(:disabled) { transform: translate(-50%, -50%) scale(.95); transition-duration: .1s; }
+.hub-label { font: 800 3.5cqw/1 var(--f-head); letter-spacing: -.04em; }
+.hub-sub { font: 700 1.55cqw/1.2 var(--f-ui); opacity: .55; }
+.hub-btn:disabled { cursor: default; background: radial-gradient(circle at 50% 30%, var(--s3), var(--sheetA) 80%); color: var(--tx); }
+.hub-btn:disabled .hub-sub { opacity: .7; color: var(--tx2); }
+.hub-btn.busy::after { content: ""; position: absolute; inset: .6cqw; border-radius: 50%; border: .35cqw solid transparent; border-top-color: var(--acc-hi); border-right-color: var(--acc); animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes tick { 40% { transform: translateX(-50%) rotate(-14deg); } }
 
 .controls { padding: 20px; display: flex; flex-direction: column; gap: 22px; position: sticky; top: 86px; }
