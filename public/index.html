@@ -117,6 +117,7 @@
     <section class="sheet stage grainy">
       <canvas class="backdrop" aria-hidden="true"></canvas>
       <span class="shade"></span>
+      <div class="react-layer" id="reactLayer" aria-hidden="true"></div>
       <div class="stage-in">
         <div class="karaoke" id="karaokeBox" hidden>
           <div class="k-main">
@@ -154,8 +155,20 @@
                 </div>
               </form>
               <div class="k-rate" id="kRate"></div>
-              <div class="k-queue" id="kQueue"></div>
-              <div class="k-board" id="kBoard"></div>
+              <div class="k-tabs-wrap">
+                <div class="seg k-tabs" id="kTabs">
+                  <span class="seg-ind"></span>
+                  <button data-ktab="queue" class="on">Дальше</button>
+                  <button data-ktab="hits">Наши хиты</button>
+                  <button data-ktab="stars">Звёзды</button>
+                </div>
+                <div class="k-queue" id="kQueue"></div>
+                <div class="k-hits" id="kHits" hidden>
+                  <input id="kHitsQ" placeholder="Поиск по хитам и певцам" autocomplete="off">
+                  <div id="kHitsList"></div>
+                </div>
+                <div class="k-board" id="kBoard" hidden></div>
+              </div>
             </div>
           </div>
         </div>
@@ -175,6 +188,9 @@
           </div>
         </div>
         <div class="stage-status" id="stageStatus"></div>
+        <div class="react-bar" id="reactBar" aria-label="Реакции">
+          <button data-rx="clap" title="Аплодисменты">👏</button><button data-rx="fire" title="Огонь">🔥</button><button data-rx="laugh" title="Смешно">😂</button><button data-rx="love" title="Люблю">😍</button><button data-rx="wow" title="Вау">😮</button><button data-rx="skull" title="Это конец">💀</button><button data-rx="party" title="Праздник">🎉</button>
+        </div>
         <button id="stopBtn" class="ghost sm stop-btn" hidden></button>
       </div>
     </section>

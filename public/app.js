@@ -252,8 +252,11 @@ function initRoom(roomId) {
 
   function handle(msg) {
     if (msg.now) serverOffset = msg.now - Date.now();
+    if (msg.type === 'profiles') { profilesMap = msg.profiles || {}; render(); return; }
+    if (msg.type === 'react') { spawnReaction(msg.kind, msg.pid, msg.name); return; }
     if (msg.type === 'state') {
       state = msg.state;
+      profilesMap = state.profiles || profilesMap;
       document.title = `${state.name} — Reelette`;
       remember();
       if (state.spin && state.spin.sid !== spinningSid) runSpin(state.spin);
@@ -347,6 +350,30 @@ function initRoom(roomId) {
     const sc = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author).map(([, v]) => v.score);
     return sc.length ? sc.reduce((a, b) => a + b, 0) / sc.length : null;
   };
+
+  // ---- оформление профилей: цвет и эффект ника, рамка аватара (общие для всех комнат) ----
+  let profilesMap = {};
+  const GRADS = {
+    sunset: ['linear-gradient(90deg,#FF5A6E,#FFB347)', '#FF5A6E', '#FFB347'],
+    neon: ['linear-gradient(90deg,#22D3EE,#A855F7)', '#22D3EE', '#A855F7'],
+    gold: ['linear-gradient(90deg,#FDE68A,#F59E0B,#FDE68A)', '#FDE68A', '#F59E0B'],
+    ice: ['linear-gradient(90deg,#E0F2FE,#7DD3FC,#A5B4FC)', '#E0F2FE', '#7DD3FC'],
+    rainbow: ['linear-gradient(90deg,#FF5A6E,#FFD54A,#3DDC97,#38BDF8,#C084FC)', '#FF5A6E', '#C084FC'],
+  };
+  const prof = pid => profilesMap[pid] || {};
+  function nickVars(p) {
+    const c = p.color || '';
+    if (c.startsWith('grad:') && GRADS[c.slice(5)]) { const [g, a, b] = GRADS[c.slice(5)]; return { cls: 'c-grad', style: `--ng:${g};--n1:${a};--n2:${b};--ngl:${a}` }; }
+    if (c) return { cls: 'c-solid', style: `--nc:${c};--n1:${c};--n2:${c};--ngl:${c}` };
+    return { cls: '', style: '' };
+  }
+  function nick(pid, name, p = prof(pid)) {
+    const v = nickVars(p);
+    const fx = p.effect && p.effect !== 'none' ? ` fx-${p.effect}` : '';
+    return `<span class="nick ${v.cls}${fx}" style="${v.style}">${esc(name)}</span>`;
+  }
+  const frameCls = (pid, p = prof(pid)) => (p.frame && p.frame !== 'none' ? ` frame-${p.frame}` : '');
+  const frameVars = (pid, p = prof(pid)) => nickVars(p).style;
 
   function syncWheel() {
     const list = activeFilms();
@@ -528,8 +555,8 @@ function initRoom(roomId) {
         <div class="group-head" data-group="${esc(g.pid)}" role="button" tabindex="0" aria-expanded="${!closed}" title="${closed ? 'Развернуть' : 'Свернуть'}">
           <svg class="g-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           <span class="g-person" data-person="${esc(g.pid)}" data-name="${esc(g.name)}" title="Профиль">
-            ${ava ? `<img src="${esc(ava)}" alt="">` : `<span class="g-ava" style="background:hsl(${hue(g.name)} 55% 42%)">${initial(g.name)}</span>`}
-            <b>${esc(g.name)}${g.pid === myPid() ? ' <span class="m">(вы)</span>' : ''}</b>
+            ${ava ? `<img class="${frameCls(g.pid)}" style="${frameVars(g.pid)}" src="${esc(ava)}" alt="">` : `<span class="g-ava${frameCls(g.pid)}" style="background:hsl(${hue(g.name)} 55% 42%);${frameVars(g.pid)}">${initial(g.name)}</span>`}
+            <b>${nick(g.pid, g.name)}${g.pid === myPid() ? ' <span class="m">(вы)</span>' : ''}</b>
           </span>
           <span class="g-count">${g.films.length}</span>
           <em>${gShare ? `${(gShare * 100).toFixed(gShare < 0.1 ? 1 : 0)}%` : '—'}</em>
@@ -706,7 +733,7 @@ function initRoom(roomId) {
     const perfs = state.perfs || [];
     $('#kEmpty').hidden = Boolean(m);
     $('#kLabel').textContent = m ? 'Сейчас поёт' : 'Сцена свободна';
-    $('#kSinger').textContent = m ? (m.singer || m.by) : '';
+    $('#kSinger').innerHTML = m ? nick(m.singerPid || '', m.singer || m.by) : '';
     $('#kSong').textContent = m ? m.title : '';
     $('#kToggle').disabled = $('#kNext').disabled = !m;
     $('#kToggle').innerHTML = !m || m.pausedAt != null
@@ -746,13 +773,81 @@ function initRoom(roomId) {
       const sc = Object.values(p.ratings || {}).map(r => r.score);
       if (!sc.length) continue;
       const k = p.singer;
-      const e = by.get(k) || { name: k, sum: 0, n: 0, songs: 0 };
+      const e = by.get(k) || { name: k, pid: p.singerPid || '', sum: 0, n: 0, songs: 0 };
       e.sum += sc.reduce((a, b) => a + b, 0) / sc.length; e.n++; e.songs++;
       by.set(k, e);
     }
     const top = [...by.values()].map(e => ({ ...e, avg: e.sum / e.n })).sort((a, b) => b.avg - a.avg).slice(0, 5);
-    $('#kBoard').innerHTML = top.length ? `<span class="label">Звёзды вечера</span>` + top.map((e, i) => `<div class="k-star"><i>${i + 1}</i><b>${esc(e.name)}</b><span>${e.songs} ${plural(e.songs, 'песня', 'песни', 'песен')}</span><em>${e.avg.toFixed(1).replace('.', ',')}</em></div>`).join('') : '';
+    renderHits();
+    $('#kBoard').innerHTML = top.length ? `<span class="label">Звёзды вечера</span>` + top.map((e, i) => `<div class="k-star"><i>${i + 1}</i><b>${nick(e.pid, e.name)}</b><span>${e.songs} ${plural(e.songs, 'песня', 'песни', 'песен')}</span><em>${e.avg.toFixed(1).replace('.', ',')}</em></div>`).join('') : '';
   }
+  // ---- реакции: всплывают у всех над сценой ----
+  const RX = { clap: '👏', fire: '🔥', laugh: '😂', love: '😍', wow: '😮', skull: '💀', party: '🎉' };
+  function spawnReaction(kind, pid, name) {
+    const layer = $('#reactLayer');
+    if (!layer || !RX[kind] || layer.childElementCount > 40) return;
+    const el = document.createElement('div');
+    el.className = 'rx';
+    el.style.left = `${8 + Math.random() * 84}%`;
+    el.style.setProperty('--dx', `${Math.round(Math.random() * 90 - 45)}px`);
+    el.style.setProperty('--rot', `${Math.round(Math.random() * 36 - 18)}deg`);
+    el.style.animationDuration = `${(2.4 + Math.random() * 0.9).toFixed(2)}s`;
+    el.innerHTML = `<span class="rx-e">${RX[kind]}</span><span class="rx-n">${nick(pid || '', name || '')}</span>`;
+    layer.append(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+  $('#reactBar').addEventListener('click', e => {
+    const b = e.target.closest('[data-rx]');
+    if (!b) return;
+    b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+    api(`/rooms/${roomId}/react`, { method: 'POST', body: { kind: b.dataset.rx, cid: me.cid, by: me.name } }).catch(() => {});
+  });
+
+  // ---- «Наши хиты»: всё, что играло в комнате ----
+  let kTab = ls.get('kTab', 'queue');
+  function setKTab(tab) {
+    kTab = tab; ls.set('kTab', tab);
+    $$('#kTabs button').forEach(b => b.classList.toggle('on', b.dataset.ktab === tab));
+    $('#kQueue').hidden = tab !== 'queue';
+    $('#kHits').hidden = tab !== 'hits';
+    $('#kBoard').hidden = tab !== 'stars';
+    requestAnimationFrame(() => placeSeg($('#kTabs')));
+  }
+  $('#kTabs').addEventListener('click', e => { const b = e.target.closest('[data-ktab]'); if (b) setKTab(b.dataset.ktab); });
+  setKTab(kTab);
+  function renderHits() {
+    const q = $('#kHitsQ').value.trim().toLowerCase();
+    const perfs = state.perfs || [];
+    const best = vid => {
+      const sc = perfs.filter(p => p.vid === vid).map(p => Object.values(p.ratings || {}).map(r => r.score)).filter(a => a.length).map(a => a.reduce((s, v) => s + v, 0) / a.length);
+      return sc.length ? Math.max(...sc) : null;
+    };
+    const list = (state.hits || [])
+      .filter(h => !q || h.title.toLowerCase().includes(q) || (h.singers || []).join(' ').toLowerCase().includes(q))
+      .sort((a, b) => b.plays - a.plays || (b.lastAt || 0) - (a.lastAt || 0));
+    $('#kHitsList').innerHTML = list.length ? list.map(h => {
+      const bs = best(h.vid);
+      return `<div class="q-item hit">
+        <img src="https://i.ytimg.com/vi/${esc(h.vid)}/default.jpg" alt="">
+        <div><b title="${esc(h.title)}">${esc(h.title)}</b><span>${h.plays} ${plural(h.plays, 'раз', 'раза', 'раз')}${bs !== null ? `, лучший балл ${bs.toFixed(1).replace('.', ',')}` : ''}${h.singers?.length ? `, ${esc(h.singers.join(', '))}` : ''}</span></div>
+        <button type="button" class="nav-icon" data-hadd="${esc(h.vid)}" title="В очередь, поёте вы"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        ${isRoomOwner() ? `<button type="button" class="nav-icon" data-hrm="${esc(h.vid)}" title="Убрать из хитов"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>` : ''}
+      </div>`;
+    }).join('') : `<p class="note">${q ? 'Ничего не нашлось.' : 'Здесь соберутся все песни, которые играли в комнате.'}</p>`;
+  }
+  $('#kHitsQ').addEventListener('input', renderHits);
+  $('#kHitsList').addEventListener('click', async e => {
+    const add = e.target.closest('[data-hadd]'), rm = e.target.closest('[data-hrm]');
+    try {
+      if (add) {
+        const r = await api(`/rooms/${roomId}/music`, { method: 'POST', body: { url: add.dataset.hadd, by: me.name, cid: me.cid } });
+        Sfx.unlock();
+        toast(r.queued ? 'Песня в очереди' : 'Поехали!');
+      }
+      if (rm) await api(`/rooms/${roomId}/music/hits/remove`, { method: 'POST', body: { vid: rm.dataset.hrm, cid: me.cid } });
+    } catch (err) { toast(err.message, true); }
+  });
+
   // ---- текст песни: строки по таймингам, текущая заливается по мере пения ----
   let lyrKey = '', lyrIdx = -1, lyrLines = null, lyrSearching = false;
   function renderLyrics(m) {
@@ -956,10 +1051,36 @@ function initRoom(roomId) {
   });
 
   // ---- мини-профиль: считается из данных комнаты ----
+  // ---- бейджи: зарабатываются сами по данным комнаты ----
+  const BADGES = [
+    { id: 'critic', name: 'Кинокритик', need: 'оценить 5 фильмов', icon: '<path d="M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.4 6.8 19.2l1-5.9L3.5 9.2l5.9-.8z"/>', test: x => x.ratedGiven >= 5, prog: x => `${Math.min(5, x.ratedGiven)}/5` },
+    { id: 'hitmaker', name: 'Хитмейкер', need: 'чтобы его фильмы выбрали 3 раза', icon: '<path d="M4 7h16v12H4z"/><path d="M8 3l4 4 4-4"/>', test: x => x.wins >= 3, prog: x => `${Math.min(3, x.wins)}/3` },
+    { id: 'taste', name: 'Тонкий вкус', need: 'средняя оценка его фильмов от 8 (минимум 2 фильма)', icon: '<path d="M8 3h8l-1 7a3 3 0 0 1-6 0zM12 13v6M8 21h8"/>', test: x => x.avgOfHis >= 8 && x.ratedN >= 2, prog: x => (x.avgOfHis ? x.avgOfHis.toFixed(1).replace('.', ',') : '—') },
+    { id: 'collector', name: 'Коллекционер', need: 'добавить 20 фильмов', icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>', test: x => x.added >= 20, prog: x => `${Math.min(20, x.added)}/20` },
+    { id: 'singer', name: 'Меломан', need: 'спеть 5 песен', icon: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>', test: x => x.perfs >= 5, prog: x => `${Math.min(5, x.perfs)}/5` },
+    { id: 'star', name: 'Звезда сцены', need: 'средний балл выступлений от 8 (минимум 2)', icon: '<rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0M12 17v4M8.5 21h7"/>', test: x => x.perfAvg >= 8 && x.perfRated >= 2, prog: x => (x.perfAvg ? x.perfAvg.toFixed(1).replace('.', ',') : '—') },
+    { id: 'soul', name: 'Душа компании', need: 'отправить 50 реакций', icon: '<path d="M12 20.5s-7.5-4.6-7.5-10.3A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3Z"/>', test: x => x.reacts >= 50, prog: x => `${Math.min(50, x.reacts)}/50` },
+  ];
+
+  const PROFILE_COLORS = ['', '#FF5A6E', '#FF9F45', '#FFD54A', '#3DDC97', '#38BDF8', '#7C6BFF', '#C084FC', '#F472B6', 'grad:sunset', 'grad:neon', 'grad:gold', 'grad:ice', 'grad:rainbow'];
+  const PROFILE_EFFECTS = [['none', 'Без эффекта'], ['glow', 'Свечение'], ['shimmer', 'Перелив'], ['pulse', 'Пульс'], ['glitch', 'Глитч']];
+  const PROFILE_FRAMES = [['none', 'Без рамки'], ['accent', 'Акцент'], ['neon', 'Неон'], ['gold', 'Золото'], ['rainbow', 'Радуга']];
+  const PROFILE_BANNERS = [['none', 'Без фона'], ['aurora', 'Сияние'], ['sunset', 'Закат'], ['ocean', 'Океан'], ['ember', 'Угли'], ['night', 'Ночь']];
+  let profDraft = null, profEditing = false;
+
   function openProfile(pid, name) {
     if (!state) return;
-    const online = people.find(p => p.pid === pid);
-    const avatar = online?.avatar || state.films.flatMap(f => f.votes || []).find(v => v.id === pid && v.avatar)?.avatar || (account.user && pid === myPid() ? account.user.avatar : '');
+    profEditing = false;
+    profDraft = { ...{ color: '', effect: 'none', frame: 'none', banner: 'none', status: '' }, ...prof(pid) };
+    renderProfile(pid, name);
+    openModal('#profileModal');
+  }
+
+  function renderProfile(pid, name) {
+    const mine = pid === myPid();
+    const p = mine && profEditing ? profDraft : prof(pid);
+    const online = people.find(x => x.pid === pid);
+    const avatar = online?.avatar || state.films.flatMap(f => f.votes || []).find(v => v.id === pid && v.avatar)?.avatar || (account.user && mine ? account.user.avatar : '');
     const added = state.films.filter(f => isBy(f, pid, name));
     const wins = state.history.filter(h => isBy(h.film, pid, name)).map(h => h.film);
     const voted = state.films.filter(f => (f.votes || []).some(v => v.id === pid));
@@ -974,28 +1095,81 @@ function initRoom(roomId) {
     const rated = state.history.filter(h => isBy(h.film, pid, name)).map(avgRating).filter(a => a !== null);
     const avgOfHis = rated.length ? rated.reduce((a, b) => a + b, 0) / rated.length : null;
     const modNow = state.modifier && state.modifier.pid === pid && state.modifier.factor !== 1 ? state.modifier : null;
+    const myPerfs = (state.perfs || []).filter(x => (x.singerPid ? x.singerPid === pid : x.singer === name));
+    const perfScores = myPerfs.map(x => Object.values(x.ratings || {}).map(r => r.score)).filter(a => a.length).map(a => a.reduce((s, v) => s + v, 0) / a.length);
+    const stats = {
+      ratedGiven: state.history.filter(h => h.ratings?.[pid]).length, wins: wins.length, avgOfHis, ratedN: rated.length,
+      added: added.length, perfs: myPerfs.length, perfRated: perfScores.length,
+      perfAvg: perfScores.length ? perfScores.reduce((a, b) => a + b, 0) / perfScores.length : 0, reacts: state.reacts?.[pid] || 0,
+    };
+    const earned = BADGES.filter(b => b.test(stats));
+    const locked = BADGES.filter(b => !b.test(stats));
+    const badge = (b, on) => `<span class="badge${on ? ' on' : ''}" title="${on ? b.name : `Ещё не получен: нужно ${b.need}. Сейчас ${b.prog(stats)}`}"><svg viewBox="0 0 24 24">${b.icon}</svg><b>${b.name}</b>${on ? '' : `<em>${b.prog(stats)}</em>`}</span>`;
     const row = list => `<div class="poster-row">${list.slice(0, 8).map(f => `<i title="${esc(f.title)}" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</i>`).join('')}${list.length > 8 ? `<span>+${list.length - 8}</span>` : ''}</div>`;
     const sec = (title, list) => (list.length ? `<div class="profile-sec"><h3>${title}</h3>${row(list)}</div>` : '');
+    const card = $('#profileModal .profile-card');
+    card.className = 'modal-card profile-card' + (p.banner && p.banner !== 'none' ? ` bn-${p.banner}` : '');
+
+    const editor = mine && profEditing ? `
+      <div class="pe">
+        <div class="pe-row"><span class="label">Цвет ника</span><div class="pe-swatches">${PROFILE_COLORS.map(c => `<button type="button" class="sw${(p.color || '') === c ? ' on' : ''}" data-pc="${c}" title="${c ? (c.startsWith('grad:') ? 'Градиент' : c) : 'Обычный'}" style="background:${c ? (c.startsWith('grad:') ? GRADS[c.slice(5)][0] : c) : 'var(--s3)'}">${c ? '' : '×'}</button>`).join('')}</div></div>
+        <div class="pe-row"><span class="label">Эффект ника</span><div class="chips">${PROFILE_EFFECTS.map(([k, t]) => `<button type="button" class="chip${p.effect === k ? ' on' : ''}" data-pe="${k}">${t}</button>`).join('')}</div></div>
+        <div class="pe-row"><span class="label">Рамка аватара</span><div class="chips">${PROFILE_FRAMES.map(([k, t]) => `<button type="button" class="chip${p.frame === k ? ' on' : ''}" data-pf="${k}">${t}</button>`).join('')}</div></div>
+        <div class="pe-row"><span class="label">Фон профиля</span><div class="chips">${PROFILE_BANNERS.map(([k, t]) => `<button type="button" class="chip${p.banner === k ? ' on' : ''}" data-pb="${k}">${t}</button>`).join('')}</div></div>
+        <label class="field"><span class="label">Статус</span><input id="peStatus" maxlength="60" placeholder="Например: сегодня пою Земфиру" value="${esc(p.status || '')}"></label>
+        <div class="pe-actions"><button type="button" class="btn btn-primary" data-psave>Сохранить</button><button type="button" class="btn btn-ghost" data-pcancel>Отмена</button></div>
+      </div>` : '';
+
     $('#profileBody').innerHTML = `
       <div class="profile-head">
-        ${avatar ? `<img src="${esc(avatar)}" alt="">` : `<span class="profile-ava" style="background:hsl(${hue(name)} 55% 42%)">${initial(name)}</span>`}
-        <div>
-          <h2>${esc(name)}</h2>
-          <div class="profile-tags"><span>${pid.startsWith('d') ? 'Discord' : 'Гость'}</span>${online ? '<span class="online">в комнате</span>' : ''}${pid === myPid() ? '<span>это вы</span>' : ''}${modNow ? `<span class="${modNow.factor < 1 ? 'down' : 'up'}">${fmtFactor(modNow.factor)} на этот выбор</span>` : ''}</div>
+        ${avatar ? `<img class="${frameCls(pid, p)}" style="${frameVars(pid, p)}" src="${esc(avatar)}" alt="">` : `<span class="profile-ava${frameCls(pid, p)}" style="background:hsl(${hue(name)} 55% 42%);${frameVars(pid, p)}">${initial(name)}</span>`}
+        <div class="profile-id">
+          <h2>${nick(pid, name, p)}</h2>
+          ${p.status ? `<p class="profile-status">${esc(p.status)}</p>` : ''}
+          <div class="profile-tags"><span>${pid.startsWith('d') ? 'Discord' : 'Гость'}</span>${online ? '<span class="online">в комнате</span>' : ''}${mine ? '<span>это вы</span>' : ''}${modNow ? `<span class="${modNow.factor < 1 ? 'down' : 'up'}">${fmtFactor(modNow.factor)} на этот выбор</span>` : ''}</div>
         </div>
+        ${mine && !profEditing ? '<button type="button" class="btn btn-ghost pe-open" data-pedit>Оформить</button>' : ''}
       </div>
+      ${editor}
       <div class="profile-stats">
         <div><b>${added.length}</b><span>${plural(added.length, 'фильм', 'фильма', 'фильмов')} в колесе</span></div>
         <div><b>${wins.length}</b><span>${plural(wins.length, 'раз выбрали', 'раза выбрали', 'раз выбрали')} его фильм</span></div>
         <div><b>${avgOfHis !== null ? avgOfHis.toFixed(1).replace('.', ',') : '—'}</b><span>средняя оценка его фильмов</span></div>
       </div>
+      <div class="profile-sec"><h3>Бейджи <span class="m">${earned.length} из ${BADGES.length}</span></h3><div class="badges">${earned.map(b => badge(b, true)).join('')}${locked.map(b => badge(b, false)).join('')}</div></div>
       ${genres.length ? `<div class="profile-sec"><h3>Любимые жанры</h3><div class="chips">${genres.map(g => `<span class="chip on-static">${esc(g)}</span>`).join('')}</div></div>` : ''}
       ${sec(`Хочет посмотреть (${voted.length} из ${rules().votes} голосов)`, voted)}
       ${sec('Выбирали его фильмы', wins)}
-      ${sec('Добавил(а) в колесо', added)}
-      ${!added.length && !wins.length && !voted.length ? '<p class="note">Пока ничего не добавил и не голосовал.</p>' : ''}`;
-    openModal('#profileModal');
+      ${sec('Добавил(а) в колесо', added)}`;
+    $('#profileBody').dataset.pid = pid;
+    $('#profileBody').dataset.name = name;
   }
+
+  $('#profileBody').addEventListener('click', async e => {
+    const body = $('#profileBody');
+    const pid = body.dataset.pid, name = body.dataset.name;
+    const t = e.target.closest('button');
+    if (!t) return;
+    if (t.matches('[data-pedit]')) { profEditing = true; return renderProfile(pid, name); }
+    if (t.matches('[data-pcancel]')) { profEditing = false; profDraft = { ...prof(pid) }; return renderProfile(pid, name); }
+    const st = $('#peStatus');
+    if (st) profDraft.status = st.value;
+    if (t.dataset.pc !== undefined) profDraft.color = t.dataset.pc;
+    else if (t.dataset.pe) profDraft.effect = t.dataset.pe;
+    else if (t.dataset.pf) profDraft.frame = t.dataset.pf;
+    else if (t.dataset.pb) profDraft.banner = t.dataset.pb;
+    else if (t.matches('[data-psave]')) {
+      try {
+        await api('/profile', { method: 'POST', body: { ...profDraft, cid: me.cid } });
+        profilesMap[pid] = { ...profDraft };
+        profEditing = false;
+        toast('Профиль обновлён');
+        render();
+      } catch (err) { return toast(err.message, true); }
+    } else return;
+    renderProfile(pid, name);
+  });
+
   document.addEventListener('click', e => {
     const t = e.target.closest('[data-person]');
     if (!t || !t.dataset.person) return;
@@ -1080,7 +1254,7 @@ function initRoom(roomId) {
     people = list;
     if (state?.duel) renderDuel(state.duel);
     const people_ = list;
-    $('#people').innerHTML = people_.slice(0, 6).map(p => `<span class="ava" style="background:hsl(${hue(p.name)} 55% 42%)" data-tip="${esc(p.name)}" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
+    $('#people').innerHTML = people_.slice(0, 6).map(p => `<span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}" data-tip="${esc(p.name)}" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
       + (people_.length > 6 ? `<span class="ava" style="background:#333">+${people_.length - 6}</span>` : '');
   }
 

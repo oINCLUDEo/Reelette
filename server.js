@@ -17,6 +17,37 @@ const PROVIDER = (process.env.MOVIE_PROVIDER || (KP_KEY ? 'kinopoisk' : TMDB_KEY
 
 // Docker env_file не снимает кавычки и пробелы, чистим сами
 const envClean = k => (process.env[k] || '').trim().replace(/^["']|["']$/g, '').trim();
+// ---------- оформление профилей: общее для всех комнат, data/profiles.json ----------
+const PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
+let profiles = {};
+try { profiles = JSON.parse(fs.readFileSync(PROFILES_FILE, 'utf8')); } catch { profiles = {}; }
+let profilesTimer = null;
+function saveProfiles() {
+  clearTimeout(profilesTimer);
+  profilesTimer = setTimeout(() => {
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(PROFILES_FILE + '.tmp', JSON.stringify(profiles));
+      fs.renameSync(PROFILES_FILE + '.tmp', PROFILES_FILE);
+    } catch (e) { console.error(`Не удалось сохранить ${PROFILES_FILE}: ${e.message}`); }
+  }, 300);
+}
+const PROFILE_GRADS = ['sunset', 'neon', 'gold', 'ice', 'rainbow'];
+const PROFILE_EFFECTS = ['none', 'glow', 'shimmer', 'pulse', 'glitch'];
+const PROFILE_FRAMES = ['none', 'accent', 'neon', 'gold', 'rainbow'];
+const PROFILE_BANNERS = ['none', 'aurora', 'sunset', 'ocean', 'ember', 'night'];
+function cleanProfile(b) {
+  const c = String(b.color || '');
+  return {
+    color: /^#[0-9a-f]{6}$/i.test(c) || (c.startsWith('grad:') && PROFILE_GRADS.includes(c.slice(5))) ? c : '',
+    effect: PROFILE_EFFECTS.includes(b.effect) ? b.effect : 'none',
+    frame: PROFILE_FRAMES.includes(b.frame) ? b.frame : 'none',
+    banner: PROFILE_BANNERS.includes(b.banner) ? b.banner : 'none',
+    status: typeof b.status === 'string' ? b.status.trim().slice(0, 60) : '',
+  };
+}
+const REACTIONS = ['clap', 'fire', 'laugh', 'love', 'wow', 'skull', 'party'];
+
 const auth = require('./auth')({
   dataDir: DATA_DIR,
   clientId: envClean('DISCORD_CLIENT_ID'),
@@ -81,6 +112,7 @@ function publicState(r) {
     rules: { votes: VOTES_PER_PERSON, points: VOTE_POINTS, cap: VOTE_CAP },
     fair: r.fair !== false, modifier: activeModifier(r), music: r.music || null, queue: r.queue || [],
     karaoke: Boolean(r.karaoke), perfs: (r.perfs || []).slice(0, 40),
+    hits: r.hits || [], reacts: r.reacts || {}, profiles,
   };
 }
 
@@ -462,6 +494,15 @@ function playTrack(r, track) {
     r.perfs = r.perfs.slice(0, 60);
     r.music.perfId = perf.perfId;
   }
+  // «Наши хиты»: что играло в комнате, сколько раз и кто пел
+  r.hits ||= [];
+  let hit = r.hits.find(x => x.vid === track.vid);
+  if (!hit) { hit = { vid: track.vid, title: track.title, author: track.author || '', plays: 0, singers: [] }; r.hits.unshift(hit); }
+  hit.plays++;
+  hit.lastAt = Date.now();
+  const singer = track.singer || track.by;
+  if (singer && !hit.singers.includes(singer)) hit.singers = [...hit.singers, singer].slice(-6);
+  r.hits = r.hits.slice(0, 200);
   if (r.karaoke) loadLyrics(r);
   scheduleMusic(r);
 }
@@ -682,6 +723,16 @@ async function api(req, res, url) {
 
   if (parts[0] === 'config') return json(res, 200, { provider: PROVIDER === 'none' || (!KP_KEY && !TMDB_KEY) ? 'none' : PROVIDER });
 
+  if (parts[0] === 'profile' && m === 'POST') {
+    const b = await readBody(req);
+    const pid = personKey(me, b);
+    if (!pid) return json(res, 400, { error: 'Не понятно, чей профиль' });
+    profiles[pid] = { ...cleanProfile(b), at: Date.now() };
+    saveProfiles();
+    for (const set of clients.values()) for (const c of set) send(c.res, { type: 'profiles', profiles });
+    return json(res, 200, { ok: true });
+  }
+
   if (parts[0] === 'search' && m === 'GET') {
     const q = str(url.searchParams.get('q'), 100);
     if (q.length < 2) return json(res, 200, { results: [] });
@@ -787,6 +838,25 @@ async function api(req, res, url) {
 
   // ---- общая музыка из YouTube: у всех один трек и одна позиция, общая очередь ----
   // startedAt — момент, когда трек был на нуле; pausedAt — позиция в секундах, если на паузе.
+  // реакции: летят у всех, не хранятся; у каждого лимит, считаем для бейджа
+  if (sub === 'react' && m === 'POST') {
+    const kind = str(b.kind, 12);
+    if (!REACTIONS.includes(kind)) return json(res, 400, { error: 'Нет такой реакции' });
+    const pid = personKey(me, b) || 'anon';
+    const rt = runtime(r);
+    rt.rx ||= new Map();
+    const now = Date.now();
+    const recent = (rt.rx.get(pid) || []).filter(t => now - t < 2500);
+    if (recent.length >= 6) return json(res, 429, { error: 'Слишком часто' });
+    recent.push(now);
+    rt.rx.set(pid, recent);
+    r.reacts ||= {};
+    r.reacts[pid] = (r.reacts[pid] || 0) + 1;
+    save();
+    broadcast(r.id, { type: 'react', kind, name: who, pid });
+    return json(res, 200, { ok: true });
+  }
+
   // оценка выступления в караоке, себя оценить нельзя
   if (sub === 'karaoke' && parts[3] === 'rate' && m === 'POST') {
     const perf = (r.perfs || []).find(p => p.perfId === str(b.perfId, 12));
@@ -830,6 +900,11 @@ async function api(req, res, url) {
         const list = await lrcSearch(q);
         return json(res, 200, { results: list.slice(0, 8).map(x => ({ id: x.id, track: x.trackName, artist: x.artistName, duration: Math.round(x.duration || 0), synced: Boolean(x.syncedLyrics) })) });
       } catch (e) { return json(res, 502, { error: 'База текстов не ответила' }); }
+    }
+    if (action === 'hits' && parts[4] === 'remove') {
+      if (!isOwner(r, me, b)) return json(res, 403, { error: 'Убирать из хитов может создатель комнаты' });
+      r.hits = (r.hits || []).filter(h => h.vid !== str(b.vid, 11));
+      pushState(r); return json(res, 200, { ok: true });
     }
     if (!r.music) return json(res, 409, { error: 'Музыка не играет' });
     if (action === 'lyrics' && parts[4] === 'set') {
