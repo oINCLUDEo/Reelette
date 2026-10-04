@@ -49,7 +49,11 @@ module.exports = function createAuth({ dataDir, clientId, clientSecret, publicUr
 
   async function discordJson(url, opts) {
     const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`${url.split('/').pop()} HTTP ${res.status}`);
+    if (!res.ok) {
+      // Discord объясняет причину в теле ответа, например {"error":"invalid_client"}
+      const body = (await res.text().catch(() => '')).slice(0, 200);
+      throw new Error(`${url.split('/').pop()} HTTP ${res.status} ${body}`);
+    }
     return res.json();
   }
 

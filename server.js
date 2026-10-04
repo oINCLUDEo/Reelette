@@ -15,11 +15,13 @@ const KP_KEY = process.env.KINOPOISK_API_KEY || '';
 const TMDB_KEY = process.env.TMDB_API_KEY || '';
 const PROVIDER = (process.env.MOVIE_PROVIDER || (KP_KEY ? 'kinopoisk' : TMDB_KEY ? 'tmdb' : 'none')).toLowerCase();
 
+// Docker env_file не снимает кавычки и пробелы, чистим сами
+const envClean = k => (process.env[k] || '').trim().replace(/^["']|["']$/g, '').trim();
 const auth = require('./auth')({
   dataDir: DATA_DIR,
-  clientId: process.env.DISCORD_CLIENT_ID,
-  clientSecret: process.env.DISCORD_CLIENT_SECRET,
-  publicUrl: process.env.PUBLIC_URL,
+  clientId: envClean('DISCORD_CLIENT_ID'),
+  clientSecret: envClean('DISCORD_CLIENT_SECRET'),
+  publicUrl: envClean('PUBLIC_URL'),
 });
 
 const MAX_FILMS = 200;

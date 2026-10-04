@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Icon</title>
+<style>
+  html, body { margin: 0; background: #000; }
+  svg { display: block; width: 1024px; height: 1024px; }
+</style>
+</head>
+<body>
+<svg id="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"></svg>
+<script>
+// Иконка приложения для Discord. Варианты: ?v=wheel | reel | halo. Discord обрезает иконку по кругу, всё важное внутри r≈430.
+const v = new URLSearchParams(location.search).get('v') || 'wheel';
+const C = 512;
+const P = (r, deg) => { const a = (deg - 90) * Math.PI / 180; return [C + r * Math.cos(a), C + r * Math.sin(a)]; };
+function wedges(r, n, fillA, fillB, gap = 0) {
+  let out = '';
+  for (let i = 0; i < n; i++) {
+    const a0 = i * 360 / n + gap / 2, a1 = (i + 1) * 360 / n - gap / 2;
+    const [x0, y0] = P(r, a0), [x1, y1] = P(r, a1);
+    out += `<path d="M${C} ${C}L${x0} ${y0}A${r} ${r} 0 0 1 ${x1} ${y1}Z" fill="${i % 2 ? fillB : fillA}"/>`;
+  }
+  return out;
+}
+const pointer = (y, s, fill) => `<path transform="translate(${C} ${y}) scale(${s})" d="M0 52-17 16A20 20 0 1 1 17 16Z" fill="${fill}" stroke="#0C0B12" stroke-width="4"/>`;
+const grain = `<filter id="g"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="3" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0"/></filter><rect width="1024" height="1024" filter="url(#g)" style="mix-blend-mode:overlay"/>`;
+
+const defs = `<defs>
+  <radialGradient id="bgV" cx="50%" cy="38%" r="75%"><stop offset="0" stop-color="#9A8CFF"/><stop offset=".45" stop-color="#5B46E0"/><stop offset="1" stop-color="#140F33"/></radialGradient>
+  <radialGradient id="bgD" cx="50%" cy="50%" r="70%"><stop offset="0" stop-color="#1B1640"/><stop offset="1" stop-color="#07060C"/></radialGradient>
+  <radialGradient id="glow"><stop offset=".55" stop-color="#7C6BFF" stop-opacity="0"/><stop offset=".72" stop-color="#B8ADFF" stop-opacity=".9"/><stop offset=".8" stop-color="#7C6BFF" stop-opacity=".35"/><stop offset="1" stop-color="#7C6BFF" stop-opacity="0"/></radialGradient>
+  <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="18"/></filter>
+  <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000" flood-opacity=".45"/></filter>
+</defs>`;
+
+let body = '';
+if (v === 'wheel') {
+  // белое колесо со стрелкой на фиолетовом
+  body = `<rect width="1024" height="1024" fill="url(#bgV)"/>
+  <circle cx="${C}" cy="${C}" r="330" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="40" filter="url(#soft)"/>
+  <g filter="url(#shadow)">
+    <circle cx="${C}" cy="${C}" r="300" fill="#fff"/>
+    ${wedges(270, 8, '#FFFFFF', '#CFC7FF')}
+    <circle cx="${C}" cy="${C}" r="270" fill="none" stroke="#0C0B12" stroke-opacity=".12" stroke-width="4"/>
+    <circle cx="${C}" cy="${C}" r="82" fill="#0C0B12"/>
+    <circle cx="${C}" cy="${C}" r="28" fill="#fff"/>
+  </g>
+  ${pointer(178, 2.6, '#0C0B12')}`;
+} else if (v === 'reel') {
+  // бобина, как логотип на сайте
+  body = `<rect width="1024" height="1024" fill="url(#bgV)"/>
+  <g filter="url(#shadow)" transform="translate(${C - 320} ${C - 320}) scale(20)">
+    <path fill="#fff" fill-rule="evenodd" d="M16 1a15 15 0 1 1 0 30 15 15 0 0 1 0-30Zm0 3.2a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm0 16.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM7.8 12.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm16.4 0a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM16 14.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6Z"/>
+  </g>`;
+} else {
+  // тёмный фон и светящееся кольцо, как фон колеса на сайте
+  let dots = '';
+  for (let i = 0; i < 24; i++) { const [x, y] = P(318, i * 15); dots += `<circle cx="${x}" cy="${y}" r="9" fill="#fff" fill-opacity="${i % 2 ? .3 : 1}"/>`; }
+  body = `<rect width="1024" height="1024" fill="url(#bgD)"/>
+  <circle cx="${C}" cy="${C}" r="470" fill="url(#glow)"/>
+  <circle cx="${C}" cy="${C}" r="345" fill="#14122A" stroke="#2B2A38" stroke-width="6"/>
+  ${dots}
+  ${wedges(290, 8, '#7C6BFF', '#2A2550')}
+  <circle cx="${C}" cy="${C}" r="290" fill="none" stroke="#000" stroke-opacity=".4" stroke-width="8"/>
+  <circle cx="${C}" cy="${C}" r="86" fill="#fff"/>
+  <circle cx="${C}" cy="${C}" r="30" fill="#7C6BFF"/>
+  ${pointer(150, 2.5, '#fff')}`;
+}
+document.getElementById('icon').innerHTML = defs + body + grain;
+</script>
+</body>
+</html>
