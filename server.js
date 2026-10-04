@@ -767,6 +767,7 @@ async function api(req, res, url) {
       pushState(r); return json(res, 200, { ok: true });
     }
     if (m === 'DELETE') {
+      if (!isOwner(r, me, b) && personOf(f) !== personKey(me, b)) return json(res, 403, { error: 'Удалять чужие фильмы может только создатель комнаты' });
       r.films = r.films.filter(x => x !== f);
       r.eliminated = r.eliminated.filter(x => x !== f.id);
       if (r.plan?.winner === f.id) r.plan = null;
@@ -788,6 +789,7 @@ async function api(req, res, url) {
   }
 
   if (sub === 'clear' && m === 'POST') {
+    if (!isOwner(r, me, b)) return json(res, 403, { error: 'Это может только создатель комнаты' });
     if (b.what === 'history') r.history = [];
     else { r.films = []; r.eliminated = []; r.plan = null; }
     pushState(r); return json(res, 200, { ok: true });

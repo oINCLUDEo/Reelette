@@ -225,13 +225,11 @@ function initRoom(roomId) {
   // музыка прокрута подстраивает темп под скорость колеса; свой трек на это время приглушается
   function musicOn() {
     window.setBackdropActive?.(true);
-    Sfx.bgm.duck(true);
     ytDuck(true);
     if (settings.music) Sfx.spinStart(() => wheel.speed || 0);
   }
   function musicOff() {
     window.setBackdropActive?.(false);
-    Sfx.bgm.duck(false);
     ytDuck(false);
     Sfx.spinStop();
   }
@@ -304,6 +302,9 @@ function initRoom(roomId) {
   const myPid = () => (account.user ? 'd' + account.user.id : 'g' + me.cid);
   const myVotesUsed = () => state.films.reduce((n, f) => n + (f.votes || []).filter(v => v.id === myPid()).length, 0);
   const iVoted = f => (f.votes || []).some(v => v.id === myPid());
+  const isRoomOwner = () => Boolean(state?.owner) && state.owner === myPid();
+  // удалить фильм может создатель комнаты или тот, кто фильм добавил
+  const canDelete = f => isRoomOwner() || personOf(f) === myPid();
   async function voteFilm(id) {
     try { await api(`/rooms/${roomId}/films/${id}/vote`, { method: 'POST', body: { cid: me.cid, by: me.name } }); }
     catch (e) { toast(e.message, true); }
@@ -430,7 +431,7 @@ function initRoom(roomId) {
           ${kind === 'win' ? `<div class="detail-actions">
             ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Открыть страницу фильма</a>` : ''}
             ${trailerBtn(f)}
-            ${state.films.some(x => x.id === f.id) ? `<button class="btn btn-ghost" data-remove="${esc(f.id)}">Убрать из колеса</button>` : ''}
+            ${state.films.some(x => x.id === f.id) && canDelete(f) ? `<button class="btn btn-ghost" data-remove="${esc(f.id)}">Убрать из колеса</button>` : ''}
           </div>` : ''}
         </div>
       </div>`;
@@ -477,12 +478,23 @@ function initRoom(roomId) {
 
     $('#filmCount').textContent = state.films.length ? String(state.films.length) : '';
     $('#filmEmpty').hidden = state.films.length > 0;
-    $('#filmList').innerHTML = state.films.map(f => {
+    // группы по тем, кто добавил: сначала ваши, потом остальные по числу фильмов
+    const groups = new Map();
+    for (const f of state.films) {
+      const p = personOf(f);
+      if (!groups.has(p)) groups.set(p, { pid: p, name: f.addedBy || 'Без имени', films: [] });
+      groups.get(p).films.push(f);
+    }
+    const ordered = [...groups.values()].sort((a, b) => (b.pid === myPid()) - (a.pid === myPid()) || b.films.length - a.films.length);
+    const avatarOf = pid => people.find(p => p.pid === pid)?.avatar
+      || state.films.flatMap(f => f.votes || []).find(v => v.id === pid && v.avatar)?.avatar
+      || (account.user && pid === myPid() ? account.user.avatar : '');
+    const filmRow = f => {
       const filtered = !out.has(f.id) && !matchesFilters(f);
       const share = (W.get(f.id) || 0) / total;
       const pct = out.has(f.id) || filtered || !total ? '—' : `${(share * 100).toFixed(share < 0.1 ? 1 : 0)}%`;
       const nv = (f.votes || []).length, mine = iVoted(f);
-      const meta = filtered ? ['не подходит под фильтры'] : [f.year, f.runtime && fmtRuntime(f.runtime), f.addedBy].filter(Boolean);
+      const meta = filtered ? ['не подходит под фильтры'] : [f.year, f.runtime && fmtRuntime(f.runtime)].filter(Boolean);
       return `<div class="film${out.has(f.id) ? ' out' : ''}${filtered ? ' filtered' : ''}${wheel.curId === f.id ? ' hot' : ''}" data-id="${esc(f.id)}">
         <div class="film-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</div>
         <div class="film-main">
@@ -496,7 +508,20 @@ function initRoom(roomId) {
             ${amOwner ? `<div class="stepper"><button data-w="-1" title="Меньше">${ICON.minus}</button><b>${f.weight}</b><button data-w="1" title="Больше">${ICON.plus}</button></div>` : ''}
           </div>
         </div>
-        <button class="film-del" data-del title="Удалить">${ICON.x}</button>
+        ${canDelete(f) ? `<button class="film-del" data-del title="Удалить">${ICON.x}</button>` : ''}
+      </div>`;
+    };
+    $('#filmList').innerHTML = ordered.map(g => {
+      const gShare = total ? g.films.reduce((a, f) => a + (W.get(f.id) || 0), 0) / total : 0;
+      const ava = avatarOf(g.pid);
+      return `<div class="film-group">
+        <button class="group-head" data-person="${esc(g.pid)}" data-name="${esc(g.name)}">
+          ${ava ? `<img src="${esc(ava)}" alt="">` : `<span class="g-ava" style="background:hsl(${hue(g.name)} 55% 42%)">${initial(g.name)}</span>`}
+          <b>${esc(g.name)}${g.pid === myPid() ? ' <span class="m">(вы)</span>' : ''}</b>
+          <span class="g-count">${g.films.length}</span>
+          <em>${gShare ? `${(gShare * 100).toFixed(gShare < 0.1 ? 1 : 0)}%` : '—'}</em>
+        </button>
+        ${g.films.map(filmRow).join('')}
       </div>`;
     }).join('');
 
@@ -806,7 +831,7 @@ function initRoom(roomId) {
 
   // ---- действия с фильмами ----
   async function removeFilm(id) {
-    try { await api(`/rooms/${roomId}/films/${id}`, { method: 'DELETE' }); }
+    try { await api(`/rooms/${roomId}/films/${id}?cid=${encodeURIComponent(me.cid)}`, { method: 'DELETE' }); }
     catch (e) { toast(e.message, true); }
   }
 
@@ -851,7 +876,7 @@ function initRoom(roomId) {
           ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Страница фильма</a>` : ''}
           ${trailerBtn(f)}
           ${!fromHistory ? `<button class="btn btn-ghost${iVoted(f) ? ' on' : ''}" data-vote-detail>${ICON.heart}${iVoted(f) ? 'Снять голос' : 'Хочу посмотреть'}</button>` : ''}
-          ${!fromHistory ? `<button class="btn btn-ghost" data-rm>Удалить из колеса</button>` : ''}
+          ${!fromHistory && canDelete(f) ? `<button class="btn btn-ghost" data-rm>Удалить из колеса</button>` : ''}
         </div>
       </div></div>`;
     $('#filmDetail [data-rm]')?.addEventListener('click', async () => { await removeFilm(f.id); closeModal('#filmModal'); });
@@ -1089,31 +1114,6 @@ function initRoom(roomId) {
     if (!settings.music) Sfx.spinStop();
   });
 
-  // своя фоновая музыка
-  const bgmVol = $('#bgmVol');
-  function setBgmVol(v) {
-    bgmVol.value = v;
-    bgmVol.style.setProperty('--f', v / 100);
-    Sfx.bgm.volume(v / 100);
-    ls.set('bgmVol', v);
-  }
-  setBgmVol(ls.get('bgmVol', 40));
-  bgmVol.addEventListener('input', () => setBgmVol(Number(bgmVol.value)));
-  const PLAY = '<svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>';
-  const PAUSE = '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>';
-  const bgmUi = () => { $('#bgmPlay').innerHTML = Sfx.bgm.playing ? PAUSE : PLAY; $('#bgmPlay').title = Sfx.bgm.playing ? 'Пауза' : 'Играть'; };
-  $('#bgmPick').addEventListener('click', () => $('#bgmFile').click());
-  $('#bgmFile').addEventListener('change', async e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    $('#bgmName').textContent = file.name.replace(/\.[^.]+$/, '');
-    $('#bgmPlay').hidden = false;
-    bgmVol.hidden = false;
-    try { await Sfx.bgm.load(file); } catch { toast('Браузер не смог открыть этот файл', true); }
-    bgmUi();
-  });
-  $('#bgmPlay').addEventListener('click', () => { Sfx.bgm.toggle(); bgmUi(); });
-
   $('#soundOn').checked = settings.sound;
   $('#soundOn').addEventListener('change', e => { settings.sound = e.target.checked; ls.set('sound', settings.sound); });
 
@@ -1153,6 +1153,8 @@ function initRoom(roomId) {
       : account.discord ? `<span class="ava" style="background:hsl(${hue(me.name)} 55% 42%)">${initial(me.name)}</span><div><b>${esc(me.name)}</b><span>Гость</span></div><a class="btn btn-discord" href="${loginUrl()}"><svg class="dc"><use href="#discord"/></svg>Войти</a>` : '';
     $('#logoutBtn')?.addEventListener('click', logout);
     $('#deleteRoom').hidden = Boolean(state?.owner && state.owner !== myPid());
+    $('#clearHistory').hidden = !isRoomOwner();
+    $('#clearFilms').hidden = !isRoomOwner();
     $('#claimRoom').hidden = Boolean(state?.owner);
     $('#setHook').value = '';
     $('#hookState').textContent = state?.hasWebhook ? 'подключён' : '';
@@ -1177,7 +1179,7 @@ function initRoom(roomId) {
   });
   $('#clearHistory').addEventListener('click', async () => {
     if (!confirm('Очистить историю выпавших фильмов?')) return;
-    await api(`/rooms/${roomId}/clear`, { method: 'POST', body: { what: 'history' } }).catch(e => toast(e.message, true));
+    await api(`/rooms/${roomId}/clear`, { method: 'POST', body: { what: 'history', cid: me.cid } }).catch(e => toast(e.message, true));
   });
   $('#deleteRoom').addEventListener('click', async () => {
     if (!confirm(`Удалить комнату «${state.name}» вместе со всеми фильмами и историей? Это нельзя отменить.`)) return;
@@ -1196,7 +1198,7 @@ function initRoom(roomId) {
   });
   $('#clearFilms').addEventListener('click', async () => {
     if (!confirm('Удалить все фильмы из колеса?')) return;
-    await api(`/rooms/${roomId}/clear`, { method: 'POST', body: { what: 'films' } }).catch(e => toast(e.message, true));
+    await api(`/rooms/${roomId}/clear`, { method: 'POST', body: { what: 'films', cid: me.cid } }).catch(e => toast(e.message, true));
     closeModal('#settingsModal');
   });
 

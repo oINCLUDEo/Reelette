@@ -535,10 +535,6 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 
 /* ---------- звук ---------- */
 .sound-field { gap: 12px; }
-.bgm { display: flex; gap: 6px; }
-.bgm #bgmPick { flex: 1; min-width: 0; justify-content: flex-start; height: 42px; font-size: 13.5px; }
-.bgm #bgmPick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bgm .bgm-play { width: 42px; height: 42px; padding: 0; flex: none; }
 
 /* ---------- общая музыка из YouTube ---------- */
 .room-music { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
@@ -554,3 +550,21 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .yt-info span { color: var(--tx3); font-size: 12.5px; }
 .yt-ctrl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .yt-ctrl .btn { height: 36px; font-size: 12.5px; padding: 0 6px; }
+
+/* мини-профиль: больше воздуха */
+.profile-card { padding: 30px; gap: 26px; }
+.profile-stats { gap: 10px; }
+.profile-stats div { padding: 18px 16px; gap: 8px; }
+.profile-sec { display: flex; flex-direction: column; gap: 12px; }
+.profile-sec h3 { margin: 0; }
+.profile-sec .chips { gap: 8px; }
+.poster-row { gap: 8px; }
+
+/* список фильмов по людям */
+.film-group { margin-bottom: 10px; }
+.group-head { position: sticky; top: 0; z-index: 2; width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 2px; border-radius: 12px; background: var(--sheetB); text-align: left; transition: background .2s; }
+.group-head:hover { background: var(--s1); }
+.group-head img, .group-head .g-ava { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; font: 800 12px var(--f-ui); color: #fff; }
+.group-head b { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.group-head .g-count { font-size: 12px; font-weight: 800; color: var(--tx2); background: var(--s2); padding: 2px 8px; border-radius: 7px; }
+.group-head em { font-style: normal; font: 800 13px var(--f-ui); color: var(--acc-hi); min-width: 36px; text-align: right; }

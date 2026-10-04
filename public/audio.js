@@ -1,4 +1,4 @@
-// Звук: щелчки колеса, сигналы отсчёта, музыка прокрута (генерируется на лету) и своя фоновая музыка.
+// Звук: щелчки колеса, сигналы отсчёта и музыка прокрута (генерируется на лету).
 // Всё на Web Audio, без файлов. Браузер разрешает звук только после первого клика по странице.
 (() => {
   let ctx = null, master = null, noise = null;
@@ -126,26 +126,8 @@
     tone(t + 0.16, { freq: hz(62), type: 'triangle', peak: 0.1, decay: 0.4, glide: hz(55) });
   }
 
-  // ---- своя фоновая музыка: файл с компьютера, играет только у этого человека ----
-  const bgm = new Audio();
-  bgm.loop = true;
-  let bgmVolume = 0.4, ducked = false;
-  const applyVolume = () => { bgm.volume = bgmVolume * (ducked ? 0.3 : 1); };
-  applyVolume();
-
   window.Sfx = {
     unlock: ac, tick, beep, win, out,
     spinStart, spinStop: () => spinStop(false),
-    bgm: {
-      load(file) {
-        if (bgm.src) URL.revokeObjectURL(bgm.src);
-        bgm.src = URL.createObjectURL(file);
-        return bgm.play();
-      },
-      toggle() { if (!bgm.src) return false; if (bgm.paused) bgm.play(); else bgm.pause(); return !bgm.paused; },
-      get playing() { return Boolean(bgm.src) && !bgm.paused; },
-      volume(v) { bgmVolume = v; applyVolume(); },
-      duck(on) { ducked = on; applyVolume(); },
-    },
   };
 })();
