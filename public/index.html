@@ -59,6 +59,26 @@
   <header class="nav"><div class="bar">
     <a class="brand" href="/"><svg><use href="#logo"/></svg><span class="brand-name">Reelette</span></a>
     <button id="roomTitle" class="room-title" title="Переименовать"></button>
+    <div class="nav-music" id="navMusic">
+      <button class="ghost sm music-btn" id="musicBtn" title="Общая музыка из YouTube, её слышат все в комнате"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Музыка</span></button>
+      <div class="yt-card" id="ytCard" hidden>
+        <div class="yt-frame"><div id="ytHost"></div><button class="yt-unmute" id="ytUnmute" hidden title="Браузер ждёт клика, чтобы включить звук">Слушать</button></div>
+        <div class="yt-info"><b id="ytTitle"></b><span id="ytBy"></span></div>
+        <div class="yt-ctrl">
+          <button class="nav-icon" id="ytToggle"></button>
+          <button class="nav-icon" id="ytChange" title="Сменить трек"><svg viewBox="0 0 24 24"><path d="M17 3l4 4-4 4"/><path d="M3 11V9a2 2 0 0 1 2-2h16"/><path d="M7 21l-4-4 4-4"/><path d="M21 13v2a2 2 0 0 1-2 2H3"/></svg></button>
+          <button class="nav-icon" id="ytStop" title="Выключить у всех"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
+        </div>
+        <input type="range" id="ytVol" min="0" max="100" value="50" title="Громкость у вас" aria-label="Громкость общей музыки у вас">
+      </div>
+      <form class="yt-add" id="ytAdd" hidden>
+        <span class="label">Общая музыка <span class="m">слышат все в комнате</span></span>
+        <div class="yt-add-row">
+          <input id="ytUrl" placeholder="Ссылка на YouTube" autocomplete="off">
+          <button class="btn btn-primary" type="submit">Включить</button>
+        </div>
+      </form>
+    </div>
     <div class="act">
       <div id="people" class="people"></div>
       <button id="inviteBtn" class="ghost sm"><svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg><span>Пригласить</span></button>
@@ -172,23 +192,6 @@
         <span class="label">Звук</span>
         <label class="check"><input type="checkbox" id="soundOn" checked><span class="box"></span>Щелчки и сигналы</label>
         <label class="check"><input type="checkbox" id="musicOn"><span class="box"></span>Музыка при прокруте</label>
-        <div class="room-music">
-          <span class="label">Общая музыка <span class="m">слышат все в комнате</span></span>
-          <form class="yt-add" id="ytAdd">
-            <input id="ytUrl" placeholder="Ссылка на YouTube" autocomplete="off">
-            <button class="btn btn-ghost" type="submit">Включить</button>
-          </form>
-          <div class="yt-card" id="ytCard" hidden>
-            <div class="yt-frame"><div id="ytHost"></div><button class="yt-unmute" id="ytUnmute" hidden>Нажмите, чтобы слушать</button></div>
-            <div class="yt-info"><b id="ytTitle"></b><span id="ytBy"></span></div>
-            <div class="yt-ctrl">
-              <button class="btn btn-ghost" id="ytToggle"></button>
-              <button class="btn btn-ghost" id="ytChange">Сменить</button>
-              <button class="btn btn-ghost" id="ytStop">Выключить</button>
-            </div>
-            <input type="range" id="ytVol" min="0" max="100" value="50" aria-label="Громкость общей музыки у вас">
-          </div>
-        </div>
       </div>
 
       <div class="rate-box" id="rateBox" hidden></div>

@@ -514,14 +514,18 @@ function initRoom(roomId) {
     $('#filmList').innerHTML = ordered.map(g => {
       const gShare = total ? g.films.reduce((a, f) => a + (W.get(f.id) || 0), 0) / total : 0;
       const ava = avatarOf(g.pid);
-      return `<div class="film-group">
-        <button class="group-head" data-person="${esc(g.pid)}" data-name="${esc(g.name)}">
-          ${ava ? `<img src="${esc(ava)}" alt="">` : `<span class="g-ava" style="background:hsl(${hue(g.name)} 55% 42%)">${initial(g.name)}</span>`}
-          <b>${esc(g.name)}${g.pid === myPid() ? ' <span class="m">(вы)</span>' : ''}</b>
+      const closed = collapsed.has(g.pid);
+      return `<div class="film-group${closed ? ' closed' : ''}">
+        <div class="group-head" data-group="${esc(g.pid)}" role="button" tabindex="0" aria-expanded="${!closed}" title="${closed ? 'Развернуть' : 'Свернуть'}">
+          <svg class="g-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          <span class="g-person" data-person="${esc(g.pid)}" data-name="${esc(g.name)}" title="Профиль">
+            ${ava ? `<img src="${esc(ava)}" alt="">` : `<span class="g-ava" style="background:hsl(${hue(g.name)} 55% 42%)">${initial(g.name)}</span>`}
+            <b>${esc(g.name)}${g.pid === myPid() ? ' <span class="m">(вы)</span>' : ''}</b>
+          </span>
           <span class="g-count">${g.films.length}</span>
           <em>${gShare ? `${(gShare * 100).toFixed(gShare < 0.1 ? 1 : 0)}%` : '—'}</em>
-        </button>
-        ${g.films.map(filmRow).join('')}
+        </div>
+        <div class="g-body"><div>${g.films.map(filmRow).join('')}</div></div>
       </div>`;
     }).join('');
 
@@ -596,14 +600,18 @@ function initRoom(roomId) {
   function syncMusic() {
     const m = state?.music;
     $('#ytCard').hidden = !m;
-    $('#ytAdd').hidden = Boolean(m) && !ytChanging;
+    $('#ytAdd').hidden = !ytChanging;
+    $('#musicBtn').hidden = Boolean(m);
     if (!m) {
       if (yt) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $('#ytHost').innerHTML = ''; }
       return;
     }
     $('#ytTitle').textContent = m.title;
     $('#ytBy').textContent = [m.author, m.pausedAt != null ? `на паузе (${m.by})` : `включил(а) ${m.by}`].filter(Boolean).join(', ');
-    $('#ytToggle').textContent = m.pausedAt != null ? 'Играть' : 'Пауза';
+    $('#ytToggle').innerHTML = m.pausedAt != null
+      ? '<svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>'
+      : '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>';
+    $('#ytToggle').title = m.pausedAt != null ? 'Играть у всех' : 'Пауза у всех';
     loadYT(() => {
       if (!yt) {
         ytVid = m.vid;
@@ -653,7 +661,14 @@ function initRoom(roomId) {
   });
   $('#ytToggle').addEventListener('click', () => api(`/rooms/${roomId}/music/toggle`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
   $('#ytStop').addEventListener('click', () => api(`/rooms/${roomId}/music/stop`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
-  $('#ytChange').addEventListener('click', () => { ytChanging = !ytChanging; syncMusic(); if (ytChanging) $('#ytUrl').focus(); });
+  const openMusicForm = () => { ytChanging = !ytChanging; syncMusic(); if (ytChanging) setTimeout(() => $('#ytUrl').focus(), 30); };
+  $('#ytChange').addEventListener('click', openMusicForm);
+  $('#musicBtn').addEventListener('click', openMusicForm);
+  // форма ссылки — всплывающая: закрывается кликом мимо и по Esc
+  document.addEventListener('click', e => {
+    if (ytChanging && !e.target.closest('#navMusic')) { ytChanging = false; syncMusic(); }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && ytChanging) { ytChanging = false; syncMusic(); } });
   $('#ytVol').addEventListener('input', () => {
     $('#ytVol').style.setProperty('--f', $('#ytVol').value / 100);
     ls.set('ytVol', Number($('#ytVol').value));
@@ -835,7 +850,24 @@ function initRoom(roomId) {
     catch (e) { toast(e.message, true); }
   }
 
+  // свёрнутые группы запоминаются для комнаты в этом браузере
+  const collapsed = new Set(ls.get('collapsed_' + roomId, []));
+  function toggleGroup(head) {
+    const pid = head.dataset.group;
+    if (collapsed.has(pid)) collapsed.delete(pid); else collapsed.add(pid);
+    ls.set('collapsed_' + roomId, [...collapsed]);
+    const closed = collapsed.has(pid);
+    head.parentElement.classList.toggle('closed', closed);
+    head.setAttribute('aria-expanded', String(!closed));
+    head.title = closed ? 'Развернуть' : 'Свернуть';
+  }
+  $('#filmList').addEventListener('keydown', e => {
+    const head = e.target.closest('[data-group]');
+    if (head && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleGroup(head); }
+  });
   $('#filmList').addEventListener('click', async e => {
+    const head = e.target.closest('[data-group]');
+    if (head) { if (!e.target.closest('[data-person]')) toggleGroup(head); return; }
     const row = e.target.closest('.film');
     if (!row) return;
     const id = row.dataset.id;
