@@ -1,7 +1,7 @@
 // Звук: щелчки колеса, сигналы отсчёта и музыка прокрута (генерируется на лету).
 // Всё на Web Audio, без файлов. Браузер разрешает звук только после первого клика по странице.
 (() => {
-  let ctx = null, master = null, noise = null;
+  let ctx = null, master = null, noise = null, analyser = null;
   function ac() {
     if (!ctx) {
       ctx = new AudioContext();
@@ -10,6 +10,9 @@
       master = ctx.createGain();
       master.gain.value = 0.9;
       master.connect(comp).connect(ctx.destination);
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      master.connect(analyser);
       noise = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
       const d = noise.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -128,6 +131,7 @@
 
   window.Sfx = {
     unlock: ac, tick, beep, win, out,
+    analyser: () => analyser,
     spinStart, spinStop: () => spinStop(false),
   };
 })();

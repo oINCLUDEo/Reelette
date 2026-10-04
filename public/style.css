@@ -620,3 +620,15 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .q-item span { color: var(--tx3); font-size: 12px; }
 .q-item .nav-icon { width: 30px; height: 30px; }
 .nav-icon:disabled { opacity: .4; pointer-events: none; }
+
+/* где посмотреть */
+.watch { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.watch-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.watch-item { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 4px; border-radius: 10px; background: var(--s2); border: 1px solid var(--bd); font-size: 13px; font-weight: 700; color: var(--tx); transition: background .2s, border-color .2s; }
+.watch-item:hover { background: var(--s3); border-color: var(--acc-hi); }
+.watch-item img { width: 28px; height: 28px; border-radius: 7px; object-fit: cover; }
+.watch-item.kp { padding-left: 12px; color: var(--tx2); }
+.win-inner .watch { margin-top: 18px; }
+
+/* эффекты: кнопка «слушать вкладку» */
+.fx-cap.on { color: #fff; background: var(--acc); box-shadow: 0 0 14px var(--glow); }

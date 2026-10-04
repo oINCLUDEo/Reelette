@@ -68,6 +68,7 @@
           <button class="nav-icon" id="ytToggle"></button>
           <button class="nav-icon" id="ytNext" title="Следующий трек у всех"><svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg></button>
           <button class="nav-icon q-btn" id="ytChange" title="Очередь и добавить трек"><svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h8"/><path d="M19 15v6M16 18h6"/></svg><i id="ytQCount" hidden></i></button>
+          <button class="nav-icon fx-cap" id="fxCap" title="Эффекты под эту музыку: браузер попросит поделиться звуком вкладки"><svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="2.5"/></svg></button>
           <button class="nav-icon" id="ytStop" title="Выключить у всех"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
         </div>
         <input type="range" id="ytVol" min="0" max="100" value="50" title="Громкость у вас" aria-label="Громкость общей музыки у вас">
@@ -195,6 +196,7 @@
         <span class="label">Звук</span>
         <label class="check"><input type="checkbox" id="soundOn" checked><span class="box"></span>Щелчки и сигналы</label>
         <label class="check"><input type="checkbox" id="musicOn"><span class="box"></span>Музыка при прокруте</label>
+        <label class="check"><input type="checkbox" id="fxOn" checked><span class="box"></span>Эффекты под музыку</label>
       </div>
 
       <div class="rate-box" id="rateBox" hidden></div>
@@ -309,6 +311,7 @@
 <div id="toasts" class="toasts"></div>
 
 <script src="/audio.js"></script>
+<script src="/fx.js"></script>
 <script src="/backdrop.js"></script>
 <script src="/wheel.js"></script>
 <script src="/app.js"></script>

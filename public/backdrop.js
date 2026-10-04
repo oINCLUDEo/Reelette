@@ -3,6 +3,7 @@
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const scenes = [];
   let target = 0;
+  let fx = { level: 0, mid: 0 };
 
   const rgb = hex => {
     hex = hex.trim().replace('#', '');
@@ -20,7 +21,7 @@
   function init(cv) {
     const ctx = cv.getContext('2d');
     const anchor = cv.closest('.sheet')?.querySelector('.wheel-box');
-    const s = { cv, ctx, anchor, dust: [], w: 0, h: 0, dpr: 1, boost: 0, vis: true };
+    const s = { cv, ctx, anchor, dust: [], waves: [], kick: 0, w: 0, h: 0, dpr: 1, boost: 0, vis: true };
     const resize = () => {
       s.dpr = Math.min(1.5, devicePixelRatio || 1);
       s.w = cv.clientWidth; s.h = cv.clientHeight;
@@ -29,7 +30,7 @@
       s.dust = Array.from({ length: n }, () => ({
         x: Math.random() * s.w, y: Math.random() * s.h,
         r: Math.random() ** 2 * 1.6 + 0.5,
-        vx: (Math.random() - 0.5) * 4, vy: -Math.random() * 6 - 1,
+        vx: 0, vy: 0, bvx: (Math.random() - 0.5) * 4, bvy: -Math.random() * 6 - 1,
         ph: Math.random() * 6.28, sp: 0.6 + Math.random() * 1.6,
       }));
     };
@@ -52,7 +53,8 @@
       cx = a.left - c.left + a.width / 2; cy = a.top - c.top + a.height / 2; R = a.width / 2;
     }
     const r0 = R * 1.04;
-    const k = (1 + 0.06 * Math.sin(t * 0.9)) * (1 + b * 0.7);
+    // под музыку кольцо дышит басом
+    const k = (1 + 0.06 * Math.sin(t * 0.9)) * (1 + b * 0.7) * (1 + fx.level * 1.1);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, w, h);
@@ -73,10 +75,27 @@
     g.addColorStop(1, rgba(colors.glow, 0));
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
 
-    // пыль: дрейфует вверх, у кольца ярче, при прокруте закручивается вокруг колеса
+    // волны от колеса на сильных долях
+    for (const wv of s.waves) {
+      wv.age += dt * 1.15;
+      const e = 1 - wv.age;
+      if (e <= 0) continue;
+      const rr = r0 * (1.02 + (1 - e * e) * 0.95);
+      ctx.beginPath(); ctx.arc(cx, cy, rr, 0, 6.283);
+      ctx.strokeStyle = rgba(colors.glow, 0.22 * e * wv.s); ctx.lineWidth = 18 * e + 4; ctx.stroke();
+      ctx.strokeStyle = rgba(colors.ring, 0.7 * e * e * wv.s); ctx.lineWidth = 2.2 * e + 0.6; ctx.stroke();
+    }
+    s.waves = s.waves.filter(wv => wv.age < 1);
+    const kick = s.kick;
+    s.kick = 0;
+
+    // пыль: дрейфует вверх, у кольца ярче, при прокруте закручивается, на долях разлетается от колеса
     for (const p of s.dust) {
       const dx = p.x - cx, dy = p.y - cy;
       const d = Math.hypot(dx, dy) || 1;
+      if (kick) { const push = 140 * kick * Math.min(1, r0 * 1.5 / d); p.vx += dx / d * push; p.vy += dy / d * push; }
+      p.vx += (p.bvx - p.vx) * Math.min(1, dt * 2.5);
+      p.vy += (p.bvy - p.vy) * Math.min(1, dt * 2.5);
       const swirl = b * 60 * Math.min(1, r0 * 1.8 / d);
       p.x += (p.vx + (-dy / d) * swirl) * dt;
       p.y += (p.vy + (dx / d) * swirl) * dt;
@@ -86,7 +105,7 @@
       const near = Math.exp(-((d - r0) ** 2) / (2 * (r0 * 0.35) ** 2));
       const a = (0.2 + 0.8 * near) * (0.55 + 0.45 * Math.sin(t * p.sp + p.ph)) * (1 + b * 0.5);
       ctx.fillStyle = rgba(near > 0.4 ? colors.ring : [255, 255, 255], a);
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1 + fx.mid * 0.9), 0, 6.283); ctx.fill();
     }
   }
 
@@ -94,6 +113,10 @@
   document.querySelectorAll('canvas.backdrop').forEach(init);
   window.setBackdropColors = readColors;
   window.setBackdropActive = on => { target = on ? 1 : 0; };
+  window.setBackdropFx = v => {
+    fx = v;
+    if (v.beat && !reduce) for (const s of scenes) { s.waves.push({ age: 0, s: v.beat }); s.kick = Math.max(s.kick, v.beat); }
+  };
 
   let last = performance.now();
   (function loop(now) {
