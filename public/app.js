@@ -763,7 +763,8 @@ function initRoom(roomId) {
     $('#kToggle').disabled = $('#kNext').disabled = $('#kRestart').disabled = !m;
     const last = state.lastTrack;
     $('#kAgain').hidden = Boolean(m) || !last;
-    if (last && !m) $('#kAgain').textContent = `Спеть ещё раз: ${last.singer || last.by}, ${last.title}`;
+    if (last && !m) $('#kAgain').innerHTML = `<span class="ka-t">Спеть ещё раз</span><span class="ka-s">${esc(last.singer || last.by)}, ${esc(last.title)}</span>`;
+    if (!m) { $('#kProg').style.width = '0'; $('#kTime').textContent = ''; } // прогресс прошлой песни не оставляем
     $('#kToggle').innerHTML = !m || m.pausedAt != null
       ? '<svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>'
       : '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>';
@@ -886,7 +887,7 @@ function initRoom(roomId) {
     if (L?.synced && $('#kOffset')) $('#kOffset').textContent = `${L.offset > 0 ? '+' : ''}${String(L.offset || 0).replace('.', ',')} с`;
     if (key === lyrKey) return;
     lyrKey = key; lyrIdx = -2; lyrLines = null;
-    if (!m) { box.innerHTML = ''; return; }
+    if (!m) { box.innerHTML = '<p class="k-lyr-note k-lyr-idle">Здесь появится текст песни</p>'; return; }
     const head = L && !L.loading && !L.none ? `<div class="k-lyr-head">
         <span>${esc(L.artist)}${L.artist && L.track ? ', ' : ''}${esc(L.track)}${L.synced ? '' : ' <em>без таймингов</em>'}</span>
         ${L.synced ? `<span class="k-offset" title="Сдвиг текста относительно видео, общий для всей комнаты"><button type="button" class="nav-icon wide" data-loff="-5" title="Текст раньше на 5 с">−5</button><button type="button" class="nav-icon" data-loff="-0.5" title="Текст раньше на 0,5 с">−</button><b id="kOffset">${L.offset > 0 ? '+' : ''}${String(L.offset || 0).replace('.', ',')} с</b><button type="button" class="nav-icon" data-loff="0.5" title="Текст позже на 0,5 с">+</button><button type="button" class="nav-icon wide" data-loff="5" title="Текст позже на 5 с">+5</button></span>` : ''}

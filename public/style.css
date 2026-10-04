@@ -952,3 +952,10 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 /* перезапуск трека */
 .k-again { margin-top: 10px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; justify-self: center; position: relative; z-index: 3; }
 #ytReplay svg { width: 17px; height: 17px; }
+
+/* «Спеть ещё раз»: две строки, длинное название обрезается */
+.k-empty { justify-items: center; }
+.k-again { display: flex; flex-direction: column; align-items: center; gap: 2px; height: auto; padding: 10px 18px; width: auto; max-width: min(100%, 520px); min-width: 0; margin-top: 12px; }
+.k-again .ka-t { font-weight: 800; }
+.k-again .ka-s { max-width: 100%; font-size: 12.5px; font-weight: 600; color: var(--tx2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-lyr-idle { margin: auto; color: var(--tx3); }
