@@ -74,7 +74,7 @@ function runtime(r) {
 
 function publicState(r) {
   return {
-    id: r.id, name: r.name, createdAt: r.createdAt, owner: r.owner || '',
+    id: r.id, name: r.name, createdAt: r.createdAt, owner: ownerKey(r),
     films: r.films, history: r.history, eliminated: r.eliminated,
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
@@ -136,6 +136,9 @@ function chanceWeights(r, list) {
 }
 // Кто действует: Discord-пользователь или гость с id браузера
 const personKey = (me, b) => (me ? 'd' + me.id : str(b.cid, 32) ? 'g' + str(b.cid, 32) : '');
+// Создатель комнаты. В старых комнатах хранился голый id Discord, приводим к тому же виду.
+const ownerKey = r => (r.owner ? (/^\d+$/.test(r.owner) ? 'd' + r.owner : r.owner) : '');
+const isOwner = (r, me, b) => Boolean(ownerKey(r)) && ownerKey(r) === personKey(me, b);
 
 // ---------- фильтры ----------
 const RUNTIMES = [0, 105, 120, 150];
@@ -532,7 +535,7 @@ function makeFilm(b, addedBy, addedById) {
     trailer: /^[\w-]{11}$/.test(b.trailer || '') ? b.trailer : '',
     url: /^https:\/\//.test(b.url || '') ? str(b.url, 500) : '',
     source: str(b.source, 20), sourceId: str(b.sourceId, 40),
-    weight: Math.min(1000, Math.max(1, Math.round(num(b.weight, 1)))),
+    weight: 1,
     addedBy, addedById: addedById || '', addedAt: Date.now(), votes: [],
   };
 }
@@ -558,7 +561,7 @@ async function api(req, res, url) {
 
   if (parts.length === 1 && m === 'POST') {
     const b = await readBody(req);
-    const r = { id: id(8), name: str(b.name, 60) || 'Киновечер', owner: me?.id || '', createdAt: Date.now(), films: [], history: [], eliminated: [], angle: 0, webhook: '', spin: null, plan: null };
+    const r = { id: id(8), name: str(b.name, 60) || 'Киновечер', owner: personKey(me, b), createdAt: Date.now(), films: [], history: [], eliminated: [], angle: 0, webhook: '', spin: null, plan: null };
     rooms[r.id] = r; save();
     return json(res, 201, { id: r.id });
   }
@@ -584,7 +587,7 @@ async function api(req, res, url) {
     return;
   }
 
-  const b = m === 'GET' || m === 'DELETE' ? {} : await readBody(req);
+  const b = m === 'GET' || m === 'DELETE' ? { cid: url.searchParams.get('cid') || '' } : await readBody(req);
   const who = me?.name || str(b.by, 32) || 'Гость';
   b.by = who;
 
@@ -612,7 +615,7 @@ async function api(req, res, url) {
   }
 
   if (!sub && m === 'DELETE') {
-    if (r.owner && r.owner !== me?.id) return json(res, 403, { error: 'Удалить комнату может только тот, кто её создал' });
+    if (ownerKey(r) && !isOwner(r, me, b)) return json(res, 403, { error: 'Удалить комнату может только тот, кто её создал' });
     const rt = runtime(r);
     clearTimeout(rt.finish); clearTimeout(rt.next); clearTimeout(rt.duelAuto); clearTimeout(rt.duelNext);
     runtimes.delete(r.id);
@@ -634,6 +637,14 @@ async function api(req, res, url) {
       r.spin = null;
       broadcast(r.id, { type: 'cancel', by: who });
     }
+    pushState(r); return json(res, 200, { ok: true });
+  }
+
+  if (sub === 'claim' && m === 'POST') {
+    if (ownerKey(r)) return json(res, 409, { error: 'У комнаты уже есть создатель' });
+    const pid = personKey(me, b);
+    if (!pid) return json(res, 400, { error: 'Не понятно, кто вы' });
+    r.owner = pid;
     pushState(r); return json(res, 200, { ok: true });
   }
 
@@ -678,16 +689,26 @@ async function api(req, res, url) {
 
   if (sub === 'films' && !parts[3] && m === 'POST') {
     const list = Array.isArray(b.films) ? b.films : [b];
-    const added = [], merged = [];
+    const added = [], merged = [], voted = [];
     for (const raw of list.slice(0, 100)) {
       if (r.films.length >= MAX_FILMS) break;
       const f = makeFilm(raw, who, personKey(me, b));
       const dup = r.films.find(x => (f.sourceId && x.sourceId === f.sourceId) || norm(x.title) === norm(f.title) && (x.year || '') === (f.year || ''));
-      if (dup) { dup.weight = Math.min(1000, dup.weight + 1); merged.push(dup.title); continue; }
+      if (dup) {
+        merged.push(dup.title);
+        const pid = personKey(me, b);
+        dup.votes ||= [];
+        const used = r.films.reduce((n, x) => n + (x.votes || []).filter(v => v.id === pid).length, 0);
+        if (pid && !dup.votes.some(v => v.id === pid) && used < VOTES_PER_PERSON) {
+          dup.votes.push({ id: pid, name: who, avatar: me?.avatar || '' });
+          voted.push(dup.title);
+        }
+        continue;
+      }
       r.films.push(f); added.push(f.title);
     }
     queueEnrich(r);
-    pushState(r); return json(res, 200, { added, merged });
+    pushState(r); return json(res, 200, { added, merged, voted });
   }
 
   if (sub === 'films' && parts[3]) {
@@ -707,6 +728,7 @@ async function api(req, res, url) {
       pushState(r); return json(res, 200, { ok: true });
     }
     if (m === 'PATCH') {
+      if (!isOwner(r, me, b)) return json(res, 403, { error: 'Менять вес может только создатель комнаты' });
       if (b.delta !== undefined) f.weight += Math.round(num(b.delta, 0));
       if (b.weight !== undefined) f.weight = Math.round(num(b.weight, f.weight));
       f.weight = Math.min(1000, Math.max(1, f.weight));

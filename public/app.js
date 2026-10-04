@@ -178,7 +178,9 @@ function initHome() {
     e.preventDefault();
     const btn = e.submitter; btn.classList.add('busy'); btn.disabled = true;
     try {
-      const { id } = await api('/rooms', { method: 'POST', body: { name: $('#roomName').value } });
+      let cid = ls.get('cid', '');
+      if (!cid) { cid = Math.random().toString(36).slice(2, 12); ls.set('cid', cid); }
+      const { id } = await api('/rooms', { method: 'POST', body: { name: $('#roomName').value, cid } });
       location.href = '/r/' + id;
     } catch (err) { toast(err.message, true); btn.classList.remove('busy'); btn.disabled = false; }
   });
@@ -463,6 +465,7 @@ function initRoom(roomId) {
     const active = activeFilms();
     const W = chanceWeights(active);
     const total = active.reduce((s, f) => s + W.get(f.id), 0);
+    const amOwner = Boolean(state.owner) && state.owner === myPid();
     const out = new Set(state.eliminated);
 
     const used = myVotesUsed(), R = rules();
@@ -496,7 +499,7 @@ function initRoom(roomId) {
           <span class="film-pct">${pct}</span>
           <div class="film-actions">
             <button class="vote-btn${mine ? ' on' : ''}${nv ? ' has' : ''}" data-vote-film title="${mine ? 'Снять свой голос' : `Хочу посмотреть: +${Math.round(rules().bonus * 100)}% к шансу`}">${ICON.heart}<b>${nv || ''}</b></button>
-            <div class="stepper"><button data-w="-1" title="Меньше">${ICON.minus}</button><b>${f.weight}</b><button data-w="1" title="Больше">${ICON.plus}</button></div>
+            ${amOwner ? `<div class="stepper"><button data-w="-1" title="Меньше">${ICON.minus}</button><b>${f.weight}</b><button data-w="1" title="Больше">${ICON.plus}</button></div>` : ''}
           </div>
         </div>
         <button class="film-del" data-del title="Удалить">${ICON.x}</button>
@@ -725,7 +728,7 @@ function initRoom(roomId) {
     if (e.target.closest('[data-vote-film]')) return voteFilm(id);
     const w = e.target.closest('[data-w]');
     if (w) {
-      try { await api(`/rooms/${roomId}/films/${id}`, { method: 'PATCH', body: { delta: Number(w.dataset.w) } }); }
+      try { await api(`/rooms/${roomId}/films/${id}`, { method: 'PATCH', body: { delta: Number(w.dataset.w), cid: me.cid } }); }
       catch (err) { toast(err.message, true); }
       return;
     }
@@ -821,7 +824,7 @@ function initRoom(roomId) {
       const r = await api(`/rooms/${roomId}/films`, { method: 'POST', body: { ...film, by: me.name, cid: me.cid } });
       b.classList.add('added');
       b.querySelector('.plus').innerHTML = ICON.check;
-      toast(r.merged.length ? `«${film.title}» уже был, вес увеличен` : `«${film.title}» добавлен`);
+      toast(r.voted.length ? `«${film.title}» уже есть, ваш голос отдан ему` : r.merged.length ? `«${film.title}» уже есть в колесе` : `«${film.title}» добавлен`);
     } catch (err) { toast(err.message, true); }
   });
 
@@ -831,7 +834,7 @@ function initRoom(roomId) {
 
   async function addFilms(films) {
     const r = await api(`/rooms/${roomId}/films`, { method: 'POST', body: { films, by: me.name, cid: me.cid } });
-    toast(`Добавлено: ${r.added.length}${r.merged.length ? `, уже были: ${r.merged.length}` : ''}`);
+    toast(`Добавлено: ${r.added.length}${r.merged.length ? `, уже были: ${r.merged.length}` : ''}${r.voted.length ? `, за ${r.voted.length} из них отдан ваш голос` : ''}`);
   }
   async function findFilm(q) {
     try { return (await api('/search?q=' + encodeURIComponent(q))).results.slice(0, 6); } catch { return []; }
@@ -1029,7 +1032,8 @@ function initRoom(roomId) {
       ? `<img src="${esc(account.user.avatar)}" alt=""><div><b>${esc(account.user.name)}</b><span>Вход через Discord</span></div><button class="btn btn-ghost" id="logoutBtn">Выйти</button>`
       : account.discord ? `<span class="ava" style="background:hsl(${hue(me.name)} 55% 42%)">${initial(me.name)}</span><div><b>${esc(me.name)}</b><span>Гость</span></div><a class="btn btn-discord" href="${loginUrl()}"><svg class="dc"><use href="#discord"/></svg>Войти</a>` : '';
     $('#logoutBtn')?.addEventListener('click', logout);
-    $('#deleteRoom').hidden = Boolean(state?.owner && state.owner !== account.user?.id);
+    $('#deleteRoom').hidden = Boolean(state?.owner && state.owner !== myPid());
+    $('#claimRoom').hidden = Boolean(state?.owner);
     $('#setHook').value = '';
     $('#hookState').textContent = state?.hasWebhook ? 'подключён' : '';
     $('#setHook').placeholder = state?.hasWebhook ? 'Вставьте новый, чтобы заменить' : 'https://discord.com/api/webhooks/…';
@@ -1058,9 +1062,16 @@ function initRoom(roomId) {
   $('#deleteRoom').addEventListener('click', async () => {
     if (!confirm(`Удалить комнату «${state.name}» вместе со всеми фильмами и историей? Это нельзя отменить.`)) return;
     try {
-      await api(`/rooms/${roomId}`, { method: 'DELETE' });
+      await api(`/rooms/${roomId}?cid=${encodeURIComponent(me.cid)}`, { method: 'DELETE' });
       ls.set('rooms', ls.get('rooms', []).filter(r => r.id !== roomId));
       location.href = '/';
+    } catch (e) { toast(e.message, true); }
+  });
+  $('#claimRoom').addEventListener('click', async () => {
+    try {
+      await api(`/rooms/${roomId}/claim`, { method: 'POST', body: { cid: me.cid } });
+      toast('Теперь вы создатель комнаты: вам доступны кнопки веса');
+      closeModal('#settingsModal');
     } catch (e) { toast(e.message, true); }
   });
   $('#clearFilms').addEventListener('click', async () => {
