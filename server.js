@@ -75,8 +75,18 @@ function publicState(r) {
     films: r.films, history: r.history, eliminated: r.eliminated,
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
+    rules: { votes: VOTES_PER_PERSON, bonus: VOTE_BONUS, cap: VOTE_CAP },
   };
 }
+
+// ---------- голоса ----------
+// У каждого 3 голоса, на фильм не больше одного своего. Голос даёт +25% к шансу, засчитывается до 4 голосов (максимум ×2).
+const VOTES_PER_PERSON = 3;
+const VOTE_BONUS = 0.25;
+const VOTE_CAP = 4;
+const effWeight = f => f.weight * (1 + VOTE_BONUS * Math.min(VOTE_CAP, (f.votes || []).length));
+// Кто действует: Discord-пользователь или гость с id браузера
+const personKey = (me, b) => (me ? 'd' + me.id : str(b.cid, 32) ? 'g' + str(b.cid, 32) : '');
 
 // ---------- фильтры ----------
 const RUNTIMES = [0, 105, 120, 150];
@@ -108,7 +118,7 @@ function broadcast(roomId, msg) {
 }
 function presence(roomId) {
   const seen = new Map();
-  for (const c of clients.get(roomId) || []) if (!seen.has(c.cid)) seen.set(c.cid, { name: c.name, avatar: c.avatar });
+  for (const c of clients.get(roomId) || []) if (!seen.has(c.cid)) seen.set(c.cid, { name: c.name, avatar: c.avatar, pid: c.pid });
   broadcast(roomId, { type: 'presence', people: [...seen.values()] });
 }
 function pushState(r) { save(); broadcast(r.id, { type: 'state', state: publicState(r) }); }
@@ -122,9 +132,9 @@ function activeFilms(r) {
   return r.films.filter(f => !r.eliminated.includes(f.id) && f.weight > 0 && matchesFilters(r, f));
 }
 function pickWeighted(list) {
-  const total = list.reduce((s, f) => s + f.weight, 0);
+  const total = list.reduce((s, f) => s + effWeight(f), 0);
   let x = crypto.randomInt(0, 1e9) / 1e9 * total;
-  for (const f of list) { x -= f.weight; if (x < 0) return f; }
+  for (const f of list) { x -= effWeight(f); if (x < 0) return f; }
   return list[list.length - 1];
 }
 
@@ -149,7 +159,7 @@ function startSpin(r, { mode, duration, auto, by, delay }) {
   r.spin = {
     sid: id(6), mode, duration, auto: Boolean(auto) && mode === 'elimination', by: str(by, 32),
     startedAt: Date.now() + delay * 1000, delay,
-    snapshot: list.map(f => ({ id: f.id, weight: f.weight })),
+    snapshot: list.map(f => ({ id: f.id, weight: Math.round(effWeight(f) * 1000) / 1000 })),
     filmId: landed.id,
     offset: 0.12 + (crypto.randomInt(0, 1000) / 1000) * 0.76,
     turns: duration ? Math.max(2, Math.round(duration * 0.9)) : 0,
@@ -292,6 +302,9 @@ function endAngle(s) {
 function recordWin(r, film, mode) {
   if (!film) return;
   r.history.unshift({ at: Date.now(), mode, film: { ...film } });
+  // фильм выбран: голоса за него возвращаются людям (в истории остаётся, кто его хотел)
+  const live = r.films.find(x => x.id === film.id);
+  if (live) live.votes = [];
   r.history = r.history.slice(0, MAX_HISTORY);
   if (r.webhook) postWebhook(r, film).catch(e => console.warn('webhook:', e.message));
 }
@@ -463,7 +476,7 @@ function makeFilm(b, addedBy, addedById) {
     url: /^https:\/\//.test(b.url || '') ? str(b.url, 500) : '',
     source: str(b.source, 20), sourceId: str(b.sourceId, 40),
     weight: Math.min(1000, Math.max(1, Math.round(num(b.weight, 1)))),
-    addedBy, addedById: addedById || '', addedAt: Date.now(),
+    addedBy, addedById: addedById || '', addedAt: Date.now(), votes: [],
   };
 }
 const norm = s => s.toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, '');
@@ -502,8 +515,9 @@ async function api(req, res, url) {
   if (sub === 'events' && m === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
     const c = me
-      ? { res, name: me.name, avatar: me.avatar, cid: 'd' + me.id }
+      ? { res, name: me.name, avatar: me.avatar, cid: 'd' + me.id, pid: 'd' + me.id }
       : { res, name: str(url.searchParams.get('name'), 32) || 'Гость', avatar: '', cid: str(url.searchParams.get('cid'), 32) || id(6) };
+    if (!c.pid) c.pid = 'g' + c.cid;
     if (!clients.has(r.id)) clients.set(r.id, new Set());
     clients.get(r.id).add(c);
     queueEnrich(r);
@@ -591,7 +605,7 @@ async function api(req, res, url) {
     const added = [], merged = [];
     for (const raw of list.slice(0, 100)) {
       if (r.films.length >= MAX_FILMS) break;
-      const f = makeFilm(raw, who, me?.id);
+      const f = makeFilm(raw, who, personKey(me, b));
       const dup = r.films.find(x => (f.sourceId && x.sourceId === f.sourceId) || norm(x.title) === norm(f.title) && (x.year || '') === (f.year || ''));
       if (dup) { dup.weight = Math.min(1000, dup.weight + 1); merged.push(dup.title); continue; }
       r.films.push(f); added.push(f.title);
@@ -603,6 +617,19 @@ async function api(req, res, url) {
   if (sub === 'films' && parts[3]) {
     const f = r.films.find(x => x.id === parts[3]);
     if (!f) return json(res, 404, { error: 'Фильм не найден' });
+    if (parts[4] === 'vote' && m === 'POST') {
+      const pid = personKey(me, b);
+      if (!pid) return json(res, 400, { error: 'Не понятно, кто голосует' });
+      f.votes ||= [];
+      const i = f.votes.findIndex(v => v.id === pid);
+      if (i >= 0) f.votes.splice(i, 1);
+      else {
+        const used = r.films.reduce((n, x) => n + (x.votes || []).filter(v => v.id === pid).length, 0);
+        if (used >= VOTES_PER_PERSON) return json(res, 400, { error: `Все ${VOTES_PER_PERSON} голоса уже отданы. Снимите голос с другого фильма.` });
+        f.votes.push({ id: pid, name: who, avatar: me?.avatar || '' });
+      }
+      pushState(r); return json(res, 200, { ok: true });
+    }
     if (m === 'PATCH') {
       if (b.delta !== undefined) f.weight += Math.round(num(b.delta, 0));
       if (b.weight !== undefined) f.weight = Math.round(num(b.weight, f.weight));

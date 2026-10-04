@@ -72,6 +72,7 @@
         <h2>Фильмы <span class="m" id="filmCount"></span></h2>
         <button id="addBtn" class="sweep sm"><span class="sq"></span><span class="ar"><svg><use href="#plus"/></svg></span><span class="tx">Добавить</span></button>
       </div>
+      <div class="my-votes" id="myVotes"></div>
       <div id="filmList" class="film-list"></div>
       <div id="filmEmpty" class="empty" hidden>
         <p>Колесо пустое. <span class="m">Добавьте пару фильмов, чтобы его крутить.</span></p>
@@ -205,6 +206,13 @@
   <div class="modal-card film-card">
     <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     <div id="filmDetail"></div>
+  </div>
+</div>
+
+<div class="modal" id="profileModal" hidden>
+  <div class="modal-card profile-card">
+    <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div id="profileBody"></div>
   </div>
 </div>
 

@@ -459,3 +459,47 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .trailer-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; background: var(--sheetB); border-radius: 0 0 28px 28px; color: var(--tx2); font-size: 13.5px; }
 .trailer-bar .btn { flex: none; height: 42px; }
 .trailer-frame { border-radius: 28px 28px 0 0; }
+
+/* ---------- голоса ---------- */
+.my-votes { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 20px 12px; padding: 10px 12px; border-radius: 13px; background: var(--s1); border: 1px solid var(--bd); font-size: 13px; font-weight: 700; color: var(--tx); }
+.my-votes .m { font-weight: 600; width: 100%; }
+.my-votes .dots { display: flex; gap: 5px; }
+.my-votes .dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--s3); transition: background .3s, box-shadow .3s; }
+.my-votes .dots i.on { background: var(--acc); box-shadow: 0 0 10px var(--glow); }
+.film-actions { display: flex; align-items: center; gap: 4px; }
+.vote-btn { display: flex; align-items: center; gap: 3px; height: 28px; min-width: 28px; padding: 0 7px; border-radius: 9px; background: var(--s1); border: 1px solid var(--bd); color: var(--tx3); font-size: 12.5px; transition: background .2s, color .2s, border-color .2s, transform .3s var(--spring); }
+.vote-btn:hover { color: var(--tx); background: var(--s2); }
+.vote-btn:active { transform: scale(.88); }
+.vote-btn b:empty { display: none; }
+.vote-btn.has { color: var(--tx2); }
+.vote-btn.on { color: #fff; background: var(--acc); border-color: var(--acc); box-shadow: 0 0 12px var(--glow); }
+.heart { width: 14px; height: 14px; stroke-width: 2; }
+.vote-btn.on .heart, .btn.on .heart { fill: currentColor; }
+.btn .heart { width: 16px; height: 16px; }
+.btn-ghost.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+.voters-line { margin: -4px 0 14px; color: var(--tx2); font-size: 14px; }
+.person { color: var(--tx); font-weight: 700; text-decoration: underline; text-decoration-color: var(--tx3); text-underline-offset: 3px; transition: text-decoration-color .2s; }
+.person:hover { text-decoration-color: var(--acc-hi); }
+.people .ava { cursor: pointer; transition: transform .25s var(--spring); }
+.people .ava:hover { transform: translateY(-2px); z-index: 2; }
+
+/* ---------- мини-профиль ---------- */
+.profile-card { width: min(520px, 100%); gap: 20px; }
+.profile-card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 140px; background: radial-gradient(70% 100% at 30% 0%, var(--glow), transparent 70%); pointer-events: none; border-radius: inherit; }
+.profile-head { position: relative; display: flex; align-items: center; gap: 16px; }
+.profile-head img, .profile-ava { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; font: 800 28px var(--f-head); color: #fff; box-shadow: 0 0 0 4px var(--sheetB), 0 0 0 6px color-mix(in srgb, var(--acc-hi) 50%, transparent), 0 10px 30px rgba(0,0,0,.4); flex: none; }
+.profile-head h2 { font-size: 28px; padding: 0; }
+.profile-tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.profile-tags span { font-size: 12.5px; font-weight: 700; padding: 4px 9px; border-radius: 8px; background: var(--s2); color: var(--tx2); }
+.profile-tags .online { color: var(--ok); }
+.profile-tags .online::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 6px; box-shadow: 0 0 8px var(--ok); vertical-align: 1px; }
+.profile-stats { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.profile-stats div { padding: 14px; border-radius: 16px; background: var(--s1); border: 1px solid var(--bd); display: grid; gap: 4px; }
+.profile-stats b { font: 800 34px/1 var(--f-ui); letter-spacing: -.06em; background: linear-gradient(180deg, var(--h1a) 30%, var(--acc-hi) 130%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.profile-stats small { font-size: 18px; letter-spacing: -.02em; }
+.profile-stats span { color: var(--tx3); font-size: 12.5px; font-weight: 600; line-height: 1.3; }
+.profile-sec h3 { font-size: 16px; margin-bottom: 10px; }
+.poster-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.poster-row i { width: 46px; height: 68px; border-radius: 9px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 15px var(--f-head); font-style: normal; color: rgba(255,255,255,.7); }
+.poster-row span { color: var(--tx3); font-weight: 700; font-size: 13px; margin-left: 4px; }
+.chip.on-static { cursor: default; display: inline-flex; align-items: center; background: var(--s2); color: var(--tx); }

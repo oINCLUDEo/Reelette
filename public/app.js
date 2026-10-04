@@ -12,6 +12,7 @@ const ICON = {
   minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>',
   x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   check: '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>',
+  heart: '<svg viewBox="0 0 24 24" class="heart"><path d="M12 20.5s-7.5-4.6-7.5-10.3A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3Z"/></svg>',
 };
 
 // ---------- палитра ----------
@@ -303,7 +304,21 @@ function initRoom(roomId) {
   function activeFilms() {
     return state ? state.films.filter(f => !state.eliminated.includes(f.id) && matchesFilters(f)) : [];
   }
-  function syncWheel() { wheel.setItems(activeFilms()); }
+  // ---- голоса: тот же расчёт веса, что на сервере ----
+  const rules = () => state?.rules || { votes: 3, bonus: 0.25, cap: 4 };
+  const effWeight = f => f.weight * (1 + rules().bonus * Math.min(rules().cap, (f.votes || []).length));
+  const myPid = () => (account.user ? 'd' + account.user.id : 'g' + me.cid);
+  const myVotesUsed = () => state.films.reduce((n, f) => n + (f.votes || []).filter(v => v.id === myPid()).length, 0);
+  const iVoted = f => (f.votes || []).some(v => v.id === myPid());
+  async function voteFilm(id) {
+    try { await api(`/rooms/${roomId}/films/${id}/vote`, { method: 'POST', body: { cid: me.cid, by: me.name } }); }
+    catch (e) { toast(e.message, true); }
+  }
+  // кто добавил фильм: id Discord-пользователя или гостя; у старых фильмов только имя
+  const personOf = f => (f.addedById ? (/^\d+$/.test(f.addedById) ? 'd' + f.addedById : f.addedById) : 'n:' + (f.addedBy || ''));
+  const isBy = (f, pid, name) => personOf(f) === pid || (!f.addedById && f.addedBy === name);
+
+  function syncWheel() { wheel.setItems(activeFilms().map(f => ({ ...f, weight: effWeight(f) }))); }
 
   function runSpin(spin) {
     spinningSid = spin.sid;
@@ -405,7 +420,7 @@ function initRoom(roomId) {
     if (f.runtime) parts.push(`<span><b>${fmtRuntime(f.runtime)}</b></span>`);
     if (f.rating) parts.push(`<span>Рейтинг <b>${esc(f.rating)}</b></span>`);
     if (f.genres?.length) parts.push(`<span>${esc(f.genres.join(', '))}</span>`);
-    if (f.addedBy) parts.push(`<span>Добавил(а) <b>${esc(f.addedBy)}</b></span>`);
+    if (f.addedBy) parts.push(`<span>Добавил(а) <button class="person" data-person="${esc(personOf(f))}" data-name="${esc(f.addedBy)}">${esc(f.addedBy)}</button></span>`);
     return parts.length ? `<div class="facts">${parts.join('')}</div>` : '';
   }
 
@@ -415,14 +430,19 @@ function initRoom(roomId) {
     $('#roomTitle').textContent = state.name;
     const spinning = Boolean(spinningSid || state.spin);
     const active = activeFilms();
-    const total = active.reduce((s, f) => s + f.weight, 0);
+    const total = active.reduce((s, f) => s + effWeight(f), 0);
     const out = new Set(state.eliminated);
+
+    const used = myVotesUsed(), R = rules();
+    $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: R.votes }, (_, i) => `<i class="${i < R.votes - used ? 'on' : ''}"></i>`).join('')}</span><span class="m">${used < R.votes ? `осталось ${R.votes - used}, каждый +${Math.round(R.bonus * 100)}% к шансу` : 'все отданы, голос можно снять'}</span>`;
 
     $('#filmCount').textContent = state.films.length ? String(state.films.length) : '';
     $('#filmEmpty').hidden = state.films.length > 0;
     $('#filmList').innerHTML = state.films.map(f => {
       const filtered = !out.has(f.id) && !matchesFilters(f);
-      const pct = out.has(f.id) || filtered || !total ? '—' : `${(f.weight / total * 100).toFixed(f.weight / total < 0.1 ? 1 : 0)}%`;
+      const share = effWeight(f) / total;
+      const pct = out.has(f.id) || filtered || !total ? '—' : `${(share * 100).toFixed(share < 0.1 ? 1 : 0)}%`;
+      const nv = (f.votes || []).length, mine = iVoted(f);
       const meta = filtered ? ['не подходит под фильтры'] : [f.year, f.runtime && fmtRuntime(f.runtime), f.addedBy].filter(Boolean);
       return `<div class="film${out.has(f.id) ? ' out' : ''}${filtered ? ' filtered' : ''}${wheel.curId === f.id ? ' hot' : ''}" data-id="${esc(f.id)}">
         <div class="film-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</div>
@@ -432,7 +452,10 @@ function initRoom(roomId) {
         </div>
         <div class="film-side">
           <span class="film-pct">${pct}</span>
-          <div class="stepper"><button data-w="-1" title="Меньше">${ICON.minus}</button><b>${f.weight}</b><button data-w="1" title="Больше">${ICON.plus}</button></div>
+          <div class="film-actions">
+            <button class="vote-btn${mine ? ' on' : ''}${nv ? ' has' : ''}" data-vote-film title="${mine ? 'Снять свой голос' : `Хочу посмотреть: +${Math.round(rules().bonus * 100)}% к шансу`}">${ICON.heart}<b>${nv || ''}</b></button>
+            <div class="stepper"><button data-w="-1" title="Меньше">${ICON.minus}</button><b>${f.weight}</b><button data-w="1" title="Больше">${ICON.plus}</button></div>
+          </div>
         </div>
         <button class="film-del" data-del title="Удалить">${ICON.x}</button>
       </div>`;
@@ -476,6 +499,51 @@ function initRoom(roomId) {
         : settings.mode === 'duel' ? 'Нажмите на центр колеса, чтобы начать дуэль' : 'Нажмите на центр колеса или пробел';
     }
   }
+
+  // ---- мини-профиль: считается из данных комнаты ----
+  function openProfile(pid, name) {
+    if (!state) return;
+    const online = people.find(p => p.pid === pid);
+    const avatar = online?.avatar || state.films.flatMap(f => f.votes || []).find(v => v.id === pid && v.avatar)?.avatar || (account.user && pid === myPid() ? account.user.avatar : '');
+    const added = state.films.filter(f => isBy(f, pid, name));
+    const wins = state.history.filter(h => isBy(h.film, pid, name)).map(h => h.film);
+    const voted = state.films.filter(f => (f.votes || []).some(v => v.id === pid));
+    const freq = new Map();
+    const seen = new Set();
+    for (const f of [...added, ...wins]) {
+      if (seen.has(f.id)) continue;
+      seen.add(f.id);
+      for (const g of f.genres || []) freq.set(g, (freq.get(g) || 0) + 1);
+    }
+    const genres = [...freq.keys()].sort((a, b) => freq.get(b) - freq.get(a)).slice(0, 4);
+    const row = list => `<div class="poster-row">${list.slice(0, 8).map(f => `<i title="${esc(f.title)}" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</i>`).join('')}${list.length > 8 ? `<span>+${list.length - 8}</span>` : ''}</div>`;
+    const sec = (title, list) => (list.length ? `<div class="profile-sec"><h3>${title}</h3>${row(list)}</div>` : '');
+    $('#profileBody').innerHTML = `
+      <div class="profile-head">
+        ${avatar ? `<img src="${esc(avatar)}" alt="">` : `<span class="profile-ava" style="background:hsl(${hue(name)} 55% 42%)">${initial(name)}</span>`}
+        <div>
+          <h2>${esc(name)}</h2>
+          <div class="profile-tags"><span>${pid.startsWith('d') ? 'Discord' : 'Гость'}</span>${online ? '<span class="online">в комнате</span>' : ''}${pid === myPid() ? '<span>это вы</span>' : ''}</div>
+        </div>
+      </div>
+      <div class="profile-stats">
+        <div><b>${added.length}</b><span>${plural(added.length, 'фильм', 'фильма', 'фильмов')} в колесе</span></div>
+        <div><b>${wins.length}</b><span>${plural(wins.length, 'раз выбрали', 'раза выбрали', 'раз выбрали')} его фильм</span></div>
+        <div><b>${voted.length}<small>/${rules().votes}</small></b><span>голосов отдано</span></div>
+      </div>
+      ${genres.length ? `<div class="profile-sec"><h3>Любимые жанры</h3><div class="chips">${genres.map(g => `<span class="chip on-static">${esc(g)}</span>`).join('')}</div></div>` : ''}
+      ${sec('Хочет посмотреть', voted)}
+      ${sec('Выбирали его фильмы', wins)}
+      ${sec('Добавил(а) в колесо', added)}
+      ${!added.length && !wins.length && !voted.length ? '<p class="note">Пока ничего не добавил и не голосовал.</p>' : ''}`;
+    openModal('#profileModal');
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-person]');
+    if (!t || !t.dataset.person) return;
+    e.preventDefault();
+    openProfile(t.dataset.person, t.dataset.name || 'Без имени');
+  });
 
   // ---- дуэль ----
   const myVoter = () => (account.user ? 'd' + account.user.id : me.cid);
@@ -554,7 +622,7 @@ function initRoom(roomId) {
     people = list;
     if (state?.duel) renderDuel(state.duel);
     const people_ = list;
-    $('#people').innerHTML = people_.slice(0, 6).map(p => `<span class="ava" style="background:hsl(${hue(p.name)} 55% 42%)" data-tip="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
+    $('#people').innerHTML = people_.slice(0, 6).map(p => `<span class="ava" style="background:hsl(${hue(p.name)} 55% 42%)" data-tip="${esc(p.name)}" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
       + (people_.length > 6 ? `<span class="ava" style="background:#333">+${people_.length - 6}</span>` : '');
   }
 
@@ -568,6 +636,7 @@ function initRoom(roomId) {
     const row = e.target.closest('.film');
     if (!row) return;
     const id = row.dataset.id;
+    if (e.target.closest('[data-vote-film]')) return voteFilm(id);
     const w = e.target.closest('[data-w]');
     if (w) {
       try { await api(`/rooms/${roomId}/films/${id}`, { method: 'PATCH', body: { delta: Number(w.dataset.w) } }); }
@@ -586,23 +655,31 @@ function initRoom(roomId) {
   function showDetail(f, fromHistory = false) {
     if (!f) return;
     const active = activeFilms();
-    const total = active.reduce((s, x) => s + x.weight, 0);
+    const total = active.reduce((s, x) => s + effWeight(x), 0);
     const inWheel = !fromHistory && active.some(x => x.id === f.id);
+    const votes = f.votes || [];
+    const votersLine = votes.length ? `<div class="voters-line">Хотят посмотреть: ${votes.map(v => `<button class="person" data-person="${esc(v.id)}" data-name="${esc(v.name)}">${esc(v.name)}</button>`).join(', ')}${!fromHistory ? ` <span class="m">+${Math.round(rules().bonus * Math.min(rules().cap, votes.length) * 100)}% к шансу</span>` : ''}</div>` : '';
     $('#filmDetail').innerHTML = `<div class="detail">
       ${f.poster ? `<img src="${esc(f.poster)}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"></div>`}
       <div>
         <h2>${esc(f.title)}</h2>
         ${f.original ? `<div class="orig">${esc(f.original)}</div>` : ''}
         ${facts(f)}
-        ${inWheel ? `<div class="facts"><span>Вес <b>${f.weight}</b></span><span>Шанс <b>${(f.weight / total * 100).toFixed(1)}%</b></span></div>` : ''}
+        ${inWheel ? `<div class="facts"><span>Вес <b>${f.weight}</b></span><span>Голосов <b>${votes.length}</b></span><span>Шанс <b>${(effWeight(f) / total * 100).toFixed(1)}%</b></span></div>` : ''}
+        ${votersLine}
         <p>${f.overview ? esc(f.overview) : '<span class="muted">Описания нет.</span>'}</p>
         <div class="detail-actions">
           ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Страница фильма</a>` : ''}
           ${trailerBtn(f)}
+          ${!fromHistory ? `<button class="btn btn-ghost${iVoted(f) ? ' on' : ''}" data-vote-detail>${ICON.heart}${iVoted(f) ? 'Снять голос' : 'Хочу посмотреть'}</button>` : ''}
           ${!fromHistory ? `<button class="btn btn-ghost" data-rm>Удалить из колеса</button>` : ''}
         </div>
       </div></div>`;
     $('#filmDetail [data-rm]')?.addEventListener('click', async () => { await removeFilm(f.id); closeModal('#filmModal'); });
+    $('#filmDetail [data-vote-detail]')?.addEventListener('click', async () => {
+      await voteFilm(f.id);
+      setTimeout(() => showDetail(state.films.find(x => x.id === f.id), false), 250);
+    });
     openModal('#filmModal');
   }
 
@@ -654,7 +731,7 @@ function initRoom(roomId) {
     if (!b || b.classList.contains('added')) return;
     const film = b.dataset.manual !== undefined ? { title: $('#searchInput').value.trim() } : lastResults[b.dataset.i];
     try {
-      const r = await api(`/rooms/${roomId}/films`, { method: 'POST', body: { ...film, by: me.name } });
+      const r = await api(`/rooms/${roomId}/films`, { method: 'POST', body: { ...film, by: me.name, cid: me.cid } });
       b.classList.add('added');
       b.querySelector('.plus').innerHTML = ICON.check;
       toast(r.merged.length ? `«${film.title}» уже был, вес увеличен` : `«${film.title}» добавлен`);
@@ -666,7 +743,7 @@ function initRoom(roomId) {
   let bulk = [];
 
   async function addFilms(films) {
-    const r = await api(`/rooms/${roomId}/films`, { method: 'POST', body: { films, by: me.name } });
+    const r = await api(`/rooms/${roomId}/films`, { method: 'POST', body: { films, by: me.name, cid: me.cid } });
     toast(`Добавлено: ${r.added.length}${r.merged.length ? `, уже были: ${r.merged.length}` : ''}`);
   }
   async function findFilm(q) {
