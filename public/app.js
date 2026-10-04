@@ -82,7 +82,10 @@ function closeModal(m) {
   }, 300);
 }
 function openTrailer(key) {
-  $('#trailerFrame').innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(key)}?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+  // youtube.com, а не youtube-nocookie: так плеер видит вход в YouTube и реже требует подтвердить, что вы не бот
+  const k = encodeURIComponent(key);
+  $('#trailerFrame').innerHTML = `<iframe src="https://www.youtube.com/embed/${k}?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+  $('#trailerLink').href = `https://www.youtube.com/watch?v=${k}`;
   openModal('#trailerModal');
 }
 document.addEventListener('click', e => {

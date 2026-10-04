@@ -141,7 +141,7 @@ input::placeholder, textarea::placeholder { color: var(--tx3); }
 .recent-list span { color: var(--tx2); font-size: 14px; }
 
 /* ---------- комната ---------- */
-.layout { display: grid; grid-template-columns: minmax(300px, 370px) minmax(0, 1fr) minmax(260px, 300px); align-items: start; }
+.layout { display: grid; grid-template-columns: minmax(300px, 370px) minmax(0, 1fr) minmax(300px, 330px); align-items: start; }
 .layout > .sheet { margin: 8px 4px; }
 .layout > .sheet:first-child { margin-left: 8px; }
 .layout > .sheet:last-child { margin-right: 8px; }
@@ -214,6 +214,9 @@ input::placeholder, textarea::placeholder { color: var(--tx3); }
 .seg button.on, .tabs button.on { color: var(--btn-tx); }
 .seg-ind, .tabs-ind { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); background: var(--btn); border-radius: 9px; transition: transform .45s var(--ease), width .45s var(--ease); }
 #delaySeg button { padding: 0 6px; }
+/* три режима в узкой панели: кнопки по ширине текста, с отступами от краёв */
+#modeSeg { grid-auto-columns: auto; grid-template-columns: repeat(3, auto); }
+#modeSeg button { padding: 0 12px; font-size: 13.5px; }
 .seg-ind, .tabs-ind { will-change: transform, width; }
 .tabs { align-self: flex-start; }
 
@@ -451,3 +454,8 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .trailer-frame { aspect-ratio: 16/9; width: 100%; }
 .trailer-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
 .trailer-card .modal-x { top: -48px; right: 0; background: var(--s2); color: var(--tx); }
+/* окно трейлера открывается поверх других окон (карточки фильма, окна победителя) */
+#trailerModal { z-index: 60; }
+.trailer-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; background: var(--sheetB); border-radius: 0 0 28px 28px; color: var(--tx2); font-size: 13.5px; }
+.trailer-bar .btn { flex: none; height: 42px; }
+.trailer-frame { border-radius: 28px 28px 0 0; }
