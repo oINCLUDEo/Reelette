@@ -38,7 +38,10 @@ function loadEnv(file) {
 // ---------- хранилище ----------
 let rooms = {};
 try { rooms = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { rooms = {}; }
-for (const r of Object.values(rooms)) { r.spin = null; r.plan = null; r.duel = null; }
+for (const r of Object.values(rooms)) {
+  r.spin = null; r.plan = null; r.duel = null;
+  for (const h of r.history || []) { h.hid ||= crypto.randomBytes(4).toString('hex'); h.ratings ||= {}; }
+}
 
 let saveTimer = null;
 function save() {
@@ -76,6 +79,7 @@ function publicState(r) {
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
     rules: { votes: VOTES_PER_PERSON, bonus: VOTE_BONUS, cap: VOTE_CAP },
+    fair: r.fair !== false, modifier: activeModifier(r),
   };
 }
 
@@ -84,7 +88,52 @@ function publicState(r) {
 const VOTES_PER_PERSON = 3;
 const VOTE_BONUS = 0.25;
 const VOTE_CAP = 4;
-const effWeight = f => f.weight * (1 + VOTE_BONUS * Math.min(VOTE_CAP, (f.votes || []).length));
+const voteMul = f => 1 + VOTE_BONUS * Math.min(VOTE_CAP, (f.votes || []).length);
+const effWeight = f => f.weight * voteMul(f);
+// Автор фильма: Discord-пользователь (d…), гость (g…), у старых фильмов только имя (n:…)
+const personOf = f => (f.addedById ? (/^\d+$/.test(f.addedById) ? 'd' + f.addedById : f.addedById) : 'n:' + (f.addedBy || ''));
+
+// ---------- оценка после просмотра: разовый бонус или штраф автору на следующий выбор ----------
+// Средняя оценка остальных (без автора): <5 → ×0.5, 5–7.9 → ×1, 8–9.9 → ×1.25, 10 → ×1.5.
+// Действует, пока не выбран следующий фильм, потом сбрасывается.
+function ratingFactor(avg) {
+  if (avg < 5) return 0.5;
+  if (avg < 8) return 1;
+  if (avg < 10) return 1.25;
+  return 1.5;
+}
+function activeModifier(r) {
+  const h = r.history?.[0];
+  if (!h || h.consumed) return null;
+  const author = personOf(h.film);
+  const scores = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author).map(([, v]) => v.score);
+  if (!scores.length) return null;
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  return { pid: author, name: h.film.addedBy || '', title: h.film.title, avg: Math.round(avg * 10) / 10, count: scores.length, factor: ratingFactor(avg) };
+}
+
+// Шансы на колесе. С «равными шансами» колесо сначала делится поровну между авторами,
+// внутри доли автора — между его фильмами по весу. Голоса и оценка действуют поверх.
+function chanceWeights(r, list) {
+  const mod = activeModifier(r);
+  const modOf = pid => (mod && mod.pid === pid ? mod.factor : 1);
+  const w = new Map();
+  if (r.fair !== false) {
+    const groups = new Map();
+    for (const f of list) {
+      const p = personOf(f);
+      if (!groups.has(p)) groups.set(p, []);
+      groups.get(p).push(f);
+    }
+    for (const [p, fs] of groups) {
+      const sum = fs.reduce((a, f) => a + f.weight, 0) || 1;
+      for (const f of fs) w.set(f.id, (100 / groups.size) * modOf(p) * (f.weight / sum) * voteMul(f));
+    }
+  } else {
+    for (const f of list) w.set(f.id, f.weight * voteMul(f) * modOf(personOf(f)));
+  }
+  return w;
+}
 // Кто действует: Discord-пользователь или гость с id браузера
 const personKey = (me, b) => (me ? 'd' + me.id : str(b.cid, 32) ? 'g' + str(b.cid, 32) : '');
 
@@ -131,10 +180,11 @@ setInterval(() => {
 function activeFilms(r) {
   return r.films.filter(f => !r.eliminated.includes(f.id) && f.weight > 0 && matchesFilters(r, f));
 }
-function pickWeighted(list) {
-  const total = list.reduce((s, f) => s + effWeight(f), 0);
+function pickWeighted(list, weights) {
+  const wOf = f => (weights ? weights.get(f.id) || 0 : effWeight(f));
+  const total = list.reduce((s, f) => s + wOf(f), 0);
   let x = crypto.randomInt(0, 1e9) / 1e9 * total;
-  for (const f of list) { x -= effWeight(f); if (x < 0) return f; }
+  for (const f of list) { x -= wOf(f); if (x < 0) return f; }
   return list[list.length - 1];
 }
 
@@ -145,13 +195,14 @@ function startSpin(r, { mode, duration, auto, by, delay }) {
   duration = Math.min(60, Math.max(0, num(duration, 12))); // 0 — сразу результат, без вращения
   delay = Math.min(15, Math.max(0, Math.round(num(delay, 0))));
   const rt = runtime(r);
+  const W = chanceWeights(r, list);
 
   let landed;
   if (mode === 'normal') {
-    landed = pickWeighted(list);
+    landed = pickWeighted(list, W);
   } else {
     // Победитель выбирается сразу пропорционально весу, порядок выбывания — случайный.
-    if (!r.plan || !list.some(f => f.id === r.plan.winner)) r.plan = { winner: pickWeighted(list).id };
+    if (!r.plan || !list.some(f => f.id === r.plan.winner)) r.plan = { winner: pickWeighted(list, W).id };
     const losers = list.filter(f => f.id !== r.plan.winner);
     landed = losers[crypto.randomInt(0, losers.length)];
   }
@@ -159,7 +210,7 @@ function startSpin(r, { mode, duration, auto, by, delay }) {
   r.spin = {
     sid: id(6), mode, duration, auto: Boolean(auto) && mode === 'elimination', by: str(by, 32),
     startedAt: Date.now() + delay * 1000, delay,
-    snapshot: list.map(f => ({ id: f.id, weight: Math.round(effWeight(f) * 1000) / 1000 })),
+    snapshot: list.map(f => ({ id: f.id, weight: Math.round(W.get(f.id) * 1000) / 1000 })),
     filmId: landed.id,
     offset: 0.12 + (crypto.randomInt(0, 1000) / 1000) * 0.76,
     turns: duration ? Math.max(2, Math.round(duration * 0.9)) : 0,
@@ -252,7 +303,11 @@ function resolveDuel(r, did) {
   const ca = count(a), cb = count(b);
   let winner;
   if (ca !== cb) winner = ca > cb ? a : b;
-  else winner = pickWeighted([a, b].map(x => r.films.find(f => f.id === x)).filter(Boolean))?.id || a; // ничья: решает вес
+  else {
+    // ничья: жребий с теми же шансами, что на колесе
+    const pair = [a, b].map(x => r.films.find(f => f.id === x)).filter(Boolean);
+    winner = pickWeighted(pair, chanceWeights(r, activeFilms(r)))?.id || a;
+  }
   d.reveal = { winner, loser: winner === a ? b : a, counts: { [a]: ca, [b]: cb }, tie: ca === cb };
   pushState(r);
   runtime(r).duelNext = setTimeout(() => advanceDuel(r, did), 2400);
@@ -301,7 +356,9 @@ function endAngle(s) {
 
 function recordWin(r, film, mode) {
   if (!film) return;
-  r.history.unshift({ at: Date.now(), mode, film: { ...film } });
+  // прошлый бонус или штраф отработал на этом выборе
+  for (const h of r.history) h.consumed = true;
+  r.history.unshift({ hid: crypto.randomBytes(4).toString('hex'), at: Date.now(), mode, film: { ...film }, ratings: {} });
   // фильм выбран: голоса за него возвращаются людям (в истории остаётся, кто его хотел)
   const live = r.films.find(x => x.id === film.id);
   if (live) live.votes = [];
@@ -532,6 +589,11 @@ async function api(req, res, url) {
   b.by = who;
 
   if (!sub && m === 'PATCH') {
+    if (b.fair !== undefined) {
+      if (r.spin || r.duel) return json(res, 409, { error: 'Это можно менять, когда колесо стоит' });
+      r.fair = Boolean(b.fair);
+      r.plan = null;
+    }
     if (b.filters !== undefined) {
       if (r.spin || r.duel) return json(res, 409, { error: 'Фильтры можно менять, когда колесо стоит' });
       r.filters = cleanFilters(b.filters);
@@ -572,6 +634,20 @@ async function api(req, res, url) {
       r.spin = null;
       broadcast(r.id, { type: 'cancel', by: who });
     }
+    pushState(r); return json(res, 200, { ok: true });
+  }
+
+  // оценка фильма после просмотра, можно менять
+  if (sub === 'rate' && m === 'POST') {
+    const h = r.history.find(x => x.hid === str(b.hid, 16));
+    if (!h) return json(res, 404, { error: 'Этого фильма нет в истории' });
+    const pid = personKey(me, b);
+    if (!pid) return json(res, 400, { error: 'Не понятно, кто оценивает' });
+    if (pid === personOf(h.film)) return json(res, 400, { error: 'Свой фильм оценивают остальные' });
+    const score = Math.round(num(b.score, 0));
+    h.ratings ||= {};
+    if (score >= 1 && score <= 10) h.ratings[pid] = { score, name: who, avatar: me?.avatar || '' };
+    else delete h.ratings[pid];
     pushState(r); return json(res, 200, { ok: true });
   }
 

@@ -503,3 +503,32 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .poster-row i { width: 46px; height: 68px; border-radius: 9px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 15px var(--f-head); font-style: normal; color: rgba(255,255,255,.7); }
 .poster-row span { color: var(--tx3); font-weight: 700; font-size: 13px; margin-left: 4px; }
 .chip.on-static { cursor: default; display: inline-flex; align-items: center; background: var(--s2); color: var(--tx); }
+
+/* ---------- бонус или штраф автору на этот выбор ---------- */
+.mod-banner { display: flex; align-items: center; gap: 12px; margin: 0 20px 12px; padding: 10px 12px; border-radius: 13px; font-size: 13px; color: var(--tx2); border: 1px solid; }
+.mod-banner b { font: 800 22px/1 var(--f-ui); letter-spacing: -.04em; flex: none; }
+.mod-banner.down { background: color-mix(in srgb, var(--bad) 10%, transparent); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+.mod-banner.down b { color: var(--bad); }
+.mod-banner.up { background: color-mix(in srgb, var(--ok) 10%, transparent); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.mod-banner.up b { color: var(--ok); }
+
+/* ---------- оценка после просмотра ---------- */
+.rate-box { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 20px; background: var(--s1); border: 1px solid var(--bd); }
+.rate-box h3 { font-size: 17px; }
+.rate-film { display: flex; gap: 12px; align-items: center; }
+.rate-film i { width: 38px; height: 56px; border-radius: 8px; background: var(--c, var(--s3)) center/cover; flex: none; display: grid; place-items: center; font: 800 15px var(--f-head); font-style: normal; color: rgba(255,255,255,.7); }
+.rate-film b { display: block; font-size: 15px; }
+.rate-film span { color: var(--tx3); font-size: 13px; }
+.rate-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.rate-scale button { height: 36px; border-radius: 10px; background: var(--s2); border: 1px solid var(--bd); font: 800 15px var(--f-ui); color: var(--tx2); transition: background .2s, color .2s, transform .3s var(--spring); }
+.rate-scale button:hover { color: var(--tx); transform: translateY(-2px); }
+.rate-scale button.low:hover, .rate-scale button.low.on { border-color: var(--bad); }
+.rate-scale button.high:hover, .rate-scale button.high.on { border-color: var(--ok); }
+.rate-scale button.on { background: var(--btn); color: var(--btn-tx); }
+.rate-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.rate-list span { display: inline-flex; align-items: center; gap: 7px; padding: 4px 6px 4px 10px; border-radius: 9px; background: var(--s2); font-size: 13px; }
+.rate-list b { min-width: 24px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: var(--sheetA); font-size: 12.5px; }
+.rate-effect { font-size: 13px; color: var(--tx2); line-height: 1.45; }
+.hist .score { margin-left: auto; font: 800 13px var(--f-ui); font-style: normal; padding: 3px 8px; border-radius: 7px; background: var(--s2); color: var(--tx); flex: none; }
+.profile-tags .down { color: var(--bad); }
+.profile-tags .up { color: var(--ok); }

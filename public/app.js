@@ -318,7 +318,38 @@ function initRoom(roomId) {
   const personOf = f => (f.addedById ? (/^\d+$/.test(f.addedById) ? 'd' + f.addedById : f.addedById) : 'n:' + (f.addedBy || ''));
   const isBy = (f, pid, name) => personOf(f) === pid || (!f.addedById && f.addedBy === name);
 
-  function syncWheel() { wheel.setItems(activeFilms().map(f => ({ ...f, weight: effWeight(f) }))); }
+  // Шансы: тот же расчёт, что на сервере (chanceWeights в server.js)
+  const voteMul = f => 1 + rules().bonus * Math.min(rules().cap, (f.votes || []).length);
+  function chanceWeights(list) {
+    const mod = state?.modifier;
+    const modOf = pid => (mod && mod.pid === pid ? mod.factor : 1);
+    const w = new Map();
+    if (state?.fair !== false) {
+      const groups = new Map();
+      for (const f of list) {
+        const p = personOf(f);
+        if (!groups.has(p)) groups.set(p, []);
+        groups.get(p).push(f);
+      }
+      for (const [p, fs] of groups) {
+        const sum = fs.reduce((a, f) => a + f.weight, 0) || 1;
+        for (const f of fs) w.set(f.id, (100 / groups.size) * modOf(p) * (f.weight / sum) * voteMul(f));
+      }
+    } else for (const f of list) w.set(f.id, f.weight * voteMul(f) * modOf(personOf(f)));
+    return w;
+  }
+  const fmtFactor = x => '×' + String(x).replace('.', ',');
+  const avgRating = h => {
+    const author = personOf(h.film);
+    const sc = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author).map(([, v]) => v.score);
+    return sc.length ? sc.reduce((a, b) => a + b, 0) / sc.length : null;
+  };
+
+  function syncWheel() {
+    const list = activeFilms();
+    const W = chanceWeights(list);
+    wheel.setItems(list.map(f => ({ ...f, weight: W.get(f.id) })));
+  }
 
   function runSpin(spin) {
     spinningSid = spin.sid;
@@ -430,17 +461,28 @@ function initRoom(roomId) {
     $('#roomTitle').textContent = state.name;
     const spinning = Boolean(spinningSid || state.spin);
     const active = activeFilms();
-    const total = active.reduce((s, f) => s + effWeight(f), 0);
+    const W = chanceWeights(active);
+    const total = active.reduce((s, f) => s + W.get(f.id), 0);
     const out = new Set(state.eliminated);
 
     const used = myVotesUsed(), R = rules();
     $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: R.votes }, (_, i) => `<i class="${i < R.votes - used ? 'on' : ''}"></i>`).join('')}</span><span class="m">${used < R.votes ? `осталось ${R.votes - used}, каждый +${Math.round(R.bonus * 100)}% к шансу` : 'все отданы, голос можно снять'}</span>`;
 
+    const mod = state.modifier;
+    $('#modBanner').hidden = !mod || mod.factor === 1;
+    if (mod && mod.factor !== 1) {
+      $('#modBanner').className = 'mod-banner ' + (mod.factor < 1 ? 'down' : 'up');
+      $('#modBanner').innerHTML = `<b>${fmtFactor(mod.factor)}</b><span>фильмам автора <button class="person" data-person="${esc(mod.pid)}" data-name="${esc(mod.name)}">${esc(mod.name)}</button> на этот выбор: «${esc(mod.title)}» получил среднюю ${String(mod.avg).replace('.', ',')}</span>`;
+    }
+    $('#fairOn').checked = state.fair !== false;
+    $('#fairOn').disabled = spinning || Boolean(state.duel);
+    renderRate();
+
     $('#filmCount').textContent = state.films.length ? String(state.films.length) : '';
     $('#filmEmpty').hidden = state.films.length > 0;
     $('#filmList').innerHTML = state.films.map(f => {
       const filtered = !out.has(f.id) && !matchesFilters(f);
-      const share = effWeight(f) / total;
+      const share = (W.get(f.id) || 0) / total;
       const pct = out.has(f.id) || filtered || !total ? '—' : `${(share * 100).toFixed(share < 0.1 ? 1 : 0)}%`;
       const nv = (f.votes || []).length, mine = iVoted(f);
       const meta = filtered ? ['не подходит под фильтры'] : [f.year, f.runtime && fmtRuntime(f.runtime), f.addedBy].filter(Boolean);
@@ -462,7 +504,10 @@ function initRoom(roomId) {
     }).join('');
 
     $('#historyList').innerHTML = state.history.length
-      ? state.history.slice(0, 20).map((h, i) => `<div class="hist" data-h="${i}"><i style="${posterStyle(h.film)}"></i><div><b>${esc(h.film.title)}</b><span>${timeAgo(h.at)}</span></div></div>`).join('')
+      ? state.history.slice(0, 20).map((h, i) => {
+        const a = avgRating(h);
+        return `<div class="hist" data-h="${i}"><i style="${posterStyle(h.film)}"></i><div><b>${esc(h.film.title)}</b><span>${timeAgo(h.at)}</span></div>${a !== null ? `<em class="score">${a.toFixed(1).replace('.', ',')}</em>` : ''}</div>`;
+      }).join('')
       : '<p class="note">Пока ничего. Победители будут появляться здесь.</p>';
 
     const btn = $('#spinBtn');
@@ -500,6 +545,44 @@ function initRoom(roomId) {
     }
   }
 
+  // ---- оценка последнего выбранного фильма ----
+  function renderRate() {
+    const h = state.history[0];
+    const box = $('#rateBox');
+    if (!h || h.consumed) { box.hidden = true; return; }
+    box.hidden = false;
+    const author = personOf(h.film);
+    const isAuthor = author === myPid();
+    const mine = h.ratings?.[myPid()]?.score || 0;
+    const list = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author);
+    const mod = state.modifier;
+    const who = `<button class="person" data-person="${esc(author)}" data-name="${esc(h.film.addedBy || '')}">${esc(h.film.addedBy || 'автора')}</button>`;
+    const effect = !mod
+      ? `Средняя оценка изменит шанс фильмов ${who} на следующий выбор.`
+      : mod.factor === 1 ? `Средняя ${String(mod.avg).replace('.', ',')}: шанс фильмов ${who} не меняется.`
+      : `Средняя ${String(mod.avg).replace('.', ',')}: фильмы ${who} получат ${fmtFactor(mod.factor)} на следующий выбор.`;
+    box.innerHTML = `
+      <h3>Оцените после просмотра</h3>
+      <div class="rate-film" data-h="0"><i style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><div><b>${esc(h.film.title)}</b><span>добавил(а) ${who}</span></div></div>
+      ${isAuthor ? '<p class="note">Это ваш фильм, его оценивают остальные.</p>'
+        : `<div class="rate-scale">${Array.from({ length: 10 }, (_, i) => `<button class="${i + 1 === mine ? 'on' : ''} ${i + 1 < 5 ? 'low' : i + 1 < 8 ? 'mid' : 'high'}" data-score="${i + 1}">${i + 1}</button>`).join('')}</div>`}
+      ${list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>` : ''}
+      <p class="rate-effect">${effect}</p>`;
+  }
+  $('#rateBox').addEventListener('click', async e => {
+    const b = e.target.closest('[data-score]');
+    if (!b) return;
+    const h = state.history[0];
+    const score = b.classList.contains('on') ? 0 : Number(b.dataset.score); // повторный клик снимает оценку
+    try { await api(`/rooms/${roomId}/rate`, { method: 'POST', body: { hid: h.hid, score, cid: me.cid, by: me.name } }); }
+    catch (err) { toast(err.message, true); }
+  });
+  $('#fairOn').addEventListener('change', e => {
+    state.fair = e.target.checked;
+    syncWheel(); render();
+    api(`/rooms/${roomId}`, { method: 'PATCH', body: { fair: state.fair } }).catch(err => toast(err.message, true));
+  });
+
   // ---- мини-профиль: считается из данных комнаты ----
   function openProfile(pid, name) {
     if (!state) return;
@@ -516,6 +599,9 @@ function initRoom(roomId) {
       for (const g of f.genres || []) freq.set(g, (freq.get(g) || 0) + 1);
     }
     const genres = [...freq.keys()].sort((a, b) => freq.get(b) - freq.get(a)).slice(0, 4);
+    const rated = state.history.filter(h => isBy(h.film, pid, name)).map(avgRating).filter(a => a !== null);
+    const avgOfHis = rated.length ? rated.reduce((a, b) => a + b, 0) / rated.length : null;
+    const modNow = state.modifier && state.modifier.pid === pid && state.modifier.factor !== 1 ? state.modifier : null;
     const row = list => `<div class="poster-row">${list.slice(0, 8).map(f => `<i title="${esc(f.title)}" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</i>`).join('')}${list.length > 8 ? `<span>+${list.length - 8}</span>` : ''}</div>`;
     const sec = (title, list) => (list.length ? `<div class="profile-sec"><h3>${title}</h3>${row(list)}</div>` : '');
     $('#profileBody').innerHTML = `
@@ -523,16 +609,16 @@ function initRoom(roomId) {
         ${avatar ? `<img src="${esc(avatar)}" alt="">` : `<span class="profile-ava" style="background:hsl(${hue(name)} 55% 42%)">${initial(name)}</span>`}
         <div>
           <h2>${esc(name)}</h2>
-          <div class="profile-tags"><span>${pid.startsWith('d') ? 'Discord' : 'Гость'}</span>${online ? '<span class="online">в комнате</span>' : ''}${pid === myPid() ? '<span>это вы</span>' : ''}</div>
+          <div class="profile-tags"><span>${pid.startsWith('d') ? 'Discord' : 'Гость'}</span>${online ? '<span class="online">в комнате</span>' : ''}${pid === myPid() ? '<span>это вы</span>' : ''}${modNow ? `<span class="${modNow.factor < 1 ? 'down' : 'up'}">${fmtFactor(modNow.factor)} на этот выбор</span>` : ''}</div>
         </div>
       </div>
       <div class="profile-stats">
         <div><b>${added.length}</b><span>${plural(added.length, 'фильм', 'фильма', 'фильмов')} в колесе</span></div>
         <div><b>${wins.length}</b><span>${plural(wins.length, 'раз выбрали', 'раза выбрали', 'раз выбрали')} его фильм</span></div>
-        <div><b>${voted.length}<small>/${rules().votes}</small></b><span>голосов отдано</span></div>
+        <div><b>${avgOfHis !== null ? avgOfHis.toFixed(1).replace('.', ',') : '—'}</b><span>средняя оценка его фильмов</span></div>
       </div>
       ${genres.length ? `<div class="profile-sec"><h3>Любимые жанры</h3><div class="chips">${genres.map(g => `<span class="chip on-static">${esc(g)}</span>`).join('')}</div></div>` : ''}
-      ${sec('Хочет посмотреть', voted)}
+      ${sec(`Хочет посмотреть (${voted.length} из ${rules().votes} голосов)`, voted)}
       ${sec('Выбирали его фильмы', wins)}
       ${sec('Добавил(а) в колесо', added)}
       ${!added.length && !wins.length && !voted.length ? '<p class="note">Пока ничего не добавил и не голосовал.</p>' : ''}`;
@@ -655,7 +741,8 @@ function initRoom(roomId) {
   function showDetail(f, fromHistory = false) {
     if (!f) return;
     const active = activeFilms();
-    const total = active.reduce((s, x) => s + effWeight(x), 0);
+    const W = chanceWeights(active);
+    const total = active.reduce((s, x) => s + W.get(x.id), 0);
     const inWheel = !fromHistory && active.some(x => x.id === f.id);
     const votes = f.votes || [];
     const votersLine = votes.length ? `<div class="voters-line">Хотят посмотреть: ${votes.map(v => `<button class="person" data-person="${esc(v.id)}" data-name="${esc(v.name)}">${esc(v.name)}</button>`).join(', ')}${!fromHistory ? ` <span class="m">+${Math.round(rules().bonus * Math.min(rules().cap, votes.length) * 100)}% к шансу</span>` : ''}</div>` : '';
@@ -665,7 +752,7 @@ function initRoom(roomId) {
         <h2>${esc(f.title)}</h2>
         ${f.original ? `<div class="orig">${esc(f.original)}</div>` : ''}
         ${facts(f)}
-        ${inWheel ? `<div class="facts"><span>Вес <b>${f.weight}</b></span><span>Голосов <b>${votes.length}</b></span><span>Шанс <b>${(effWeight(f) / total * 100).toFixed(1)}%</b></span></div>` : ''}
+        ${inWheel ? `<div class="facts"><span>Вес <b>${f.weight}</b></span><span>Голосов <b>${votes.length}</b></span><span>Шанс <b>${(W.get(f.id) / total * 100).toFixed(1)}%</b></span></div>` : ''}
         ${votersLine}
         <p>${f.overview ? esc(f.overview) : '<span class="muted">Описания нет.</span>'}</p>
         <div class="detail-actions">
