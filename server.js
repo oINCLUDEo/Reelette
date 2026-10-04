@@ -35,12 +35,17 @@ let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    const tmp = DATA_FILE + '.tmp';
-    const out = {};
-    for (const [id, r] of Object.entries(rooms)) out[id] = { ...r, spin: null, plan: null };
-    fs.writeFileSync(tmp, JSON.stringify(out));
-    fs.renameSync(tmp, DATA_FILE);
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      const tmp = DATA_FILE + '.tmp';
+      const out = {};
+      for (const [id, r] of Object.entries(rooms)) out[id] = { ...r, spin: null, plan: null };
+      fs.writeFileSync(tmp, JSON.stringify(out));
+      fs.renameSync(tmp, DATA_FILE);
+    } catch (e) {
+      // не роняем сервер: комнаты живут в памяти, пишем в лог причину
+      console.error(`Не удалось сохранить ${DATA_FILE}: ${e.message}`);
+    }
   }, 300);
 }
 
