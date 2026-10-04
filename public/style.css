@@ -777,3 +777,18 @@ body.karaoke-on .k-lyr-view { flex: 1; min-height: 150px; height: auto; }
   body.karaoke-on .k-side { height: auto; }
   .k-vol input { width: 70px; }
 }
+
+/* ---------- караоке: высота сцены по экрану, текст прокручивается внутри своего окна ---------- */
+body.karaoke-on .karaoke { height: calc(100vh - 150px); min-height: 560px; display: flex; flex-direction: column; }
+body.karaoke-on .k-head { flex: none; }
+body.karaoke-on .k-main { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+body.karaoke-on .k-left { min-height: 0; }
+body.karaoke-on .k-video, body.karaoke-on .k-bar { flex: none; }
+body.karaoke-on .k-lyrics { flex: 1; min-height: 0; overflow: hidden; }
+body.karaoke-on .k-lyr-view { flex: 1; min-height: 0; height: auto; }
+body.karaoke-on .k-side { height: auto; min-height: 0; overflow-y: auto; }
+@media (max-width: 1100px) {
+  body.karaoke-on .karaoke { height: auto; min-height: 0; }
+  body.karaoke-on .k-lyrics { flex: none; }
+  body.karaoke-on .k-lyr-view { flex: none; height: 200px; }
+}
