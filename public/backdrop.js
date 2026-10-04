@@ -52,6 +52,13 @@
       const a = s.anchor.getBoundingClientRect(), c = s.cv.getBoundingClientRect();
       cx = a.left - c.left + a.width / 2; cy = a.top - c.top + a.height / 2; R = a.width / 2;
     }
+    // караоке: колеса нет, светимся мягко за видео, без кольца
+    const kv = s.cv.closest('.stage')?.classList.contains('karaoke-on') ? s.cv.parentElement.querySelector('.k-video') : null;
+    if (kv?.offsetParent) {
+      const a = kv.getBoundingClientRect(), c = s.cv.getBoundingClientRect();
+      cx = a.left - c.left + a.width / 2; cy = a.top - c.top + a.height / 2; R = a.width * 0.42;
+    }
+    const ringOn = !kv;
     const r0 = R * 1.04;
     // под музыку кольцо дышит басом
     const k = (1 + 0.06 * Math.sin(t * 0.9)) * (1 + b * 0.7) * (1 + fx.level * 1.1);
@@ -67,6 +74,7 @@
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
 
     // кольцо
+    if (ringOn) {
     g = ctx.createRadialGradient(cx, cy, r0 * 0.97, cx, cy, r0 * 1.6);
     g.addColorStop(0, rgba(colors.ring, 0));
     g.addColorStop(0.035, rgba(colors.ring, 0.85 * k));
@@ -74,6 +82,7 @@
     g.addColorStop(0.4, rgba(colors.glow, 0.1 * k));
     g.addColorStop(1, rgba(colors.glow, 0));
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    }
 
     // волны от колеса на сильных долях
     for (const wv of s.waves) {

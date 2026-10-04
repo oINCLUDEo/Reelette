@@ -679,7 +679,8 @@ function initRoom(roomId) {
         return;
       }
       if (!ytReady) return;
-      if (ytVid !== m.vid) { ytVid = m.vid; yt.loadVideoById({ videoId: m.vid, startSeconds: ytExpected(m) }); return; }
+      const playing = yt.getVideoData?.()?.video_id;
+      if (ytVid !== m.vid || (playing && playing !== m.vid)) { ytVid = m.vid; yt.loadVideoById({ videoId: m.vid, startSeconds: ytExpected(m) }); return; }
       reportDuration(m);
       const exp = ytExpected(m), cur = yt.getCurrentTime(), st = yt.getPlayerState();
       if (m.pausedAt != null) {
@@ -703,11 +704,17 @@ function initRoom(roomId) {
     const q = state.queue || [];
     const perfs = state.perfs || [];
     $('#kEmpty').hidden = Boolean(m);
-    $('#kLabel').textContent = m ? 'Поёт' : 'Сцена свободна';
+    $('#kLabel').textContent = m ? 'Сейчас поёт' : 'Сцена свободна';
     $('#kSinger').textContent = m ? (m.singer || m.by) : '';
     $('#kSong').textContent = m ? m.title : '';
-    $('#kToggle').hidden = $('#kNext').hidden = !m;
-    if (m) $('#kToggle').textContent = m.pausedAt != null ? 'Продолжить' : 'Пауза';
+    $('#kToggle').disabled = $('#kNext').disabled = !m;
+    $('#kToggle').innerHTML = !m || m.pausedAt != null
+      ? '<svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>'
+      : '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>';
+    $('#kToggle').title = m?.pausedAt != null ? 'Продолжить у всех' : 'Пауза у всех';
+    const nx = q[0];
+    $('#kUpNext').innerHTML = nx ? `<span>Далее</span><b>${esc(nx.singer || nx.by)}</b><em>${esc(nx.title)}</em>` : '';
+    renderLyrics(m);
     $('#kSingerIn').placeholder = `Кто поёт (по умолчанию ${me.name || 'вы'})`;
 
     const perf = m?.perfId && perfs.find(p => p.perfId === m.perfId);
@@ -743,6 +750,89 @@ function initRoom(roomId) {
     const top = [...by.values()].map(e => ({ ...e, avg: e.sum / e.n })).sort((a, b) => b.avg - a.avg).slice(0, 5);
     $('#kBoard').innerHTML = top.length ? `<span class="label">Звёзды вечера</span>` + top.map((e, i) => `<div class="k-star"><i>${i + 1}</i><b>${esc(e.name)}</b><span>${e.songs} ${plural(e.songs, 'песня', 'песни', 'песен')}</span><em>${e.avg.toFixed(1).replace('.', ',')}</em></div>`).join('') : '';
   }
+  // ---- текст песни: строки по таймингам, текущая заливается по мере пения ----
+  let lyrKey = '', lyrIdx = -1, lyrLines = null, lyrSearching = false;
+  function renderLyrics(m) {
+    const L = m?.lyrics;
+    const box = $('#kLyrics');
+    const key = !m ? 'none' : !L || L.loading ? 'loading:' + m.vid : L.none ? 'nf:' + m.vid : `${m.vid}:${L.id}:${lyrSearching}`;
+    // смещение меняется без перерисовки строк
+    if (L?.synced && $('#kOffset')) $('#kOffset').textContent = `${L.offset > 0 ? '+' : ''}${String(L.offset || 0).replace('.', ',')} с`;
+    if (key === lyrKey) return;
+    lyrKey = key; lyrIdx = -1; lyrLines = null;
+    if (!m) { box.innerHTML = ''; return; }
+    const head = L && !L.loading && !L.none ? `<div class="k-lyr-head">
+        <span>${esc(L.artist)}${L.artist && L.track ? ', ' : ''}${esc(L.track)}${L.synced ? '' : ' <em>без таймингов</em>'}</span>
+        ${L.synced ? `<span class="k-offset"><button type="button" class="nav-icon" data-loff="-0.5" title="Текст раньше на 0,5 с">−</button><b id="kOffset">${L.offset > 0 ? '+' : ''}${String(L.offset || 0).replace('.', ',')} с</b><button type="button" class="nav-icon" data-loff="0.5" title="Текст позже на 0,5 с">+</button></span>` : ''}
+        <button type="button" class="link-btn" data-lfind>Не тот текст</button>
+      </div>` : '';
+    const search = `<form class="k-lyr-search" id="kLyrSearch"><input placeholder="Исполнитель и название" value="${esc(L?.none ? L.q : (L?.artist ? L.artist + ' ' : '') + (L?.track || ''))}"><button class="btn btn-ghost" type="submit">Найти текст</button></form><div class="k-lyr-results" id="kLyrResults"></div>`;
+    if (lyrSearching || L?.none) {
+      box.innerHTML = head + (L?.none && !lyrSearching ? '<p class="k-lyr-note">Текст не нашёлся автоматически. Уточните название:</p>' : '') + search;
+    } else if (!L || L.loading) {
+      box.innerHTML = '<p class="k-lyr-note">Ищем текст…</p>';
+    } else if (L.synced?.length) {
+      box.innerHTML = head + `<div class="k-lyr-view"><div class="k-lines" id="kLines">${L.synced.map((l, i) => `<p data-i="${i}">${esc(l.text) || '<span class="k-dots">• • •</span>'}</p>`).join('')}</div></div>`;
+      lyrLines = L.synced;
+    } else {
+      box.innerHTML = head + `<div class="k-lyr-plain">${esc(L.plain).replace(/\n/g, '<br>')}</div>`;
+    }
+  }
+  function karaokeTime(m) {
+    return ytReady && ytVid === m.vid && yt.getVideoData?.()?.video_id === m.vid ? yt.getCurrentTime() : ytExpected(m);
+  }
+  const fmtT = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  (function karaokeFrame() {
+    requestAnimationFrame(karaokeFrame);
+    const m = state?.music;
+    if (!state?.karaoke || !m) return;
+    const t = karaokeTime(m);
+    const d = m.duration || (ytReady ? yt.getDuration() : 0);
+    $('#kProg').style.width = d ? `${Math.min(100, t / d * 100)}%` : '0';
+    $('#kTime').textContent = d ? `${fmtT(t)} / ${fmtT(d)}` : fmtT(t);
+    if (!lyrLines) return;
+    const lt = t + (m.lyrics?.offset || 0);
+    let i = -1;
+    for (let k = 0; k < lyrLines.length && lyrLines[k].t <= lt; k++) i = k;
+    const view = $('.k-lyr-view'), lines = $('#kLines');
+    if (!view || !lines) return;
+    if (i !== lyrIdx) {
+      lines.querySelector('p.on')?.classList.remove('on');
+      lines.querySelectorAll('p.past').forEach(p => p.classList.remove('past'));
+      const p = lines.children[Math.max(0, i)];
+      if (i >= 0) {
+        p.classList.add('on');
+        for (let k = Math.max(0, i - 3); k < i; k++) lines.children[k].classList.add('past');
+      }
+      lines.style.transform = `translateY(${view.clientHeight / 2 - p.offsetTop - p.offsetHeight / 2}px)`;
+      lyrIdx = i;
+    }
+    if (i >= 0) {
+      const a = lyrLines[i].t, b = lyrLines[i + 1]?.t ?? a + 4;
+      lines.children[i].style.setProperty('--p', Math.max(0, Math.min(1, (lt - a) / Math.max(0.3, b - a))).toFixed(3));
+    }
+  })();
+  $('#kLyrics').addEventListener('click', async e => {
+    const off = e.target.closest('[data-loff]');
+    if (off) return api(`/rooms/${roomId}/music/lyrics/offset`, { method: 'POST', body: { delta: Number(off.dataset.loff) } }).catch(err => toast(err.message, true));
+    if (e.target.closest('[data-lfind]')) { lyrSearching = !lyrSearching; lyrKey = ''; renderLyrics(state.music); return; }
+    const pick = e.target.closest('[data-lid]');
+    if (pick) {
+      try { await api(`/rooms/${roomId}/music/lyrics/set`, { method: 'POST', body: { id: Number(pick.dataset.lid) } }); lyrSearching = false; lyrKey = ''; }
+      catch (err) { toast(err.message, true); }
+    }
+  });
+  $('#kLyrics').addEventListener('submit', async e => {
+    e.preventDefault();
+    const q = e.target.querySelector('input').value.trim();
+    const out = $('#kLyrResults');
+    out.innerHTML = '<p class="k-lyr-note">Ищем…</p>';
+    try {
+      const { results } = await api(`/rooms/${roomId}/music/lyrics/search`, { method: 'POST', body: { q } });
+      out.innerHTML = results.length ? results.map(x => `<button type="button" class="k-lyr-item" data-lid="${x.id}"><b>${esc(x.track)}</b><span>${esc(x.artist)}, ${fmtT(x.duration)}${x.synced ? '' : ', без таймингов'}</span></button>`).join('') : '<p class="k-lyr-note">Ничего не нашлось.</p>';
+    } catch (err) { out.innerHTML = ''; toast(err.message, true); }
+  });
+
   $('#kRate').addEventListener('click', async e => {
     const b = e.target.closest('[data-kscore]');
     if (!b) return;

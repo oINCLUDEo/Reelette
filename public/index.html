@@ -109,19 +109,33 @@
       <span class="shade"></span>
       <div class="stage-in">
         <div class="karaoke" id="karaokeBox" hidden>
-          <div class="k-now">
-            <span class="k-label" id="kLabel">Поёт</span>
-            <b id="kSinger"></b>
-            <span id="kSong"></span>
-          </div>
           <div class="k-main">
-            <div class="k-video">
-              <div id="kHost"></div>
-              <div class="k-empty" id="kEmpty">
-                <b>Сцена свободна.</b>
-                <span>Добавьте песню справа. Удобнее всего караоке-версии с YouTube: текст уже на экране.</span>
+            <div class="k-left">
+              <div class="k-head">
+                <div class="k-who">
+                  <span class="k-label" id="kLabel">Сейчас поёт</span>
+                  <b id="kSinger"></b>
+                  <span class="k-song" id="kSong"></span>
+                </div>
+                <div class="k-upnext" id="kUpNext"></div>
               </div>
-              <button class="yt-unmute" id="kUnmute" hidden>Нажмите, чтобы слушать</button>
+              <div class="k-video">
+                <div id="kHost"></div>
+                <div class="k-shield"></div>
+                <div class="k-empty" id="kEmpty">
+                  <b>Сцена свободна.</b>
+                  <span>Добавьте песню справа. Текст подтянется сам, если песня есть в базе текстов.</span>
+                </div>
+                <button class="yt-unmute" id="kUnmute" hidden>Нажмите, чтобы слушать</button>
+              </div>
+              <div class="k-bar" id="kBar">
+                <button class="nav-icon" id="kToggle"></button>
+                <button class="nav-icon" id="kNext" title="Следующая песня у всех"><svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg></button>
+                <div class="k-progress"><i id="kProg"></i></div>
+                <span class="k-time" id="kTime"></span>
+                <button class="ghost sm" id="kExit">Выйти из караоке</button>
+              </div>
+              <div class="k-lyrics" id="kLyrics"></div>
             </div>
             <div class="k-side">
               <form class="k-add" id="kAdd">
@@ -130,18 +144,13 @@
                 <input id="kSingerIn" placeholder="Кто поёт (по умолчанию вы)" maxlength="32" autocomplete="off">
                 <div class="k-add-row">
                   <button class="btn btn-primary" type="submit">В очередь</button>
-                  <button class="btn btn-ghost" type="button" id="kFind" title="Откроет поиск на YouTube: скопируйте ссылку на нужное видео и вставьте сюда">Найти караоке</button>
+                  <button class="btn btn-ghost" type="button" id="kFind" title="Откроет поиск на YouTube: скопируйте ссылку на нужное видео и вставьте сюда">Найти на YouTube</button>
                 </div>
               </form>
               <div class="k-rate" id="kRate"></div>
               <div class="k-queue" id="kQueue"></div>
               <div class="k-board" id="kBoard"></div>
             </div>
-          </div>
-          <div class="k-ctrl">
-            <button class="ghost sm" id="kToggle"></button>
-            <button class="ghost sm" id="kNext">Следующая песня</button>
-            <button class="ghost sm" id="kExit">Выйти из караоке</button>
           </div>
         </div>
         <div class="current"><span id="currentTitle">&nbsp;</span></div>

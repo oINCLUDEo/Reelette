@@ -462,7 +462,80 @@ function playTrack(r, track) {
     r.perfs = r.perfs.slice(0, 60);
     r.music.perfId = perf.perfId;
   }
+  if (r.karaoke) loadLyrics(r);
   scheduleMusic(r);
+}
+
+// ---------- тексты песен для караоке: LRCLIB (открытая база текстов с таймингами) ----------
+const LRC_UA = { 'User-Agent': 'Reelette karaoke (https://github.com/oINCLUDEo/Reelette)' };
+// Название с YouTube чистим от «(Karaoke Version)», «[Official Video]» и т. п., канал «… - Topic» — это исполнитель.
+function songQuery(title, author) {
+  const noise = /(karaoke|караоке|lyrics?|текст|official|video|клип|audio|минус|instrumental|version|remaster|hd|4k|mv)/i;
+  let t = String(title || '')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\(([^)]*)\)/g, (all, inner) => (noise.test(inner) ? ' ' : all))
+    .replace(/\b(karaoke|караоке|lyrics|official (music )?video|минус|instrumental)\b/gi, ' ')
+    .replace(/[|•]+/g, ' ').replace(/\s+/g, ' ').trim();
+  let artist = String(author || '').replace(/\s*-\s*Topic$/i, '').replace(/VEVO$/i, '').trim();
+  if (/sing king|karaoke|караоке|zzang|stingray|singstar/i.test(author || '')) {
+    // у караоке-каналов в начале названия часто стоит имя канала: «Sing King - Song»
+    const ch = String(author || '').trim();
+    if (ch && t.toLowerCase().startsWith(ch.toLowerCase())) t = t.slice(ch.length).replace(/^\s*[-–—:|]\s*/, '');
+    artist = '';
+  }
+  return { q: t, artist };
+}
+function parseLrc(text) {
+  const out = [];
+  for (const line of String(text || '').split(/\r?\n/)) {
+    const times = [...line.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+    if (!times.length) continue;
+    const words = line.replace(/\[[^\]]*\]/g, '').trim();
+    for (const tm of times) out.push({ t: Math.round((Number(tm[1]) * 60 + Number(tm[2])) * 100) / 100, text: words.slice(0, 200) });
+  }
+  return out.sort((a, b) => a.t - b.t).slice(0, 600);
+}
+const toLyrics = x => ({
+  id: x.id, track: str(x.trackName || '', 120), artist: str(x.artistName || '', 120), duration: Number(x.duration) || 0,
+  synced: x.syncedLyrics ? parseLrc(x.syncedLyrics) : null,
+  plain: x.syncedLyrics ? '' : str(x.plainLyrics || '', 8000),
+  offset: 0,
+});
+const lrcSearch = q => getJson(`https://lrclib.net/api/search?q=${encodeURIComponent(q)}`, LRC_UA).then(a => (Array.isArray(a) ? a : []));
+async function loadLyrics(r) {
+  const mu = r.music;
+  if (!mu || mu.lyrics) return;
+  mu.lyrics = { loading: true };
+  const { q, artist } = songQuery(mu.title, mu.author);
+  let list = [];
+  try {
+    list = await lrcSearch(artist ? `${artist} ${q}` : q);
+    if (!list.length && artist) list = await lrcSearch(q);
+  } catch (e) { console.warn('Текст песни:', e.message); }
+  if (r.music !== mu) return;
+  const pick = bestLyrics(list, { q, artist, duration: mu.duration || 0 });
+  mu.lyrics = pick ? { ...toLyrics(pick), auto: true, withDuration: Boolean(mu.duration) } : { none: true, q: artist ? `${artist} ${q}` : q };
+  pushState(r);
+}
+// Выбираем лучший вариант: совпадение исполнителя и названия, тайминги, близкая длительность;
+// live, ремиксы и каверы штрафуются, если их не было в запросе.
+function bestLyrics(list, { q, artist, duration }) {
+  const n = x => String(x || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const query = n(q), art = n(artist);
+  const extra = /\b(live|remix|cover|acoustic|version|instrumental|karaoke|sped up|slowed)\b/i;
+  let best = null, bestScore = -Infinity;
+  for (const x of list) {
+    if (!x.syncedLyrics && !x.plainLyrics) continue;
+    const track = n(x.trackName), who = n(x.artistName);
+    let sc = x.syncedLyrics ? 3 : 0;
+    if (art && (who.includes(art) || art.includes(who))) sc += 3;
+    if (track && (query.includes(track) || track.includes(query))) sc += 3;
+    if (query.split(' ').some(w => w.length > 2 && who.includes(w))) sc += 1;
+    if (extra.test(x.trackName || '') && !extra.test(q)) sc -= 3;
+    if (duration && x.duration) sc += Math.abs(x.duration - duration) < 4 ? 3 : Math.abs(x.duration - duration) < 12 ? 1 : -2;
+    if (sc > bestScore) { bestScore = sc; best = x; }
+  }
+  return best;
 }
 // Трек закончился или его пропустили: следующий из очереди, а если очередь пуста — текущий по кругу.
 function advanceMusic(r) {
@@ -654,6 +727,7 @@ async function api(req, res, url) {
     if (b.karaoke !== undefined) {
       if (r.spin || r.duel) return json(res, 409, { error: 'Дождитесь конца прокрута или дуэли' });
       r.karaoke = Boolean(b.karaoke);
+      if (r.karaoke && r.music) loadLyrics(r);
     }
     if (b.fair !== undefined) {
       if (r.spin || r.duel) return json(res, 409, { error: 'Это можно менять, когда колесо стоит' });
@@ -748,7 +822,27 @@ async function api(req, res, url) {
       if (i > 0) r.queue.unshift(...r.queue.splice(i, 1));
       pushState(r); return json(res, 200, { ok: true });
     }
+    // ручной поиск текста, если подобрался не тот
+    if (action === 'lyrics' && parts[4] === 'search') {
+      const q = str(b.q, 120);
+      if (q.length < 2) return json(res, 200, { results: [] });
+      try {
+        const list = await lrcSearch(q);
+        return json(res, 200, { results: list.slice(0, 8).map(x => ({ id: x.id, track: x.trackName, artist: x.artistName, duration: Math.round(x.duration || 0), synced: Boolean(x.syncedLyrics) })) });
+      } catch (e) { return json(res, 502, { error: 'База текстов не ответила' }); }
+    }
     if (!r.music) return json(res, 409, { error: 'Музыка не играет' });
+    if (action === 'lyrics' && parts[4] === 'set') {
+      try {
+        const x = await getJson(`https://lrclib.net/api/get/${Number(b.id) || 0}`, LRC_UA);
+        r.music.lyrics = toLyrics(x);
+      } catch (e) { return json(res, 502, { error: 'Не удалось загрузить текст' }); }
+      pushState(r); return json(res, 200, { ok: true });
+    }
+    if (action === 'lyrics' && parts[4] === 'offset') {
+      if (r.music.lyrics?.synced) r.music.lyrics.offset = Math.max(-30, Math.min(30, Math.round(((r.music.lyrics.offset || 0) + num(b.delta, 0)) * 10) / 10));
+      pushState(r); return json(res, 200, { ok: true });
+    }
     if (action === 'next') { advanceMusic(r); return json(res, 200, { ok: true }); }
     if (action === 'duration') {
       // длительность знает только плеер: первый, кто загрузил трек, сообщает её серверу
@@ -756,6 +850,7 @@ async function api(req, res, url) {
       if (r.music.vid === str(b.vid, 11) && !r.music.duration && d > 1 && d < 6 * 3600) {
         r.music.duration = d;
         scheduleMusic(r);
+        if (r.karaoke && r.music.lyrics?.auto && !r.music.lyrics.withDuration) { r.music.lyrics = null; loadLyrics(r); }
         save();
       }
       return json(res, 200, { ok: true });
