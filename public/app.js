@@ -759,7 +759,7 @@ function initRoom(roomId) {
     // смещение меняется без перерисовки строк
     if (L?.synced && $('#kOffset')) $('#kOffset').textContent = `${L.offset > 0 ? '+' : ''}${String(L.offset || 0).replace('.', ',')} с`;
     if (key === lyrKey) return;
-    lyrKey = key; lyrIdx = -1; lyrLines = null;
+    lyrKey = key; lyrIdx = -2; lyrLines = null;
     if (!m) { box.innerHTML = ''; return; }
     const head = L && !L.loading && !L.none ? `<div class="k-lyr-head">
         <span>${esc(L.artist)}${L.artist && L.track ? ', ' : ''}${esc(L.track)}${L.synced ? '' : ' <em>без таймингов</em>'}</span>
@@ -772,7 +772,7 @@ function initRoom(roomId) {
     } else if (!L || L.loading) {
       box.innerHTML = '<p class="k-lyr-note">Ищем текст…</p>';
     } else if (L.synced?.length) {
-      box.innerHTML = head + `<div class="k-lyr-view"><div class="k-lines" id="kLines">${L.synced.map((l, i) => `<p data-i="${i}">${esc(l.text) || '<span class="k-dots">• • •</span>'}</p>`).join('')}</div></div>`;
+      box.innerHTML = head + `<div class="k-lyr-view"><span class="k-intro" id="kIntro" hidden></span><div class="k-lines" id="kLines">${L.synced.map((l, i) => `<p data-i="${i}">${esc(l.text) || '<span class="k-dots">• • •</span>'}</p>`).join('')}</div></div>`;
       lyrLines = L.synced;
     } else {
       box.innerHTML = head + `<div class="k-lyr-plain">${esc(L.plain).replace(/\n/g, '<br>')}</div>`;
@@ -796,15 +796,23 @@ function initRoom(roomId) {
     for (let k = 0; k < lyrLines.length && lyrLines[k].t <= lt; k++) i = k;
     const view = $('.k-lyr-view'), lines = $('#kLines');
     if (!view || !lines) return;
+    const intro = $('#kIntro');
+    if (intro) {
+      intro.hidden = i >= 0;
+      if (i < 0) intro.textContent = `Вступление, ещё ${Math.max(0, Math.ceil(lyrLines[0].t - lt))} с`;
+    }
     if (i !== lyrIdx) {
-      lines.querySelector('p.on')?.classList.remove('on');
-      lines.querySelectorAll('p.past').forEach(p => p.classList.remove('past'));
+      const first = lyrIdx === -2; // первый кадр: ставим на место без анимации
+      lines.querySelectorAll('p.on, p.past, p.next').forEach(p => p.classList.remove('on', 'past', 'next'));
       const p = lines.children[Math.max(0, i)];
       if (i >= 0) {
         p.classList.add('on');
         for (let k = Math.max(0, i - 3); k < i; k++) lines.children[k].classList.add('past');
       }
+      lines.children[i + 1]?.classList.add('next');
+      if (first) lines.classList.add('instant');
       lines.style.transform = `translateY(${view.clientHeight / 2 - p.offsetTop - p.offsetHeight / 2}px)`;
+      if (first) requestAnimationFrame(() => lines.classList.remove('instant'));
       lyrIdx = i;
     }
     if (i >= 0) {
@@ -897,13 +905,14 @@ function initRoom(roomId) {
     if (ytChanging && !e.target.closest('#navMusic')) { ytChanging = false; syncMusic(); }
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && ytChanging) { ytChanging = false; syncMusic(); } });
-  $('#ytVol').addEventListener('input', () => {
-    $('#ytVol').style.setProperty('--f', $('#ytVol').value / 100);
-    ls.set('ytVol', Number($('#ytVol').value));
+  function setYtVol(v) {
+    for (const el of [$('#ytVol'), $('#kVol')]) { el.value = v; el.style.setProperty('--f', v / 100); }
+    ls.set('ytVol', v);
     ytVolume();
-  });
-  $('#ytVol').value = ls.get('ytVol', 50);
-  $('#ytVol').style.setProperty('--f', $('#ytVol').value / 100);
+  }
+  $('#ytVol').addEventListener('input', e => setYtVol(Number(e.target.value)));
+  $('#kVol').addEventListener('input', e => setYtVol(Number(e.target.value)));
+  setYtVol(ls.get('ytVol', 50));
 
   // ---- оценка последнего выбранного фильма ----
   function renderRate() {
