@@ -137,11 +137,13 @@ class Wheel {
     this.items = this.items.filter(i => i.target > 0 || i.w > 0.002);
     if (this.items.length !== before) this.dirty = true;
 
+    const prevRot = this.rot;
     if (this.anim) {
       const t = Math.min(1, Math.max(0, (now - this.anim.start) / this.anim.dur)); // до старта (отсчёт) t = 0
       this.rot = this.anim.from + (this.anim.to - this.anim.from) * Wheel.ease(t);
       if (t >= 1) { const d = this.anim.done; this.anim = null; this.rot %= 1; d?.(); }
     } else if (this.idleSpeed) this.rot += this.idleSpeed * dt;
+    this.speed = this.anim && dt > 0 ? Math.abs(this.rot - prevRot) / dt : 0;
 
     const idx = this.currentIndex();
     const id = this.items[idx]?.id ?? null;

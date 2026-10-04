@@ -164,10 +164,22 @@
 
       <div class="checks">
         <label class="check" id="autoWrap"><input type="checkbox" id="autoSpin"><span class="box"></span>Крутить до победителя</label>
-        <label class="check"><input type="checkbox" id="soundOn" checked><span class="box"></span>Звук щелчков</label>
       </div>
 
       <button id="resetBtn" class="btn btn-ghost btn-block" hidden>Вернуть выбывших в колесо</button>
+
+      <div class="field sound-field">
+        <span class="label">Звук</span>
+        <label class="check"><input type="checkbox" id="soundOn" checked><span class="box"></span>Щелчки и сигналы</label>
+        <label class="check"><input type="checkbox" id="musicOn"><span class="box"></span>Музыка при прокруте</label>
+        <div class="bgm">
+          <button class="btn btn-ghost" id="bgmPick"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span id="bgmName">Своя фоновая музыка</span></button>
+          <button class="btn btn-ghost bgm-play" id="bgmPlay" hidden title="Пауза"></button>
+        </div>
+        <input type="range" id="bgmVol" min="0" max="100" value="40" hidden aria-label="Громкость фоновой музыки">
+        <input type="file" id="bgmFile" accept="audio/*" hidden>
+        <p class="note">Свой трек играет только у вас и никуда не отправляется. Во время прокрута он становится тише.</p>
+      </div>
 
       <div class="rate-box" id="rateBox" hidden></div>
 
@@ -280,6 +292,7 @@
 
 <div id="toasts" class="toasts"></div>
 
+<script src="/audio.js"></script>
 <script src="/backdrop.js"></script>
 <script src="/wheel.js"></script>
 <script src="/app.js"></script>

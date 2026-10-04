@@ -532,3 +532,10 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .hist .score { margin-left: auto; font: 800 13px var(--f-ui); font-style: normal; padding: 3px 8px; border-radius: 7px; background: var(--s2); color: var(--tx); flex: none; }
 .profile-tags .down { color: var(--bad); }
 .profile-tags .up { color: var(--ok); }
+
+/* ---------- звук ---------- */
+.sound-field { gap: 12px; }
+.bgm { display: flex; gap: 6px; }
+.bgm #bgmPick { flex: 1; min-width: 0; justify-content: flex-start; height: 42px; font-size: 13.5px; }
+.bgm #bgmPick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bgm .bgm-play { width: 42px; height: 42px; padding: 0; flex: none; }

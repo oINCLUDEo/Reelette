@@ -197,30 +197,16 @@ function initRoom(roomId) {
   let serverOffset = 0;
   let es = null;
   let provider = 'none';
-  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', false), sound: ls.get('sound', true), delay: 0 };
+  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', false), sound: ls.get('sound', true), music: ls.get('music', false), delay: 0 };
   let people = [];
   let countdown = null; // секунд до старта, пока идёт отсчёт
   let countdownTimer = null;
 
   // ---- звук щелчка ----
-  let actx = null;
-  let lastTick = 0;
   function tick() {
     const p = $('#pointer');
     p.classList.remove('tick'); void p.offsetWidth; p.classList.add('tick');
-    if (!settings.sound) return;
-    const now = performance.now();
-    if (now - lastTick < 35) return;
-    lastTick = now;
-    try {
-      actx ||= new AudioContext();
-      const o = actx.createOscillator(), g = actx.createGain();
-      o.type = 'triangle'; o.frequency.value = 1800 + Math.random() * 300;
-      g.gain.setValueAtTime(0.08, actx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.05);
-      o.connect(g).connect(actx.destination);
-      o.start(); o.stop(actx.currentTime + 0.06);
-    } catch {}
+    if (settings.sound) Sfx.tick();
   }
 
   wheel = new Wheel($('#wheel'), {
@@ -234,16 +220,18 @@ function initRoom(roomId) {
 
   // короткий сигнал отсчёта, на старте выше
   function beep(go) {
-    if (!settings.sound) return;
-    try {
-      actx ||= new AudioContext();
-      const o = actx.createOscillator(), g = actx.createGain();
-      o.type = 'sine'; o.frequency.value = go ? 1046 : 660;
-      g.gain.setValueAtTime(0.12, actx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + (go ? 0.35 : 0.15));
-      o.connect(g).connect(actx.destination);
-      o.start(); o.stop(actx.currentTime + 0.4);
-    } catch {}
+    if (settings.sound) Sfx.beep(go);
+  }
+  // музыка прокрута подстраивает темп под скорость колеса; свой трек на это время приглушается
+  function musicOn() {
+    window.setBackdropActive?.(true);
+    Sfx.bgm.duck(true);
+    if (settings.music) Sfx.spinStart(() => wheel.speed || 0);
+  }
+  function musicOff() {
+    window.setBackdropActive?.(false);
+    Sfx.bgm.duck(false);
+    Sfx.spinStop();
   }
 
   // ---- подключение ----
@@ -273,6 +261,7 @@ function initRoom(roomId) {
       showResult(msg);
     } else if (msg.type === 'cancel') {
       stopCountdown();
+      musicOff();
       wheel.anim = null;
       spinningSid = null;
       wheel.setAngle(state.angle);
@@ -361,10 +350,10 @@ function initRoom(roomId) {
     $$('.modal.winner').forEach(closeModal);
     stopCountdown();
     if (elapsed < 0) startCountdown(spin);
-    else window.setBackdropActive?.(true);
+    else musicOn();
     wheel.spin(spin, state.angle, elapsed, () => {
       spinningSid = null;
-      window.setBackdropActive?.(false);
+      musicOff();
       if (!state.spin || state.spin.sid === spin.sid) {
         state.angle = Wheel.endAngle(spin);
         // если итог уже пришёл (вкладка была свёрнута), сразу показываем актуальное колесо
@@ -381,7 +370,7 @@ function initRoom(roomId) {
       if (left <= 0) {
         stopCountdown();
         beep(true);
-        window.setBackdropActive?.(true);
+        musicOn();
         render();
         return;
       }
@@ -408,7 +397,9 @@ function initRoom(roomId) {
   function showResult(msg) {
     const f = msg.film;
     if (!f) return;
+    if (msg.mode !== 'elimination' && settings.music) setTimeout(() => Sfx.win(), msg.mode === 'final' ? 1700 : msg.mode === 'duel' ? 600 : 0);
     if (msg.mode === 'elimination') {
+      if (settings.sound) Sfx.out();
       showWin(f, 'out', msg.left);
       if (msg.left > 1) setTimeout(() => { if ($('#winDetail').dataset.id === f.id) closeModal('#winModal'); }, 2300);
     } else if (msg.mode === 'final') {
@@ -994,12 +985,43 @@ function initRoom(roomId) {
 
   $('#autoSpin').checked = settings.auto;
   $('#autoSpin').addEventListener('change', e => { settings.auto = e.target.checked; ls.set('auto', settings.auto); });
+  $('#musicOn').checked = settings.music;
+  $('#musicOn').addEventListener('change', e => {
+    settings.music = e.target.checked; ls.set('music', settings.music);
+    if (!settings.music) Sfx.spinStop();
+  });
+
+  // своя фоновая музыка
+  const bgmVol = $('#bgmVol');
+  function setBgmVol(v) {
+    bgmVol.value = v;
+    bgmVol.style.setProperty('--f', v / 100);
+    Sfx.bgm.volume(v / 100);
+    ls.set('bgmVol', v);
+  }
+  setBgmVol(ls.get('bgmVol', 40));
+  bgmVol.addEventListener('input', () => setBgmVol(Number(bgmVol.value)));
+  const PLAY = '<svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>';
+  const PAUSE = '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>';
+  const bgmUi = () => { $('#bgmPlay').innerHTML = Sfx.bgm.playing ? PAUSE : PLAY; $('#bgmPlay').title = Sfx.bgm.playing ? 'Пауза' : 'Играть'; };
+  $('#bgmPick').addEventListener('click', () => $('#bgmFile').click());
+  $('#bgmFile').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    $('#bgmName').textContent = file.name.replace(/\.[^.]+$/, '');
+    $('#bgmPlay').hidden = false;
+    bgmVol.hidden = false;
+    try { await Sfx.bgm.load(file); } catch { toast('Браузер не смог открыть этот файл', true); }
+    bgmUi();
+  });
+  $('#bgmPlay').addEventListener('click', () => { Sfx.bgm.toggle(); bgmUi(); });
+
   $('#soundOn').checked = settings.sound;
   $('#soundOn').addEventListener('change', e => { settings.sound = e.target.checked; ls.set('sound', settings.sound); });
 
   async function spin() {
     if ($('#spinBtn').disabled) return;
-    actx ||= new AudioContext(); // разблокировать звук по клику
+    Sfx.unlock(); // браузер разрешает звук только после клика
     if (settings.mode === 'duel') {
       try { await api(`/rooms/${roomId}/duel/start`, { method: 'POST', body: { by: me.name } }); }
       catch (e) { toast(e.message, true); }
