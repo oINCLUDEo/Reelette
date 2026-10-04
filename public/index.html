@@ -60,12 +60,14 @@
     <a class="brand" href="/"><svg><use href="#logo"/></svg><span class="brand-name">Reelette</span></a>
     <button id="roomTitle" class="room-title" title="Переименовать"></button>
     <div class="nav-music" id="navMusic">
+      <button class="ghost sm icon" id="ytReplay" hidden><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
       <button class="ghost sm music-btn" id="musicBtn" title="Общая музыка из YouTube, её слышат все в комнате"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Музыка</span></button>
       <div class="yt-card" id="ytCard" hidden>
         <div class="yt-frame"><div id="ytHost"></div><button class="yt-unmute" id="ytUnmute" hidden title="Браузер ждёт клика, чтобы включить звук">Слушать</button></div>
         <div class="yt-info"><b id="ytTitle"></b><span id="ytBy"></span></div>
         <div class="yt-ctrl">
           <button class="nav-icon" id="ytToggle"></button>
+          <button class="nav-icon" id="ytRestart" title="С начала у всех"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
           <button class="nav-icon" id="ytNext" title="Следующий трек у всех"><svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg></button>
           <button class="nav-icon q-btn" id="ytChange" title="Очередь и добавить трек"><svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h8"/><path d="M19 15v6M16 18h6"/></svg><i id="ytQCount" hidden></i></button>
           <button class="nav-icon" id="ytStop" title="Выключить у всех"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
@@ -128,11 +130,13 @@
                 <div class="k-empty" id="kEmpty">
                   <b>Сцена свободна.</b>
                   <span>Добавьте песню справа. Текст подтянется сам, если песня есть в базе текстов.</span>
+                  <button class="btn btn-ghost k-again" id="kAgain" hidden></button>
                 </div>
                 <button class="yt-unmute" id="kUnmute" hidden>Нажмите, чтобы слушать</button>
               </div>
               <div class="k-bar" id="kBar">
                 <button class="nav-icon" id="kToggle"></button>
+                <button class="nav-icon" id="kRestart" title="С начала у всех"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
                 <button class="nav-icon" id="kNext" title="Следующая песня у всех"><svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg></button>
                 <div class="k-progress"><i id="kProg"></i></div>
                 <span class="k-time" id="kTime"></span>

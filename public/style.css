@@ -948,3 +948,7 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 @keyframes bnLive { to { background-position: -300% 0; } }
 .profile-card.bn-stars::before { height: 190px; background: radial-gradient(1.5px 1.5px at 12% 30%, #fff, transparent), radial-gradient(1px 1px at 28% 70%, #fff, transparent), radial-gradient(1.5px 1.5px at 46% 20%, #fff, transparent), radial-gradient(1px 1px at 63% 55%, #fff, transparent), radial-gradient(2px 2px at 80% 25%, #fff, transparent), radial-gradient(1px 1px at 90% 70%, #fff, transparent), radial-gradient(70% 120% at 50% 0%, rgba(79,70,229,.45), transparent 70%); animation: bnStars 3s ease-in-out infinite alternate; }
 @keyframes bnStars { from { opacity: .7; } to { opacity: 1; } }
+
+/* перезапуск трека */
+.k-again { margin-top: 10px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; justify-self: center; position: relative; z-index: 3; }
+#ytReplay svg { width: 17px; height: 17px; }

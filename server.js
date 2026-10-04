@@ -116,7 +116,7 @@ function publicState(r) {
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
     rules: { votes: VOTES_PER_PERSON, points: VOTE_POINTS, cap: VOTE_CAP },
-    fair: r.fair !== false, modifier: activeModifier(r), music: r.music || null, queue: r.queue || [],
+    fair: r.fair !== false, modifier: activeModifier(r), music: r.music || null, queue: r.queue || [], lastTrack: r.music ? null : r.lastTrack || null,
     karaoke: Boolean(r.karaoke), perfs: (r.perfs || []).slice(0, 40),
     hits: r.hits || [], reacts: r.reacts || {}, profiles,
   };
@@ -490,7 +490,7 @@ function playTrack(r, track) {
   r.music = {
     vid: track.vid, title: track.title, author: track.author, by: track.by,
     singer: track.singer || '', singerPid: track.singerPid || '',
-    startedAt: Date.now(), pausedAt: null, duration: 0,
+    startedAt: Date.now(), pausedAt: null, duration: track.duration || 0,
   };
   // в караоке каждая спетая песня — выступление, его можно оценить
   if (r.karaoke && track.singer) {
@@ -589,7 +589,12 @@ function advanceMusic(r) {
   if (!rooms[r.id] || !r.music) return;
   r.queue ||= [];
   if (r.queue.length) playTrack(r, r.queue.shift());
-  else { r.music = null; clearTimeout(runtime(r).musicT); }
+  else {
+    const mu = r.music;
+    r.lastTrack = { vid: mu.vid, title: mu.title, author: mu.author, by: mu.by, singer: mu.singer, singerPid: mu.singerPid, duration: mu.duration || 0 };
+    r.music = null;
+    clearTimeout(runtime(r).musicT);
+  }
   pushState(r);
 }
 function scheduleMusic(r) {
@@ -910,6 +915,18 @@ async function api(req, res, url) {
     if (action === 'hits' && parts[4] === 'remove') {
       if (!isOwner(r, me, b)) return json(res, 403, { error: 'Убирать из хитов может создатель комнаты' });
       r.hits = (r.hits || []).filter(h => h.vid !== str(b.vid, 11));
+      pushState(r); return json(res, 200, { ok: true });
+    }
+    // перезапуск: текущий трек с начала, а если музыка уже остановилась — последний трек ещё раз
+    if (action === 'restart') {
+      if (r.music) {
+        r.music.startedAt = Date.now();
+        if (r.music.pausedAt != null) r.music.pausedAt = 0;
+        r.music.by = who;
+        scheduleMusic(r);
+      } else if (r.lastTrack) {
+        playTrack(r, { ...r.lastTrack, by: who });
+      } else return json(res, 409, { error: 'Нечего перезапускать' });
       pushState(r); return json(res, 200, { ok: true });
     }
     if (!r.music) return json(res, 409, { error: 'Музыка не играет' });

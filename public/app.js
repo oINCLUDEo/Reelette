@@ -684,6 +684,9 @@ function initRoom(roomId) {
     $('#ytAdd').hidden = !ytChanging;
     renderQueue();
     $('#musicBtn').hidden = Boolean(m);
+    const last = state?.lastTrack;
+    $('#ytReplay').hidden = Boolean(m) || !last;
+    if (last) $('#ytReplay').title = `Сыграть ещё раз: ${last.title}`;
     if (!m) {
       if (yt) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $(ytHostCur).innerHTML = ''; }
       return;
@@ -736,7 +739,8 @@ function initRoom(roomId) {
         if (Math.abs(cur - exp) > 1) yt.seekTo(exp, true);
         $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = true));
       } else {
-        if (st === 0) { $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = true)); return; } // доиграл, ждём сервер
+        const dur = m.duration || yt.getDuration() || 0;
+        if (st === 0 && (!dur || exp >= dur - 1.5)) { $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = true)); return; } // доиграл, ждём сервер
         if (Math.abs(cur - exp) > 2.5) yt.seekTo(exp, true);
         if (st !== 1 && st !== 3) yt.playVideo();
         // браузер не дал включить звук без клика: просим нажать
@@ -756,7 +760,10 @@ function initRoom(roomId) {
     $('#kLabel').textContent = m ? 'Сейчас поёт' : 'Сцена свободна';
     $('#kSinger').innerHTML = m ? nick(m.singerPid || '', m.singer || m.by) : '';
     $('#kSong').textContent = m ? m.title : '';
-    $('#kToggle').disabled = $('#kNext').disabled = !m;
+    $('#kToggle').disabled = $('#kNext').disabled = $('#kRestart').disabled = !m;
+    const last = state.lastTrack;
+    $('#kAgain').hidden = Boolean(m) || !last;
+    if (last && !m) $('#kAgain').textContent = `Спеть ещё раз: ${last.singer || last.by}, ${last.title}`;
     $('#kToggle').innerHTML = !m || m.pausedAt != null
       ? '<svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>'
       : '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>';
@@ -1013,6 +1020,8 @@ function initRoom(roomId) {
     if (up) api(`/rooms/${roomId}/music/up`, { method: 'POST', body: { qid: up.dataset.qup } }).catch(err => toast(err.message, true));
     if (rm) api(`/rooms/${roomId}/music/remove`, { method: 'POST', body: { qid: rm.dataset.qrm } }).catch(err => toast(err.message, true));
   });
+  const restartMusic = () => { Sfx.unlock(); api(`/rooms/${roomId}/music/restart`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)); };
+  ['#ytRestart', '#kRestart', '#ytReplay', '#kAgain'].forEach(sel => $(sel).addEventListener('click', restartMusic));
   $('#ytNext').addEventListener('click', () => api(`/rooms/${roomId}/music/next`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
   $('#ytToggle').addEventListener('click', () => api(`/rooms/${roomId}/music/toggle`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
   $('#ytStop').addEventListener('click', () => confirm('Выключить музыку у всех и очистить очередь?') && api(`/rooms/${roomId}/music/stop`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
