@@ -568,6 +568,12 @@ function initRoom(roomId) {
     $('.stage').classList.toggle('dueling', Boolean(duel));
     $('#duelBox').hidden = !duel;
     if (duel) renderDuel(duel);
+    const karaoke = Boolean(state.karaoke);
+    $('.stage').classList.toggle('karaoke-on', karaoke);
+    document.body.classList.toggle('karaoke-on', karaoke);
+    $('#karaokeBox').hidden = !karaoke;
+    $('#karaokeBtn').classList.toggle('on', karaoke);
+    if (karaoke) renderKaraoke();
     renderFilters(spinning || Boolean(duel));
 
     if (duel) $('#stageStatus').textContent = '';
@@ -632,14 +638,17 @@ function initRoom(roomId) {
     yt.setVolume(Math.round(v * (ytDucked ? 0.3 : 1)));
   }
   function ytDuck(on) { ytDucked = on; ytVolume(); }
+  let ytHostCur = '#ytHost';
   function syncMusic() {
     const m = state?.music;
+    const hostSel = state?.karaoke ? '#kHost' : '#ytHost';
+    if (yt && ytHostCur !== hostSel) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $(ytHostCur).innerHTML = ''; }
     $('#ytCard').hidden = !m;
     $('#ytAdd').hidden = !ytChanging;
     renderQueue();
     $('#musicBtn').hidden = Boolean(m);
     if (!m) {
-      if (yt) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $('#ytHost').innerHTML = ''; }
+      if (yt) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $(ytHostCur).innerHTML = ''; }
       return;
     }
     $('#ytTitle').textContent = m.title;
@@ -651,8 +660,9 @@ function initRoom(roomId) {
     loadYT(() => {
       if (!yt) {
         ytVid = m.vid;
-        $('#ytHost').innerHTML = '<div></div>';
-        yt = new YT.Player($('#ytHost').firstChild, {
+        ytHostCur = hostSel;
+        $(hostSel).innerHTML = '<div></div>';
+        yt = new YT.Player($(hostSel).firstChild, {
           videoId: m.vid,
           playerVars: { autoplay: 1, controls: 0, disablekb: 1, rel: 0, playsinline: 1, iv_load_policy: 3, start: Math.floor(ytExpected(m)) },
           events: {
@@ -661,7 +671,7 @@ function initRoom(roomId) {
               // трек закончился, а общая музыка не на паузе: начинаем заново (по кругу)
               if (e.data === 0 && state?.music && state.music.pausedAt == null && !state.queue?.length) { yt.seekTo(0, true); yt.playVideo(); }
               if (e.data === 1 && state?.music) reportDuration(state.music);
-              if (e.data === 1) $('#ytUnmute').hidden = true;
+              if (e.data === 1) $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = true));
             },
             onError: e => toast(e.data === 101 || e.data === 150 ? 'Автор запретил встраивать это видео' : 'YouTube не смог воспроизвести трек', true),
           },
@@ -675,17 +685,99 @@ function initRoom(roomId) {
       if (m.pausedAt != null) {
         if (st === 1 || st === 3) yt.pauseVideo();
         if (Math.abs(cur - exp) > 1) yt.seekTo(exp, true);
-        $('#ytUnmute').hidden = true;
+        $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = true));
       } else {
         if (Math.abs(cur - exp) > 2.5) yt.seekTo(exp, true);
         if (st !== 1 && st !== 3) yt.playVideo();
         // браузер не дал включить звук без клика: просим нажать
-        $('#ytUnmute').hidden = st === 1 || st === 3;
+        $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = st === 1 || st === 3));
       }
     });
   }
   setInterval(() => { if (state?.music) syncMusic(); }, 4000);
-  $('#ytUnmute').addEventListener('click', () => { Sfx.unlock(); if (ytReady) { yt.playVideo(); ytVolume(); } setTimeout(syncMusic, 600); });
+  $$('#ytUnmute, #kUnmute').forEach(el => el.addEventListener('click', () => { Sfx.unlock(); if (ytReady) { yt.playVideo(); ytVolume(); } setTimeout(syncMusic, 600); }));
+
+  // ---- караоке: сцена с большим плеером, очередь певцов, оценки выступлений ----
+  function renderKaraoke() {
+    const m = state.music;
+    const q = state.queue || [];
+    const perfs = state.perfs || [];
+    $('#kEmpty').hidden = Boolean(m);
+    $('#kLabel').textContent = m ? 'Поёт' : 'Сцена свободна';
+    $('#kSinger').textContent = m ? (m.singer || m.by) : '';
+    $('#kSong').textContent = m ? m.title : '';
+    $('#kToggle').hidden = $('#kNext').hidden = !m;
+    if (m) $('#kToggle').textContent = m.pausedAt != null ? 'Продолжить' : 'Пауза';
+    $('#kSingerIn').placeholder = `Кто поёт (по умолчанию ${me.name || 'вы'})`;
+
+    const perf = m?.perfId && perfs.find(p => p.perfId === m.perfId);
+    if (!perf) $('#kRate').innerHTML = '';
+    else {
+      const list = Object.values(perf.ratings || {});
+      const avg = list.length ? list.reduce((a, r) => a + r.score, 0) / list.length : null;
+      const mine = perf.ratings?.[myPid()]?.score || 0;
+      $('#kRate').innerHTML = `<span class="label">Оценка выступления ${avg !== null ? `<b>${avg.toFixed(1).replace('.', ',')}</b>` : ''}</span>
+        ${perf.singerPid && perf.singerPid === myPid() ? '<p class="note">Это ваше выступление, оценивают остальные.</p>'
+          : `<div class="rate-scale">${Array.from({ length: 10 }, (_, i) => `<button class="${i + 1 === mine ? 'on' : ''} ${i + 1 < 5 ? 'low' : i + 1 < 8 ? 'mid' : 'high'}" data-kscore="${i + 1}">${i + 1}</button>`).join('')}</div>`}`;
+    }
+
+    $('#kQueue').innerHTML = `<span class="label">Дальше <span class="m">${q.length || ''}</span></span>` + (q.length
+      ? q.map((t, i) => `<div class="q-item">
+          <img src="https://i.ytimg.com/vi/${esc(t.vid)}/default.jpg" alt="">
+          <div><b>${esc(t.singer || t.by)}</b><span>${esc(t.title)}</span></div>
+          ${i ? `<button type="button" class="nav-icon" data-qup="${esc(t.qid)}" title="Следующей"><svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></button>` : ''}
+          <button type="button" class="nav-icon" data-qrm="${esc(t.qid)}" title="Убрать"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        </div>`).join('')
+      : '<p class="note">Очередь пуста.</p>');
+
+    // звёзды вечера: средний балл певца по оценённым выступлениям
+    const by = new Map();
+    for (const p of perfs) {
+      const sc = Object.values(p.ratings || {}).map(r => r.score);
+      if (!sc.length) continue;
+      const k = p.singer;
+      const e = by.get(k) || { name: k, sum: 0, n: 0, songs: 0 };
+      e.sum += sc.reduce((a, b) => a + b, 0) / sc.length; e.n++; e.songs++;
+      by.set(k, e);
+    }
+    const top = [...by.values()].map(e => ({ ...e, avg: e.sum / e.n })).sort((a, b) => b.avg - a.avg).slice(0, 5);
+    $('#kBoard').innerHTML = top.length ? `<span class="label">Звёзды вечера</span>` + top.map((e, i) => `<div class="k-star"><i>${i + 1}</i><b>${esc(e.name)}</b><span>${e.songs} ${plural(e.songs, 'песня', 'песни', 'песен')}</span><em>${e.avg.toFixed(1).replace('.', ',')}</em></div>`).join('') : '';
+  }
+  $('#kRate').addEventListener('click', async e => {
+    const b = e.target.closest('[data-kscore]');
+    if (!b) return;
+    const perfId = state.music?.perfId;
+    const score = b.classList.contains('on') ? 0 : Number(b.dataset.kscore);
+    try { await api(`/rooms/${roomId}/karaoke/rate`, { method: 'POST', body: { perfId, score, cid: me.cid, by: me.name } }); }
+    catch (err) { toast(err.message, true); }
+  });
+  $('#kQueue').addEventListener('click', e => {
+    const up = e.target.closest('[data-qup]'), rm = e.target.closest('[data-qrm]');
+    if (up) api(`/rooms/${roomId}/music/up`, { method: 'POST', body: { qid: up.dataset.qup } }).catch(err => toast(err.message, true));
+    if (rm) api(`/rooms/${roomId}/music/remove`, { method: 'POST', body: { qid: rm.dataset.qrm } }).catch(err => toast(err.message, true));
+  });
+  $('#kAdd').addEventListener('submit', async e => {
+    e.preventDefault();
+    const url = $('#kUrl').value.trim();
+    if (!url) return;
+    if (!/youtu\.?be|^[\w-]{11}$/.test(url)) { openKaraokeSearch(); return; } // не ссылка — ищем на YouTube
+    try {
+      const r = await api(`/rooms/${roomId}/music`, { method: 'POST', body: { url, singer: $('#kSingerIn').value.trim(), by: me.name, cid: me.cid } });
+      $('#kUrl').value = ''; $('#kSingerIn').value = '';
+      Sfx.unlock();
+      toast(r.queued ? 'Песня в очереди' : 'Поехали!');
+    } catch (err) { toast(err.message, true); }
+  });
+  function openKaraokeSearch() {
+    const q = $('#kUrl').value.trim();
+    window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent((q && !/youtu/.test(q) ? q + ' ' : '') + 'караоке')}`, '_blank', 'noopener');
+  }
+  $('#kFind').addEventListener('click', openKaraokeSearch);
+  $('#kToggle').addEventListener('click', () => api(`/rooms/${roomId}/music/toggle`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
+  $('#kNext').addEventListener('click', () => api(`/rooms/${roomId}/music/next`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
+  const setKaraoke = on => api(`/rooms/${roomId}`, { method: 'PATCH', body: { karaoke: on } }).catch(e => toast(e.message, true));
+  $('#kExit').addEventListener('click', () => setKaraoke(false));
+  $('#karaokeBtn').addEventListener('click', () => { Sfx.unlock(); setKaraoke(!state?.karaoke); });
   $('#ytAdd').addEventListener('submit', async e => {
     e.preventDefault();
     const url = $('#ytUrl').value.trim();
@@ -1197,7 +1289,7 @@ function initRoom(roomId) {
   $('#soundOn').addEventListener('change', e => { settings.sound = e.target.checked; ls.set('sound', settings.sound); });
 
   async function spin() {
-    if ($('#spinBtn').disabled) return;
+    if ($('#spinBtn').disabled || state?.karaoke) return;
     Sfx.unlock(); // браузер разрешает звук только после клика
     if (settings.mode === 'duel') {
       try { await api(`/rooms/${roomId}/duel/start`, { method: 'POST', body: { by: me.name } }); }

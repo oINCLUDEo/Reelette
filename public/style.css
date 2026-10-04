@@ -636,3 +636,41 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .hint::after { content: attr(data-hint); position: absolute; top: calc(100% + 8px); left: -12px; width: 250px; padding: 11px 13px; border-radius: 13px; background: var(--s2); border: 1px solid var(--bd); box-shadow: 0 14px 40px rgba(0,0,0,.5); color: var(--tx2); font: 500 13px/1.5 var(--f-ui); letter-spacing: 0; text-align: left; white-space: normal; opacity: 0; transform: translateY(-4px); pointer-events: none; transition: opacity .2s, transform .25s var(--ease); z-index: 30; }
 .hint:hover::after, .hint:focus-visible::after { opacity: 1; transform: none; }
 .hint[data-hint=""]::after { display: none; }
+
+/* ---------- караоке ---------- */
+.karaoke-btn.on { background: var(--acc); border-color: var(--acc); color: #fff; box-shadow: 0 0 16px var(--glow); }
+.karaoke-btn svg { width: 17px; height: 17px; }
+.stage.karaoke-on .wheel-box, .stage.karaoke-on .current, .stage.karaoke-on .stage-status, .stage.karaoke-on #stopBtn, .stage.karaoke-on #duelBox { display: none !important; }
+body.karaoke-on .nav-music .yt-frame { display: none; }
+.karaoke { width: 100%; max-width: 1180px; display: flex; flex-direction: column; gap: 18px; }
+.k-now { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-height: 44px; }
+.k-label { color: var(--tx2); font-weight: 700; }
+.k-now b { font: 800 clamp(26px, 2.8vw, 40px)/1.05 var(--f-head); letter-spacing: -.045em; background: linear-gradient(180deg, var(--h1a) 30%, var(--h1b) 125%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 22px var(--glow)); }
+.k-now span:last-child { color: var(--tx3); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.k-main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.k-video { position: relative; aspect-ratio: 16/9; border-radius: 22px; overflow: hidden; background: #000; border: 1px solid var(--bd); box-shadow: 0 30px 80px rgba(0,0,0,.5), 0 0 60px var(--glow); }
+.k-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+.k-empty { position: absolute; inset: 0; display: grid; place-content: center; gap: 8px; padding: 30px; text-align: center; background: radial-gradient(60% 60% at 50% 40%, color-mix(in srgb, var(--acc) 22%, transparent), transparent 70%), var(--sheetA); }
+.k-empty b { font: 800 26px var(--f-head); letter-spacing: -.03em; }
+.k-empty span { color: var(--tx2); max-width: 42ch; }
+.k-video .yt-unmute { font-size: 16px; }
+.k-side { display: flex; flex-direction: column; gap: 16px; padding: 16px; border-radius: 20px; background: color-mix(in srgb, var(--sheetB) 85%, transparent); border: 1px solid var(--bd); max-height: calc(100vh - 260px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
+.k-add { display: flex; flex-direction: column; gap: 8px; }
+.k-add input { height: 42px; font-size: 13.5px; }
+.k-add-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.k-add-row .btn { height: 40px; font-size: 13px; padding: 0 8px; }
+.k-rate { display: flex; flex-direction: column; gap: 8px; }
+.k-rate:empty { display: none; }
+.k-rate .label b { color: var(--acc-hi); font-size: 15px; }
+.k-queue { display: flex; flex-direction: column; gap: 4px; }
+.k-board { display: flex; flex-direction: column; gap: 6px; }
+.k-board:empty { display: none; }
+.k-star { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; background: var(--s1); font-size: 13.5px; }
+.k-star i { font: 800 13px var(--f-ui); font-style: normal; color: var(--tx3); text-align: center; }
+.k-star:first-of-type i { color: var(--acc-hi); }
+.k-star b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-star span { color: var(--tx3); font-size: 12px; }
+.k-star em { font: 800 14px var(--f-ui); font-style: normal; color: var(--acc-hi); }
+.k-ctrl { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+@media (max-width: 1180px) { .k-main { grid-template-columns: 1fr; } .k-side { max-height: none; } }
+@media (max-width: 860px) { .karaoke-btn span { display: none; } }

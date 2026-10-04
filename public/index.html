@@ -83,6 +83,7 @@
       </form>
     </div>
     <div class="act">
+      <button class="ghost sm karaoke-btn" id="karaokeBtn" title="Караоке: большой плеер на сцене, очередь певцов и оценки"><svg viewBox="0 0 24 24"><path d="M15.5 3.5a5 5 0 1 1-7 7"/><circle cx="12" cy="7" r="4.2"/><path d="M9 10.5 3.6 18.4a1.5 1.5 0 0 0 2 2L13.5 15"/></svg><span>Караоке</span></button>
       <div id="people" class="people"></div>
       <button id="inviteBtn" class="ghost sm"><svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg><span>Пригласить</span></button>
       <button id="settingsBtn" class="ghost sm icon" title="Настройки"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
@@ -107,6 +108,42 @@
       <canvas class="backdrop" aria-hidden="true"></canvas>
       <span class="shade"></span>
       <div class="stage-in">
+        <div class="karaoke" id="karaokeBox" hidden>
+          <div class="k-now">
+            <span class="k-label" id="kLabel">Поёт</span>
+            <b id="kSinger"></b>
+            <span id="kSong"></span>
+          </div>
+          <div class="k-main">
+            <div class="k-video">
+              <div id="kHost"></div>
+              <div class="k-empty" id="kEmpty">
+                <b>Сцена свободна.</b>
+                <span>Добавьте песню справа. Удобнее всего караоке-версии с YouTube: текст уже на экране.</span>
+              </div>
+              <button class="yt-unmute" id="kUnmute" hidden>Нажмите, чтобы слушать</button>
+            </div>
+            <div class="k-side">
+              <form class="k-add" id="kAdd">
+                <span class="label">Добавить песню</span>
+                <input id="kUrl" placeholder="Ссылка на YouTube или название" autocomplete="off">
+                <input id="kSingerIn" placeholder="Кто поёт (по умолчанию вы)" maxlength="32" autocomplete="off">
+                <div class="k-add-row">
+                  <button class="btn btn-primary" type="submit">В очередь</button>
+                  <button class="btn btn-ghost" type="button" id="kFind" title="Откроет поиск на YouTube: скопируйте ссылку на нужное видео и вставьте сюда">Найти караоке</button>
+                </div>
+              </form>
+              <div class="k-rate" id="kRate"></div>
+              <div class="k-queue" id="kQueue"></div>
+              <div class="k-board" id="kBoard"></div>
+            </div>
+          </div>
+          <div class="k-ctrl">
+            <button class="ghost sm" id="kToggle"></button>
+            <button class="ghost sm" id="kNext">Следующая песня</button>
+            <button class="ghost sm" id="kExit">Выйти из караоке</button>
+          </div>
+        </div>
         <div class="current"><span id="currentTitle">&nbsp;</span></div>
         <div class="wheel-box" id="wheelBox">
           <canvas id="wheel"></canvas>

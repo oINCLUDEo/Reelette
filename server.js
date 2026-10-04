@@ -80,6 +80,7 @@ function publicState(r) {
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
     rules: { votes: VOTES_PER_PERSON, points: VOTE_POINTS, cap: VOTE_CAP },
     fair: r.fair !== false, modifier: activeModifier(r), music: r.music || null, queue: r.queue || [],
+    karaoke: Boolean(r.karaoke), perfs: (r.perfs || []).slice(0, 40),
   };
 }
 
@@ -448,7 +449,19 @@ async function fetchTrack(url) {
   return { vid, title: str(meta.title || '', 160) || 'Трек с YouTube', author: str(meta.author_name || '', 80) };
 }
 function playTrack(r, track) {
-  r.music = { vid: track.vid, title: track.title, author: track.author, by: track.by, startedAt: Date.now(), pausedAt: null, duration: 0 };
+  r.music = {
+    vid: track.vid, title: track.title, author: track.author, by: track.by,
+    singer: track.singer || '', singerPid: track.singerPid || '',
+    startedAt: Date.now(), pausedAt: null, duration: 0,
+  };
+  // в караоке каждая спетая песня — выступление, его можно оценить
+  if (r.karaoke && track.singer) {
+    r.perfs ||= [];
+    const perf = { perfId: id(6), vid: track.vid, title: track.title, singer: track.singer, singerPid: track.singerPid || '', at: Date.now(), ratings: {} };
+    r.perfs.unshift(perf);
+    r.perfs = r.perfs.slice(0, 60);
+    r.music.perfId = perf.perfId;
+  }
   scheduleMusic(r);
 }
 // Трек закончился или его пропустили: следующий из очереди, а если очередь пуста — текущий по кругу.
@@ -638,6 +651,10 @@ async function api(req, res, url) {
   b.by = who;
 
   if (!sub && m === 'PATCH') {
+    if (b.karaoke !== undefined) {
+      if (r.spin || r.duel) return json(res, 409, { error: 'Дождитесь конца прокрута или дуэли' });
+      r.karaoke = Boolean(b.karaoke);
+    }
     if (b.fair !== undefined) {
       if (r.spin || r.duel) return json(res, 409, { error: 'Это можно менять, когда колесо стоит' });
       r.fair = Boolean(b.fair);
@@ -696,13 +713,28 @@ async function api(req, res, url) {
 
   // ---- общая музыка из YouTube: у всех один трек и одна позиция, общая очередь ----
   // startedAt — момент, когда трек был на нуле; pausedAt — позиция в секундах, если на паузе.
+  // оценка выступления в караоке, себя оценить нельзя
+  if (sub === 'karaoke' && parts[3] === 'rate' && m === 'POST') {
+    const perf = (r.perfs || []).find(p => p.perfId === str(b.perfId, 12));
+    if (!perf) return json(res, 404, { error: 'Выступление не найдено' });
+    const pid = personKey(me, b);
+    if (!pid) return json(res, 400, { error: 'Не понятно, кто оценивает' });
+    if (perf.singerPid && perf.singerPid === pid) return json(res, 400, { error: 'Себя оценивают остальные' });
+    const score = Math.round(num(b.score, 0));
+    if (score >= 1 && score <= 10) perf.ratings[pid] = { score, name: who };
+    else delete perf.ratings[pid];
+    pushState(r); return json(res, 200, { ok: true });
+  }
+
   if (sub === 'music' && m === 'POST') {
     const action = parts[3];
     r.queue ||= [];
     if (!action) {
       const t = await fetchTrack(b.url);
       if (t.error) return json(res, 400, { error: t.error });
-      const track = { ...t, by: who };
+      // кто поёт (для караоке): по умолчанию тот, кто добавил
+      const singer = str(b.singer, 32);
+      const track = { ...t, by: who, singer: singer || who, singerPid: !singer || singer === who ? personKey(me, b) : '' };
       if (!r.music || b.now) playTrack(r, track);
       else {
         if (r.queue.length >= 50) return json(res, 400, { error: 'В очереди уже 50 треков' });
