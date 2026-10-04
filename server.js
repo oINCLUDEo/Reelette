@@ -38,7 +38,7 @@ function loadEnv(file) {
 // ---------- хранилище ----------
 let rooms = {};
 try { rooms = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { rooms = {}; }
-for (const r of Object.values(rooms)) { r.spin = null; r.plan = null; }
+for (const r of Object.values(rooms)) { r.spin = null; r.plan = null; r.duel = null; }
 
 let saveTimer = null;
 function save() {
@@ -48,7 +48,7 @@ function save() {
       fs.mkdirSync(DATA_DIR, { recursive: true });
       const tmp = DATA_FILE + '.tmp';
       const out = {};
-      for (const [id, r] of Object.entries(rooms)) out[id] = { ...r, spin: null, plan: null };
+      for (const [id, r] of Object.entries(rooms)) out[id] = { ...r, spin: null, plan: null, duel: null };
       fs.writeFileSync(tmp, JSON.stringify(out));
       fs.renameSync(tmp, DATA_FILE);
     } catch (e) {
@@ -74,7 +74,29 @@ function publicState(r) {
     id: r.id, name: r.name, createdAt: r.createdAt, owner: r.owner || '',
     films: r.films, history: r.history, eliminated: r.eliminated,
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
+    filters: r.filters || cleanFilters({}), duel: r.duel || null,
   };
+}
+
+// ---------- фильтры ----------
+const RUNTIMES = [0, 105, 120, 150];
+const YEARS = [0, 2000, 2010, 2020];
+function cleanFilters(b) {
+  return {
+    on: Boolean(b?.on),
+    maxRuntime: RUNTIMES.includes(Number(b?.maxRuntime)) ? Number(b.maxRuntime) : 0,
+    minYear: YEARS.includes(Number(b?.minYear)) ? Number(b.minYear) : 0,
+    genres: Array.isArray(b?.genres) ? [...new Set(b.genres.map(g => str(g, 30).toLowerCase()).filter(Boolean))].slice(0, 12) : [],
+  };
+}
+// Неизвестная длина или год фильтр не режет; при выборе жанров фильм без жанров не проходит.
+function matchesFilters(r, f) {
+  const F = r.filters;
+  if (!F?.on) return true;
+  if (F.maxRuntime && f.runtime && f.runtime > F.maxRuntime) return false;
+  if (F.minYear && f.year && Number(f.year) < F.minYear) return false;
+  if (F.genres.length && !(f.genres || []).some(g => F.genres.includes(g.toLowerCase()))) return false;
+  return true;
 }
 
 // ---------- SSE ----------
@@ -97,7 +119,7 @@ setInterval(() => {
 
 // ---------- колесо ----------
 function activeFilms(r) {
-  return r.films.filter(f => !r.eliminated.includes(f.id) && f.weight > 0);
+  return r.films.filter(f => !r.eliminated.includes(f.id) && f.weight > 0 && matchesFilters(r, f));
 }
 function pickWeighted(list) {
   const total = list.reduce((s, f) => s + f.weight, 0);
@@ -173,6 +195,89 @@ function finishSpin(r, sid) {
   pushState(r);
 }
 
+// ---------- дуэль: пары, голосование, проигравший вылетает ----------
+function shuffle(a) {
+  a = [...a];
+  for (let i = a.length - 1; i > 0; i--) { const j = crypto.randomInt(0, i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function pairUp(ids) {
+  const matches = [];
+  for (let i = 0; i + 1 < ids.length; i += 2) matches.push([ids[i], ids[i + 1]]);
+  return { matches, bye: ids.length % 2 ? ids[ids.length - 1] : null };
+}
+function startDuel(r, by) {
+  const list = activeFilms(r);
+  if (list.length < 2) return 'Для дуэли нужно хотя бы два фильма';
+  const { matches, bye } = pairUp(shuffle(list.map(f => f.id)));
+  r.duel = { did: id(6), by, round: 1, matches, idx: 0, next: bye ? [bye] : [], votes: {}, reveal: null, left: list.length };
+  pushState(r);
+  return null;
+}
+function presentVoters(r) {
+  const set = new Set();
+  for (const c of clients.get(r.id) || []) set.add(c.cid);
+  return set;
+}
+function voteDuel(r, voter, name, filmId) {
+  const d = r.duel;
+  if (!d || d.reveal) return 'Голосование за эту пару уже закрыто';
+  if (!d.matches[d.idx].includes(filmId)) return 'Этого фильма нет в паре';
+  d.votes[voter] = { film: filmId, name };
+  pushState(r);
+  // проголосовали все, кто сейчас в комнате: подводим итог сами
+  const present = presentVoters(r);
+  if (present.size && [...present].every(v => d.votes[v])) {
+    const rt = runtime(r);
+    clearTimeout(rt.duelAuto);
+    rt.duelAuto = setTimeout(() => resolveDuel(r, d.did), 900);
+  }
+  return null;
+}
+function resolveDuel(r, did) {
+  const d = r.duel;
+  if (!d || d.did !== did || d.reveal) return;
+  const [a, b] = d.matches[d.idx];
+  const count = fid => Object.values(d.votes).filter(v => v.film === fid).length;
+  const ca = count(a), cb = count(b);
+  let winner;
+  if (ca !== cb) winner = ca > cb ? a : b;
+  else winner = pickWeighted([a, b].map(x => r.films.find(f => f.id === x)).filter(Boolean))?.id || a; // ничья: решает вес
+  d.reveal = { winner, loser: winner === a ? b : a, counts: { [a]: ca, [b]: cb }, tie: ca === cb };
+  pushState(r);
+  runtime(r).duelNext = setTimeout(() => advanceDuel(r, did), 2400);
+}
+function advanceDuel(r, did) {
+  const d = r.duel;
+  if (!d || d.did !== did || !d.reveal) return;
+  d.next.push(d.reveal.winner);
+  d.left--;
+  d.reveal = null;
+  d.votes = {};
+  d.idx++;
+  if (d.idx >= d.matches.length) {
+    if (d.next.length === 1) {
+      const film = r.films.find(f => f.id === d.next[0]);
+      r.duel = null;
+      recordWin(r, film, 'duel');
+      broadcast(r.id, { type: 'result', mode: 'duel', film });
+      pushState(r);
+      return;
+    }
+    const { matches, bye } = pairUp(shuffle(d.next));
+    d.round++;
+    d.matches = matches;
+    d.idx = 0;
+    d.next = bye ? [bye] : [];
+  }
+  pushState(r);
+}
+function stopDuel(r) {
+  const rt = runtime(r);
+  clearTimeout(rt.duelAuto); clearTimeout(rt.duelNext);
+  r.duel = null;
+}
+
 // Угол хранится как доля оборота, считается так же, как на клиенте.
 function endAngle(s) {
   const total = s.snapshot.reduce((a, f) => a + f.weight, 0);
@@ -200,11 +305,14 @@ async function postWebhook(r, film) {
     footer: { text: `Reelette · ${r.name}` },
   };
   if (film.poster) embed.thumbnail = { url: film.poster };
-  if (film.rating) embed.fields = [{ name: 'Рейтинг', value: String(film.rating), inline: true }];
+  embed.fields = [
+    film.rating && { name: 'Рейтинг', value: String(film.rating), inline: true },
+    film.runtime && { name: 'Длительность', value: fmtRuntime(film.runtime), inline: true },
+  ].filter(Boolean);
   await fetch(r.webhook, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'Reelette', content: 'Колесо выбрало фильм', embeds: [embed] }),
+    body: JSON.stringify({ username: 'Reelette', content: 'Сегодня смотрим', embeds: [embed] }),
   });
 }
 
@@ -245,16 +353,73 @@ async function searchMovies(q) {
   return [];
 }
 
-async function enrich(film) {
-  if (film.source !== 'kinopoisk' || !KP_KEY || film.overview) return film;
-  try {
-    const j = await getJson(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${encodeURIComponent(film.sourceId)}`, { 'X-API-KEY': KP_KEY });
-    film.overview = str(j.description || j.shortDescription || '', 2000);
-    if (j.ratingKinopoisk) film.rating = String(j.ratingKinopoisk);
-    if (j.posterUrlPreview) film.poster = j.posterUrlPreview;
-    if (!film.genres?.length && j.genres) film.genres = j.genres.map(g => g.genre).slice(0, 3);
-  } catch (e) { console.warn('enrich:', e.message); }
-  return film;
+const fmtRuntime = m => (m >= 60 ? `${Math.floor(m / 60)} ч ${m % 60} мин` : `${m} мин`);
+function ytKey(u) {
+  const m = String(u || '').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : '';
+}
+
+// Длительность, жанры и трейлер. Поиск их не отдаёт, поэтому догружаем в фоне после добавления.
+async function fetchDetails(f) {
+  if (f.source === 'tmdb' && TMDB_KEY) {
+    const [type, tid] = f.sourceId.split('/');
+    if (!/^(movie|tv)$/.test(type) || !/^\d+$/.test(tid)) return;
+    const bearer = TMDB_KEY.length > 40;
+    const u = `https://api.themoviedb.org/3/${type}/${tid}?language=ru-RU&append_to_response=videos&include_video_language=ru,en,null${bearer ? '' : `&api_key=${TMDB_KEY}`}`;
+    const j = await getJson(u, bearer ? { Authorization: `Bearer ${TMDB_KEY}` } : {});
+    f.runtime = Number(j.runtime || j.episode_run_time?.[0] || 0) || 0;
+    if (j.genres?.length) f.genres = j.genres.map(g => str(g.name, 30).toLowerCase()).slice(0, 3);
+    if (!f.overview && j.overview) f.overview = str(j.overview, 2000);
+    const vids = (j.videos?.results || []).filter(v => v.site === 'YouTube');
+    const pick = ['Trailer', 'Teaser'].flatMap(t => [vids.find(v => v.type === t && v.iso_639_1 === 'ru'), vids.find(v => v.type === t)]).find(Boolean) || vids[0];
+    f.trailer = pick ? str(pick.key, 20) : '';
+  } else if (f.source === 'kinopoisk' && KP_KEY) {
+    const base = `https://kinopoiskapiunofficial.tech/api/v2.2/films/${encodeURIComponent(f.sourceId)}`;
+    const j = await getJson(base, { 'X-API-KEY': KP_KEY });
+    f.runtime = Number(j.filmLength) || 0;
+    if (!f.overview) f.overview = str(j.description || j.shortDescription || '', 2000);
+    if (j.ratingKinopoisk) f.rating = String(j.ratingKinopoisk);
+    if (j.posterUrlPreview) f.poster = j.posterUrlPreview;
+    if (j.genres?.length) f.genres = j.genres.map(g => str(g.genre, 30).toLowerCase()).slice(0, 3);
+    try {
+      const v = await getJson(base + '/videos', { 'X-API-KEY': KP_KEY });
+      f.trailer = (v.items || []).map(x => ytKey(x.url)).find(Boolean) || '';
+    } catch { f.trailer = ''; }
+  } else return;
+  f.detailsAt = Date.now();
+}
+
+const enrichQueue = [];
+const enrichQueued = new Set();
+const enrichFailed = new Set(); // не повторяем до перезапуска, чтобы не долбить API
+let enrichActive = 0;
+function queueEnrich(r) {
+  for (const f of r.films) {
+    if (!f.source || !f.sourceId || f.detailsAt || enrichQueued.has(f.id) || enrichFailed.has(f.id)) continue;
+    if ((f.source === 'tmdb' && !TMDB_KEY) || (f.source === 'kinopoisk' && !KP_KEY)) continue;
+    enrichQueued.add(f.id);
+    enrichQueue.push([r, f]);
+  }
+  pumpEnrich();
+}
+function pumpEnrich() {
+  while (enrichActive < 3 && enrichQueue.length) {
+    const [r, f] = enrichQueue.shift();
+    enrichActive++;
+    fetchDetails(f)
+      .catch(e => { enrichFailed.add(f.id); console.warn(`Детали «${f.title}»: ${e.message}`); })
+      .finally(() => {
+        enrichActive--;
+        enrichQueued.delete(f.id);
+        if (rooms[r.id] && r.films.includes(f)) schedulePush(r);
+        pumpEnrich();
+      });
+  }
+}
+const pushTimers = new Map();
+function schedulePush(r) {
+  if (pushTimers.has(r.id)) return;
+  pushTimers.set(r.id, setTimeout(() => { pushTimers.delete(r.id); if (rooms[r.id]) pushState(r); }, 500));
 }
 
 async function getJson(url, headers) {
@@ -292,7 +457,9 @@ function makeFilm(b, addedBy, addedById) {
     original: str(b.original, 160), year: str(String(b.year || ''), 4),
     poster: /^https:\/\//.test(b.poster || '') ? str(b.poster, 500) : '',
     overview: str(b.overview, 2000), rating: str(String(b.rating || ''), 6),
-    genres: Array.isArray(b.genres) ? b.genres.slice(0, 3).map(g => str(g, 30)) : [],
+    genres: Array.isArray(b.genres) ? b.genres.slice(0, 3).map(g => str(g, 30).toLowerCase()) : [],
+    runtime: Math.max(0, Math.round(num(b.runtime, 0))),
+    trailer: /^[\w-]{11}$/.test(b.trailer || '') ? b.trailer : '',
     url: /^https:\/\//.test(b.url || '') ? str(b.url, 500) : '',
     source: str(b.source, 20), sourceId: str(b.sourceId, 40),
     weight: Math.min(1000, Math.max(1, Math.round(num(b.weight, 1)))),
@@ -330,7 +497,7 @@ async function api(req, res, url) {
   if (!r) return json(res, 404, { error: 'Комната не найдена' });
   const sub = parts[2];
 
-  if (!sub && m === 'GET') return json(res, 200, publicState(r));
+  if (!sub && m === 'GET') { queueEnrich(r); return json(res, 200, publicState(r)); }
 
   if (sub === 'events' && m === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
@@ -339,6 +506,7 @@ async function api(req, res, url) {
       : { res, name: str(url.searchParams.get('name'), 32) || 'Гость', avatar: '', cid: str(url.searchParams.get('cid'), 32) || id(6) };
     if (!clients.has(r.id)) clients.set(r.id, new Set());
     clients.get(r.id).add(c);
+    queueEnrich(r);
     send(res, { type: 'state', state: publicState(r), now: Date.now() });
     presence(r.id);
     req.on('close', () => { clients.get(r.id)?.delete(c); presence(r.id); });
@@ -350,6 +518,14 @@ async function api(req, res, url) {
   b.by = who;
 
   if (!sub && m === 'PATCH') {
+    if (b.filters !== undefined) {
+      if (r.spin || r.duel) return json(res, 409, { error: 'Фильтры можно менять, когда колесо стоит' });
+      r.filters = cleanFilters(b.filters);
+      // набор фильмов изменился, серия на выбывание начинается заново
+      r.eliminated = []; r.plan = null;
+      const rt = runtime(r);
+      rt.series = false; clearTimeout(rt.next); rt.next = null;
+    }
     if (b.name !== undefined) r.name = str(b.name, 60) || r.name;
     if (b.webhook !== undefined) {
       const w = str(b.webhook, 300);
@@ -362,7 +538,7 @@ async function api(req, res, url) {
   if (!sub && m === 'DELETE') {
     if (r.owner && r.owner !== me?.id) return json(res, 403, { error: 'Удалить комнату может только тот, кто её создал' });
     const rt = runtime(r);
-    clearTimeout(rt.finish); clearTimeout(rt.next);
+    clearTimeout(rt.finish); clearTimeout(rt.next); clearTimeout(rt.duelAuto); clearTimeout(rt.duelNext);
     runtimes.delete(r.id);
     delete rooms[r.id];
     save();
@@ -385,6 +561,29 @@ async function api(req, res, url) {
     pushState(r); return json(res, 200, { ok: true });
   }
 
+  if (sub === 'duel' && m === 'POST') {
+    const action = parts[3];
+    if (action === 'start') {
+      if (r.spin || r.duel) return json(res, 409, { error: 'Сначала дождитесь конца прокрута или дуэли' });
+      const err = startDuel(r, who);
+      return err ? json(res, 400, { error: err }) : json(res, 200, { ok: true });
+    }
+    if (!r.duel) return json(res, 409, { error: 'Дуэль не идёт' });
+    if (action === 'vote') {
+      const voter = me ? 'd' + me.id : str(b.cid, 32);
+      if (!voter) return json(res, 400, { error: 'Не понятно, кто голосует' });
+      const err = voteDuel(r, voter, who, str(b.filmId, 20));
+      return err ? json(res, 400, { error: err }) : json(res, 200, { ok: true });
+    }
+    if (action === 'next') { resolveDuel(r, r.duel.did); return json(res, 200, { ok: true }); }
+    if (action === 'stop') {
+      stopDuel(r);
+      broadcast(r.id, { type: 'duel-stop', by: who });
+      pushState(r); return json(res, 200, { ok: true });
+    }
+  }
+
+  if (r.duel && sub !== 'duel') return json(res, 409, { error: 'Идёт дуэль, подождите' });
   if (r.spin && sub !== 'spin') return json(res, 409, { error: 'Колесо крутится, подождите' });
 
   if (sub === 'films' && !parts[3] && m === 'POST') {
@@ -395,8 +594,9 @@ async function api(req, res, url) {
       const f = makeFilm(raw, who, me?.id);
       const dup = r.films.find(x => (f.sourceId && x.sourceId === f.sourceId) || norm(x.title) === norm(f.title) && (x.year || '') === (f.year || ''));
       if (dup) { dup.weight = Math.min(1000, dup.weight + 1); merged.push(dup.title); continue; }
-      r.films.push(await enrich(f)); added.push(f.title);
+      r.films.push(f); added.push(f.title);
     }
+    queueEnrich(r);
     pushState(r); return json(res, 200, { added, merged });
   }
 

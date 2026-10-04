@@ -222,12 +222,16 @@ input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; hei
 input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--btn); box-shadow: 0 0 0 5px var(--glow); cursor: pointer; }
 input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; border-radius: 50%; background: var(--btn); cursor: pointer; }
 
-.check { display: flex; align-items: center; gap: 11px; font-size: 14px; cursor: pointer; user-select: none; color: var(--tx2); }
+.check { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: 14px; font-weight: 600; cursor: pointer; user-select: none; color: var(--tx2); transition: color .2s; }
 .check input { display: none; }
-.check .box { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--ghost-bd); display: grid; place-items: center; transition: background .2s, border-color .2s; flex: none; }
-.check input:checked + .box { background: var(--btn); border-color: var(--btn); }
-.check input:checked + .box::after { content: ''; width: 5px; height: 10px; border: solid var(--btn-tx); border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
-.check input:checked ~ * { color: var(--tx); }
+/* переключатель: дорожка справа, кругляш ездит влево-вправо */
+.check .box { order: 2; position: relative; width: 44px; height: 26px; border-radius: 99px; background: var(--s3); border: 1px solid var(--bd); flex: none; transition: background .3s, border-color .3s, box-shadow .3s; }
+.check .box::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--tx2); box-shadow: 0 2px 6px rgba(0,0,0,.35); transition: transform .4s var(--spring), background .3s; }
+.check input:checked + .box { background: var(--acc); border-color: var(--acc); box-shadow: 0 0 16px var(--glow); }
+.check input:checked + .box::after { transform: translateX(18px); background: #fff; }
+.check:has(input:checked) { color: var(--tx); }
+.check:has(input:disabled) { opacity: .5; cursor: default; }
+.check-title { font: 800 18px var(--f-head); letter-spacing: -.02em; color: var(--tx); }
 
 .history h3 { font-size: 18px; margin-bottom: 10px; }
 .history-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
@@ -405,3 +409,45 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .bulk-actions .btn.on { background: var(--btn); color: var(--btn-tx); border-color: var(--btn); }
 .bulk-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
 .bulk-search input { height: 40px; }
+
+/* ---------- фильтры ---------- */
+.filters-body { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; transition: opacity .2s; }
+.filters-body.locked { opacity: .5; pointer-events: none; }
+#fRuntime button, #fYear button { padding: 0 4px; font-size: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { height: 32px; padding: 0 12px; border-radius: 10px; background: var(--s1); border: 1px solid var(--bd); color: var(--tx2); font-weight: 700; font-size: 13px; transition: background .2s, color .2s, border-color .2s; }
+.chip:first-letter { text-transform: uppercase; }
+.chip:hover { background: var(--s2); color: var(--tx); }
+.chip.on { background: var(--btn); color: var(--btn-tx); border-color: var(--btn); }
+.film.filtered { opacity: .38; }
+.film.filtered .film-meta { color: var(--tx3); font-style: italic; }
+
+/* ---------- дуэль ---------- */
+.stage.dueling .wheel-box, .stage.dueling .current { display: none; }
+.duel { width: min(100%, 860px); display: flex; flex-direction: column; align-items: center; gap: 22px; }
+.duel-progress { display: flex; gap: 14px; align-items: baseline; color: var(--tx2); font-weight: 600; }
+.duel-progress b { font: 800 clamp(26px, 2.6vw, 36px) var(--f-head); letter-spacing: -.04em; color: var(--tx); }
+.duel-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: clamp(12px, 2vw, 28px); width: 100%; }
+.duel-vs { font: 800 clamp(30px, 3.4vw, 52px)/1 var(--f-ui); letter-spacing: -.06em; background: linear-gradient(180deg, var(--h1a) 20%, var(--acc-hi) 120%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 18px var(--glow)); }
+.duel-card { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 24px; background: color-mix(in srgb, var(--sheetB) 80%, transparent); border: 1.5px solid var(--bd); text-align: left; transition: transform .35s var(--spring), border-color .25s, box-shadow .25s, opacity .4s, filter .4s; }
+.duel-card:not(:disabled):hover { transform: translateY(-4px); border-color: var(--acc-hi); }
+.duel-card.mine { border-color: var(--acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 35%, transparent), 0 0 40px var(--glow); }
+.duel-card.win { border-color: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 35%, transparent), 0 0 40px color-mix(in srgb, var(--ok) 30%, transparent); transform: scale(1.03); }
+.duel-card.lose { opacity: .35; filter: grayscale(.8); transform: scale(.96); }
+.duel-poster { width: 100%; aspect-ratio: 2/3; max-height: 40vh; border-radius: 16px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 48px var(--f-head); color: rgba(255,255,255,.7); }
+.duel-info b { display: block; font: 800 20px/1.15 var(--f-head); letter-spacing: -.02em; }
+.duel-info span { color: var(--tx3); font-size: 13.5px; }
+.duel-voters { display: flex; flex-wrap: wrap; gap: 5px; min-height: 26px; }
+.duel-voters i { font-style: normal; font-size: 12.5px; font-weight: 700; padding: 4px 9px; border-radius: 8px; background: var(--s2); color: var(--tx); animation: pop .45s var(--spring); }
+.duel-voters em { font-style: normal; color: var(--tx3); font-size: 13px; }
+.duel-badge { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); padding: 7px 14px; border-radius: 10px; font-weight: 800; font-size: 13.5px; white-space: nowrap; background: var(--btn); color: var(--btn-tx); animation: pop .5s var(--spring); }
+.duel-card.win .duel-badge { background: var(--ok); color: #fff; }
+.duel-foot { display: flex; align-items: center; gap: 10px; color: var(--tx2); font-size: 14px; }
+.duel-foot span { margin-right: 6px; }
+
+/* ---------- трейлер ---------- */
+.trailer-card { width: min(1000px, 100%); padding: 0; overflow: visible; background: #000; max-height: none; }
+.trailer-frame { border-radius: inherit; overflow: hidden; }
+.trailer-frame { aspect-ratio: 16/9; width: 100%; }
+.trailer-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+.trailer-card .modal-x { top: -48px; right: 0; background: var(--s2); color: var(--tx); }

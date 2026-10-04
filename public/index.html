@@ -88,6 +88,15 @@
           <button id="spinBtn" class="hub-btn" title="Крутить (пробел)"><span class="hub-label">Крутить</span><span class="hub-sub" id="hubSub"></span></button>
           <div class="pointer" id="pointer"><svg viewBox="0 0 40 52"><path d="M20 50 3 14A18 18 0 1 1 37 14Z"/></svg></div>
         </div>
+        <div class="duel" id="duelBox" hidden>
+          <div class="duel-progress" id="duelProgress"></div>
+          <div class="duel-pair" id="duelPair"></div>
+          <div class="duel-foot">
+            <span id="duelVotes"></span>
+            <button id="duelNext" class="ghost sm">Подвести итог</button>
+            <button id="duelStop" class="ghost sm">Остановить</button>
+          </div>
+        </div>
         <div class="stage-status" id="stageStatus"></div>
         <button id="stopBtn" class="ghost sm stop-btn" hidden></button>
       </div>
@@ -99,17 +108,43 @@
         <div class="seg" id="modeSeg">
           <span class="seg-ind"></span>
           <button data-mode="normal">Обычный</button>
-          <button data-mode="elimination">На выбывание</button>
+          <button data-mode="elimination">Выбывание</button>
+          <button data-mode="duel">Дуэль</button>
         </div>
         <p class="note" id="modeNote"></p>
       </div>
 
-      <div class="field">
+      <div class="field filters">
+        <label class="check check-title"><input type="checkbox" id="filtersOn"><span class="box"></span>Фильтры</label>
+        <div id="filtersBody" class="filters-body" hidden>
+          <span class="label">Длина</span>
+          <div class="seg" id="fRuntime">
+            <span class="seg-ind"></span>
+            <button data-v="0">Любая</button>
+            <button data-v="105">до 1:45</button>
+            <button data-v="120">до 2 ч</button>
+            <button data-v="150">до 2:30</button>
+          </div>
+          <span class="label">Год</span>
+          <div class="seg" id="fYear">
+            <span class="seg-ind"></span>
+            <button data-v="0">Любой</button>
+            <button data-v="2000">2000+</button>
+            <button data-v="2010">2010+</button>
+            <button data-v="2020">2020+</button>
+          </div>
+          <span class="label">Жанры</span>
+          <div class="chips" id="fGenres"></div>
+          <p class="note" id="filtersNote"></p>
+        </div>
+      </div>
+
+      <div class="field" id="durField">
         <span class="label">Длительность <b id="durVal">12 с</b></span>
         <input type="range" id="duration" min="0" max="40" value="12">
       </div>
 
-      <div class="field">
+      <div class="field" id="delayField">
         <span class="label">Отсчёт перед прокрутом</span>
         <div class="seg" id="delaySeg">
           <span class="seg-ind"></span>
@@ -121,7 +156,7 @@
       </div>
 
       <div class="checks">
-        <label class="check" id="autoWrap"><input type="checkbox" id="autoSpin"><span class="box"></span>Крутить до победителя без остановок</label>
+        <label class="check" id="autoWrap"><input type="checkbox" id="autoSpin"><span class="box"></span>Крутить до победителя</label>
         <label class="check"><input type="checkbox" id="soundOn" checked><span class="box"></span>Звук щелчков</label>
       </div>
 
@@ -170,6 +205,13 @@
   <div class="modal-card film-card">
     <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     <div id="filmDetail"></div>
+  </div>
+</div>
+
+<div class="modal" id="trailerModal" hidden>
+  <div class="modal-card trailer-card">
+    <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="trailer-frame" id="trailerFrame"></div>
   </div>
 </div>
 

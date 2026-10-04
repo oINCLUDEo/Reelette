@@ -76,8 +76,21 @@ function closeModal(m) {
   if (!el || el.hidden) return;
   el.classList.remove('open');
   clearTimeout(el._t);
-  el._t = setTimeout(() => { el.hidden = true; }, 300);
+  el._t = setTimeout(() => {
+    el.hidden = true;
+    if (el.id === 'trailerModal') $('#trailerFrame').innerHTML = '';
+  }, 300);
 }
+function openTrailer(key) {
+  $('#trailerFrame').innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(key)}?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+  openModal('#trailerModal');
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-trailer]');
+  if (t) { e.stopPropagation(); openTrailer(t.dataset.trailer); }
+}, true);
+const fmtRuntime = m => (m >= 60 ? `${Math.floor(m / 60)} ч ${m % 60} мин` : `${m} мин`);
+const trailerBtn = f => (f.trailer ? `<button class="btn btn-ghost" data-trailer="${esc(f.trailer)}"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>Трейлер</button>` : '');
 const anyModalOpen = () => $$('.modal:not([hidden])').length > 0;
 function messageModal(html) {
   document.body.insertAdjacentHTML('beforeend', `<div class="modal" data-fixed><div class="modal-card small-card">${html}</div></div>`);
@@ -178,7 +191,8 @@ function initRoom(roomId) {
   let serverOffset = 0;
   let es = null;
   let provider = 'none';
-  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', false), sound: ls.get('sound', true), delay: ls.get('delay', 0) };
+  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', false), sound: ls.get('sound', true), delay: 0 };
+  let people = [];
   let countdown = null; // секунд до старта, пока идёт отсчёт
   let countdownTimer = null;
 
@@ -259,6 +273,8 @@ function initRoom(roomId) {
       syncWheel();
       toast(msg.by ? `${msg.by} отменил(а) прокрут` : 'Прокрут отменён');
       render();
+    } else if (msg.type === 'duel-stop') {
+      toast(msg.by ? `${msg.by} остановил(а) дуэль` : 'Дуэль остановлена');
     } else if (msg.type === 'deleted') {
       es.close();
       ls.set('rooms', ls.get('rooms', []).filter(r => r.id !== roomId));
@@ -272,8 +288,17 @@ function initRoom(roomId) {
     ls.set('rooms', list.slice(0, 12));
   }
 
+  // Та же логика, что на сервере: неизвестная длина или год не отсекаются, без жанров при выбранных жанрах не проходит.
+  function matchesFilters(f) {
+    const F = state?.filters;
+    if (!F?.on) return true;
+    if (F.maxRuntime && f.runtime && f.runtime > F.maxRuntime) return false;
+    if (F.minYear && f.year && Number(f.year) < F.minYear) return false;
+    if (F.genres.length && !(f.genres || []).some(g => F.genres.includes(String(g).toLowerCase()))) return false;
+    return true;
+  }
   function activeFilms() {
-    return state ? state.films.filter(f => !state.eliminated.includes(f.id)) : [];
+    return state ? state.films.filter(f => !state.eliminated.includes(f.id) && matchesFilters(f)) : [];
   }
   function syncWheel() { wheel.setItems(activeFilms()); }
 
@@ -338,14 +363,16 @@ function initRoom(roomId) {
     } else if (msg.mode === 'final') {
       clearTimeout(finalTimer);
       finalTimer = setTimeout(() => showWin(f, 'win'), 1700);
+    } else if (msg.mode === 'duel') {
+      setTimeout(() => showWin(f, 'win', 0, 'Победитель дуэли'), 600);
     } else showWin(f, 'win');
   }
 
-  function showWin(f, kind, left) {
+  function showWin(f, kind, left, title) {
     const card = $('#winModal .win-card');
     card.classList.toggle('out', kind === 'out');
     $('#winDetail').dataset.id = f.id;
-    const label = kind === 'out' ? `Выбывает${left > 1 ? `, осталось ${left}` : ''}` : 'Сегодня смотрим';
+    const label = title || (kind === 'out' ? `Выбывает${left > 1 ? `, осталось ${left}` : ''}` : 'Сегодня смотрим');
     $('#winDetail').innerHTML = `
       ${f.poster ? `<div class="win-bg" style="--img:url('${esc(f.poster)}')"></div>` : ''}
       <div class="win-inner">
@@ -357,6 +384,7 @@ function initRoom(roomId) {
           ${kind === 'win' && f.overview ? `<p>${esc(f.overview)}</p>` : ''}
           ${kind === 'win' ? `<div class="detail-actions">
             ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Открыть страницу фильма</a>` : ''}
+            ${trailerBtn(f)}
             ${state.films.some(x => x.id === f.id) ? `<button class="btn btn-ghost" data-remove="${esc(f.id)}">Убрать из колеса</button>` : ''}
           </div>` : ''}
         </div>
@@ -371,6 +399,7 @@ function initRoom(roomId) {
   function facts(f) {
     const parts = [];
     if (f.year) parts.push(`<span><b>${esc(f.year)}</b></span>`);
+    if (f.runtime) parts.push(`<span><b>${fmtRuntime(f.runtime)}</b></span>`);
     if (f.rating) parts.push(`<span>Рейтинг <b>${esc(f.rating)}</b></span>`);
     if (f.genres?.length) parts.push(`<span>${esc(f.genres.join(', '))}</span>`);
     if (f.addedBy) parts.push(`<span>Добавил(а) <b>${esc(f.addedBy)}</b></span>`);
@@ -389,12 +418,14 @@ function initRoom(roomId) {
     $('#filmCount').textContent = state.films.length ? String(state.films.length) : '';
     $('#filmEmpty').hidden = state.films.length > 0;
     $('#filmList').innerHTML = state.films.map(f => {
-      const pct = out.has(f.id) || !total ? '—' : `${(f.weight / total * 100).toFixed(f.weight / total < 0.1 ? 1 : 0)}%`;
-      return `<div class="film${out.has(f.id) ? ' out' : ''}${wheel.curId === f.id ? ' hot' : ''}" data-id="${esc(f.id)}">
+      const filtered = !out.has(f.id) && !matchesFilters(f);
+      const pct = out.has(f.id) || filtered || !total ? '—' : `${(f.weight / total * 100).toFixed(f.weight / total < 0.1 ? 1 : 0)}%`;
+      const meta = filtered ? ['не подходит под фильтры'] : [f.year, f.runtime && fmtRuntime(f.runtime), f.addedBy].filter(Boolean);
+      return `<div class="film${out.has(f.id) ? ' out' : ''}${filtered ? ' filtered' : ''}${wheel.curId === f.id ? ' hot' : ''}" data-id="${esc(f.id)}">
         <div class="film-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</div>
         <div class="film-main">
           <div class="film-title">${esc(f.title)}</div>
-          <div class="film-meta">${[f.year, f.addedBy].filter(Boolean).map(esc).join(', ')}</div>
+          <div class="film-meta">${meta.map(esc).join(', ')}</div>
         </div>
         <div class="film-side">
           <span class="film-pct">${pct}</span>
@@ -410,10 +441,12 @@ function initRoom(roomId) {
 
     const btn = $('#spinBtn');
     const counting = countdown !== null;
-    btn.disabled = spinning || active.length < 2;
+    const duel = state.duel;
+    btn.disabled = spinning || Boolean(duel) || active.length < 2;
     btn.classList.toggle('busy', spinning && !counting);
     btn.classList.toggle('count', counting);
-    $('#spinBtn .hub-label').textContent = counting ? String(countdown) : spinning ? 'Крутится' : settings.mode === 'elimination' && state.eliminated.length ? 'Дальше' : 'Крутить';
+    $('#spinBtn .hub-label').textContent = counting ? String(countdown) : spinning ? 'Крутится'
+      : settings.mode === 'duel' ? 'Дуэль' : settings.mode === 'elimination' && state.eliminated.length ? 'Дальше' : 'Крутить';
     $('#hubSub').textContent = counting || spinning ? '' : active.length < 2 ? 'нужно 2 фильма' : `${active.length} ${plural(active.length, 'фильм', 'фильма', 'фильмов')}`;
 
     $('#stopBtn').hidden = !counting && !state.series;
@@ -424,19 +457,102 @@ function initRoom(roomId) {
         : state.series ? `Серия до победителя, осталось ${active.length}` : by ? `Крутит ${by}` : 'Колесо крутится';
     }
     $('#resetBtn').hidden = !state.eliminated.length || spinning;
-    $('#addBtn').disabled = spinning;
+    $('#addBtn').disabled = spinning || Boolean(duel);
 
-    if (!spinning) {
+    $('.stage').classList.toggle('dueling', Boolean(duel));
+    $('#duelBox').hidden = !duel;
+    if (duel) renderDuel(duel);
+    renderFilters(spinning || Boolean(duel));
+
+    if (duel) $('#stageStatus').textContent = '';
+    else if (!spinning) {
       $('#stageStatus').textContent = active.length < 2
         ? (state.eliminated.length && active.length === 1 ? 'Остался один фильм. Чтобы начать заново, верните выбывших.'
           : state.films.length ? 'Для прокрута нужно хотя бы два фильма' : '')
-        : settings.mode === 'elimination' && state.eliminated.length ? `В колесе осталось ${active.length}` : 'Нажмите на центр колеса или пробел';
+        : settings.mode === 'elimination' && state.eliminated.length ? `В колесе осталось ${active.length}`
+        : settings.mode === 'duel' ? 'Нажмите на центр колеса, чтобы начать дуэль' : 'Нажмите на центр колеса или пробел';
     }
   }
 
-  function renderPeople(people) {
-    $('#people').innerHTML = people.slice(0, 6).map(p => `<span class="ava" style="background:hsl(${hue(p.name)} 55% 42%)" data-tip="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
-      + (people.length > 6 ? `<span class="ava" style="background:#333">+${people.length - 6}</span>` : '');
+  // ---- дуэль ----
+  const myVoter = () => (account.user ? 'd' + account.user.id : me.cid);
+  function renderDuel(d) {
+    const pair = d.matches[d.idx] || [];
+    const byId = new Map(state.films.map(f => [f.id, f]));
+    const mine = d.votes[myVoter()]?.film;
+    const voters = Object.values(d.votes);
+    $('#duelProgress').innerHTML = `<b>Раунд ${d.round}</b><span>пара ${d.idx + 1} из ${d.matches.length}</span><span>осталось ${d.left}</span>`;
+    $('#duelPair').innerHTML = pair.map((fid, i) => {
+      const f = byId.get(fid) || { title: '?' };
+      const names = voters.filter(v => v.film === fid).map(v => v.name);
+      const rv = d.reveal;
+      const cls = [mine === fid && 'mine', rv && (rv.winner === fid ? 'win' : 'lose')].filter(Boolean).join(' ');
+      const card = `<button class="duel-card ${cls}" data-vote="${esc(fid)}" ${rv ? 'disabled' : ''}>
+        <span class="duel-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</span>
+        <span class="duel-info"><b>${esc(f.title)}</b><span>${[f.year, f.runtime && fmtRuntime(f.runtime)].filter(Boolean).map(esc).join(', ')}</span></span>
+        <span class="duel-voters">${names.length ? names.map(n => `<i>${esc(n)}</i>`).join('') : '<em>нет голосов</em>'}</span>
+        ${rv ? `<span class="duel-badge">${rv.winner === fid ? (rv.tie ? 'Ничья, прошёл по жребию' : 'Проходит дальше') : 'Вылетает'}</span>` : ''}
+      </button>`;
+      return i === 0 ? card + '<span class="duel-vs">VS</span>' : card;
+    }).join('');
+    $('#duelVotes').textContent = d.reveal ? 'Итог пары' : `Проголосовали ${voters.length} из ${Math.max(people.length, voters.length)}`;
+    $('#duelNext').hidden = Boolean(d.reveal);
+  }
+  $('#duelPair').addEventListener('click', async e => {
+    const c = e.target.closest('[data-vote]');
+    if (!c || c.disabled) return;
+    try { await api(`/rooms/${roomId}/duel/vote`, { method: 'POST', body: { filmId: c.dataset.vote, cid: me.cid, by: me.name } }); }
+    catch (err) { toast(err.message, true); }
+  });
+  $('#duelNext').addEventListener('click', () => api(`/rooms/${roomId}/duel/next`, { method: 'POST' }).catch(e => toast(e.message, true)));
+  $('#duelStop').addEventListener('click', () => {
+    if (!confirm('Остановить дуэль? Прогресс пропадёт.')) return;
+    api(`/rooms/${roomId}/duel/stop`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true));
+  });
+
+  // ---- фильтры (общие для комнаты) ----
+  function saveFilters(patch) {
+    state.filters = { ...state.filters, ...patch };
+    syncWheel();
+    render();
+    api(`/rooms/${roomId}`, { method: 'PATCH', body: { filters: state.filters } }).catch(e => toast(e.message, true));
+  }
+  function renderFilters(locked) {
+    const F = state.filters || { on: false, maxRuntime: 0, minYear: 0, genres: [] };
+    $('#filtersOn').checked = F.on;
+    $('#filtersOn').disabled = locked;
+    $('#filtersBody').hidden = !F.on;
+    $('#filtersBody').classList.toggle('locked', locked);
+    if (!F.on) return;
+    $$('#fRuntime button').forEach(b => b.classList.toggle('on', Number(b.dataset.v) === F.maxRuntime));
+    $$('#fYear button').forEach(b => b.classList.toggle('on', Number(b.dataset.v) === F.minYear));
+    requestAnimationFrame(() => { placeSeg($('#fRuntime')); placeSeg($('#fYear')); });
+    const freq = new Map();
+    for (const f of state.films) for (const g of f.genres || []) freq.set(g.toLowerCase(), (freq.get(g.toLowerCase()) || 0) + 1);
+    const genres = [...new Set([...F.genres, ...[...freq.keys()].sort((a, b) => freq.get(b) - freq.get(a))])];
+    $('#fGenres').innerHTML = genres.length
+      ? genres.map(g => `<button class="chip${F.genres.includes(g) ? ' on' : ''}" data-g="${esc(g)}">${esc(g)}</button>`).join('')
+      : '<span class="note">Жанры появятся, когда подгрузятся данные фильмов</span>';
+    const fit = state.films.filter(matchesFilters).length;
+    const noLen = F.maxRuntime ? state.films.filter(f => !f.runtime).length : 0;
+    $('#filtersNote').textContent = `Подходит ${fit} из ${state.films.length}.` + (noLen ? ` У ${noLen} нет длительности, их фильтр по длине не отсекает.` : '');
+  }
+  $('#filtersOn').addEventListener('change', e => saveFilters({ on: e.target.checked }));
+  $('#fRuntime').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) saveFilters({ maxRuntime: Number(b.dataset.v) }); });
+  $('#fYear').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) saveFilters({ minYear: Number(b.dataset.v) }); });
+  $('#fGenres').addEventListener('click', e => {
+    const b = e.target.closest('[data-g]');
+    if (!b) return;
+    const g = b.dataset.g, cur = state.filters.genres || [];
+    saveFilters({ genres: cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g] });
+  });
+
+  function renderPeople(list) {
+    people = list;
+    if (state?.duel) renderDuel(state.duel);
+    const people_ = list;
+    $('#people').innerHTML = people_.slice(0, 6).map(p => `<span class="ava" style="background:hsl(${hue(p.name)} 55% 42%)" data-tip="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
+      + (people_.length > 6 ? `<span class="ava" style="background:#333">+${people_.length - 6}</span>` : '');
   }
 
   // ---- действия с фильмами ----
@@ -479,6 +595,7 @@ function initRoom(roomId) {
         <p>${f.overview ? esc(f.overview) : '<span class="muted">Описания нет.</span>'}</p>
         <div class="detail-actions">
           ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Страница фильма</a>` : ''}
+          ${trailerBtn(f)}
           ${!fromHistory ? `<button class="btn btn-ghost" data-rm>Удалить из колеса</button>` : ''}
         </div>
       </div></div>`;
@@ -669,8 +786,11 @@ function initRoom(roomId) {
     placeSeg($('#modeSeg'));
     $('#modeNote').textContent = m === 'normal'
       ? 'Один прокрут выбирает один фильм. Шанс фильма равен его доле в колесе.'
-      : 'Каждый прокрут убирает один фильм, последний оставшийся побеждает. Шансы на победу такие же, как в обычном режиме.';
+      : m === 'elimination' ? 'Каждый прокрут убирает один фильм, последний оставшийся побеждает. Шансы на победу такие же, как в обычном режиме.'
+      : 'Фильмы выходят парами, все голосуют. Проигравший вылетает, пока не останется один. При ничьей победителя выбирает жребий с учётом веса.';
     $('#autoWrap').hidden = m !== 'elimination';
+    $('#durField').hidden = m === 'duel';
+    $('#delayField').hidden = m === 'duel';
     render();
   }
   $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
@@ -687,7 +807,7 @@ function initRoom(roomId) {
   setDur(settings.duration);
 
   function setDelay(v) {
-    settings.delay = v; ls.set('delay', v);
+    settings.delay = v;
     $$('#delaySeg button').forEach(b => b.classList.toggle('on', Number(b.dataset.delay) === v));
     placeSeg($('#delaySeg'));
   }
@@ -710,6 +830,11 @@ function initRoom(roomId) {
   async function spin() {
     if ($('#spinBtn').disabled) return;
     actx ||= new AudioContext(); // разблокировать звук по клику
+    if (settings.mode === 'duel') {
+      try { await api(`/rooms/${roomId}/duel/start`, { method: 'POST', body: { by: me.name } }); }
+      catch (e) { toast(e.message, true); }
+      return;
+    }
     try {
       await api(`/rooms/${roomId}/spin`, { method: 'POST', body: { mode: settings.mode, duration: settings.duration, auto: settings.auto, delay: settings.delay, by: me.name } });
     } catch (e) { toast(e.message, true); }
