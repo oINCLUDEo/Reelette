@@ -226,11 +226,13 @@ function initRoom(roomId) {
   function musicOn() {
     window.setBackdropActive?.(true);
     Sfx.bgm.duck(true);
+    ytDuck(true);
     if (settings.music) Sfx.spinStart(() => wheel.speed || 0);
   }
   function musicOff() {
     window.setBackdropActive?.(false);
     Sfx.bgm.duck(false);
+    ytDuck(false);
     Sfx.spinStop();
   }
 
@@ -253,6 +255,7 @@ function initRoom(roomId) {
       if (state.spin && state.spin.sid !== spinningSid) runSpin(state.spin);
       if (!state.spin && !spinningSid) { syncWheel(); wheel.setAngle(state.angle); }
       render();
+      syncMusic();
     } else if (msg.type === 'spin') {
       runSpin(msg.spin);
     } else if (msg.type === 'presence') {
@@ -538,6 +541,101 @@ function initRoom(roomId) {
         : settings.mode === 'duel' ? 'Нажмите на центр колеса, чтобы начать дуэль' : 'Нажмите на центр колеса или пробел';
     }
   }
+
+  // ---- общая музыка из YouTube ----
+  // Сервер хранит, когда трек был на нуле (startedAt) или на какой секунде пауза (pausedAt).
+  // Каждый плеер считает ожидаемую позицию сам и подтягивается, если ушёл больше чем на 2,5 с.
+  let yt = null, ytReady = false, ytVid = null, ytDucked = false, ytChanging = false;
+  function loadYT(cb) {
+    if (window.YT?.Player) return cb();
+    if (!loadYT.queue) {
+      loadYT.queue = [];
+      window.onYouTubeIframeAPIReady = () => loadYT.queue.forEach(f => f());
+      const sc = document.createElement('script');
+      sc.src = 'https://www.youtube.com/iframe_api';
+      document.head.append(sc);
+    }
+    loadYT.queue.push(cb);
+  }
+  function ytExpected(m) {
+    const pos = m.pausedAt != null ? m.pausedAt : (Date.now() + serverOffset - m.startedAt) / 1000;
+    const d = ytReady ? yt.getDuration() : 0;
+    return d > 1 ? pos % d : pos;
+  }
+  function ytVolume() {
+    if (!ytReady) return;
+    const v = Number($('#ytVol').value);
+    yt.setVolume(Math.round(v * (ytDucked ? 0.3 : 1)));
+  }
+  function ytDuck(on) { ytDucked = on; ytVolume(); }
+  function syncMusic() {
+    const m = state?.music;
+    $('#ytCard').hidden = !m;
+    $('#ytAdd').hidden = Boolean(m) && !ytChanging;
+    if (!m) {
+      if (yt) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $('#ytHost').innerHTML = ''; }
+      return;
+    }
+    $('#ytTitle').textContent = m.title;
+    $('#ytBy').textContent = [m.author, m.pausedAt != null ? `на паузе (${m.by})` : `включил(а) ${m.by}`].filter(Boolean).join(', ');
+    $('#ytToggle').textContent = m.pausedAt != null ? 'Играть' : 'Пауза';
+    loadYT(() => {
+      if (!yt) {
+        ytVid = m.vid;
+        $('#ytHost').innerHTML = '<div></div>';
+        yt = new YT.Player($('#ytHost').firstChild, {
+          videoId: m.vid,
+          playerVars: { autoplay: 1, controls: 0, disablekb: 1, rel: 0, playsinline: 1, iv_load_policy: 3, start: Math.floor(ytExpected(m)) },
+          events: {
+            onReady: () => { ytReady = true; ytVolume(); syncMusic(); },
+            onStateChange: e => {
+              // трек закончился, а общая музыка не на паузе: начинаем заново (по кругу)
+              if (e.data === 0 && state?.music && state.music.pausedAt == null) { yt.seekTo(0, true); yt.playVideo(); }
+              if (e.data === 1) $('#ytUnmute').hidden = true;
+            },
+            onError: e => toast(e.data === 101 || e.data === 150 ? 'Автор запретил встраивать это видео' : 'YouTube не смог воспроизвести трек', true),
+          },
+        });
+        return;
+      }
+      if (!ytReady) return;
+      if (ytVid !== m.vid) { ytVid = m.vid; yt.loadVideoById({ videoId: m.vid, startSeconds: ytExpected(m) }); return; }
+      const exp = ytExpected(m), cur = yt.getCurrentTime(), st = yt.getPlayerState();
+      if (m.pausedAt != null) {
+        if (st === 1 || st === 3) yt.pauseVideo();
+        if (Math.abs(cur - exp) > 1) yt.seekTo(exp, true);
+        $('#ytUnmute').hidden = true;
+      } else {
+        if (Math.abs(cur - exp) > 2.5) yt.seekTo(exp, true);
+        if (st !== 1 && st !== 3) yt.playVideo();
+        // браузер не дал включить звук без клика: просим нажать
+        $('#ytUnmute').hidden = st === 1 || st === 3;
+      }
+    });
+  }
+  setInterval(() => { if (state?.music) syncMusic(); }, 4000);
+  $('#ytUnmute').addEventListener('click', () => { Sfx.unlock(); if (ytReady) { yt.playVideo(); ytVolume(); } setTimeout(syncMusic, 600); });
+  $('#ytAdd').addEventListener('submit', async e => {
+    e.preventDefault();
+    const url = $('#ytUrl').value.trim();
+    if (!url) return;
+    try {
+      await api(`/rooms/${roomId}/music`, { method: 'POST', body: { url, by: me.name } });
+      $('#ytUrl').value = '';
+      ytChanging = false;
+      Sfx.unlock();
+    } catch (err) { toast(err.message, true); }
+  });
+  $('#ytToggle').addEventListener('click', () => api(`/rooms/${roomId}/music/toggle`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
+  $('#ytStop').addEventListener('click', () => api(`/rooms/${roomId}/music/stop`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
+  $('#ytChange').addEventListener('click', () => { ytChanging = !ytChanging; syncMusic(); if (ytChanging) $('#ytUrl').focus(); });
+  $('#ytVol').addEventListener('input', () => {
+    $('#ytVol').style.setProperty('--f', $('#ytVol').value / 100);
+    ls.set('ytVol', Number($('#ytVol').value));
+    ytVolume();
+  });
+  $('#ytVol').value = ls.get('ytVol', 50);
+  $('#ytVol').style.setProperty('--f', $('#ytVol').value / 100);
 
   // ---- оценка последнего выбранного фильма ----
   function renderRate() {

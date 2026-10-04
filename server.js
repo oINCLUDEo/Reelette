@@ -79,7 +79,7 @@ function publicState(r) {
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
     rules: { votes: VOTES_PER_PERSON, bonus: VOTE_BONUS, cap: VOTE_CAP },
-    fair: r.fair !== false, modifier: activeModifier(r),
+    fair: r.fair !== false, modifier: activeModifier(r), music: r.music || null,
   };
 }
 
@@ -428,7 +428,9 @@ async function searchMovies(q) {
 
 const fmtRuntime = m => (m >= 60 ? `${Math.floor(m / 60)} ч ${m % 60} мин` : `${m} мин`);
 function ytKey(u) {
-  const m = String(u || '').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/)([\w-]{11})/);
+  const s = String(u || '').trim();
+  if (/^[\w-]{11}$/.test(s)) return s;
+  const m = s.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/);
   return m ? m[1] : '';
 }
 
@@ -646,6 +648,36 @@ async function api(req, res, url) {
     if (!pid) return json(res, 400, { error: 'Не понятно, кто вы' });
     r.owner = pid;
     pushState(r); return json(res, 200, { ok: true });
+  }
+
+  // ---- общая музыка из YouTube: у всех один трек и одна позиция ----
+  // startedAt — момент, когда трек был на нуле; pausedAt — позиция в секундах, если на паузе.
+  if (sub === 'music' && m === 'POST') {
+    const action = parts[3];
+    if (!action) {
+      const vid = ytKey(b.url);
+      if (!vid) return json(res, 400, { error: 'Не похоже на ссылку на YouTube' });
+      let meta = {};
+      try {
+        const o = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + vid)}`, { signal: AbortSignal.timeout(6000) });
+        if (o.status === 401 || o.status === 403) return json(res, 400, { error: 'Автор запретил встраивать это видео, возьмите другое' });
+        if (o.status === 404 || o.status === 400) return json(res, 400, { error: 'Видео не найдено или оно приватное' });
+        if (o.ok) meta = await o.json();
+      } catch { /* YouTube не ответил: включаем без названия */ }
+      r.music = {
+        vid, title: str(meta.title || '', 160) || 'Трек с YouTube', author: str(meta.author_name || '', 80),
+        by: who, startedAt: Date.now(), pausedAt: null,
+      };
+      pushState(r); return json(res, 200, { ok: true });
+    }
+    if (!r.music) return json(res, 409, { error: 'Музыка не играет' });
+    if (action === 'toggle') {
+      if (r.music.pausedAt != null) { r.music.startedAt = Date.now() - r.music.pausedAt * 1000; r.music.pausedAt = null; }
+      else r.music.pausedAt = Math.max(0, (Date.now() - r.music.startedAt) / 1000);
+      r.music.by = who;
+      pushState(r); return json(res, 200, { ok: true });
+    }
+    if (action === 'stop') { r.music = null; pushState(r); return json(res, 200, { ok: true }); }
   }
 
   // оценка фильма после просмотра, можно менять

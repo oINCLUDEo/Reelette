@@ -179,6 +179,24 @@
         <input type="range" id="bgmVol" min="0" max="100" value="40" hidden aria-label="Громкость фоновой музыки">
         <input type="file" id="bgmFile" accept="audio/*" hidden>
         <p class="note">Свой трек играет только у вас и никуда не отправляется. Во время прокрута он становится тише.</p>
+
+        <div class="room-music">
+          <span class="label">Общая музыка <span class="m">слышат все в комнате</span></span>
+          <form class="yt-add" id="ytAdd">
+            <input id="ytUrl" placeholder="Ссылка на YouTube" autocomplete="off">
+            <button class="btn btn-ghost" type="submit">Включить</button>
+          </form>
+          <div class="yt-card" id="ytCard" hidden>
+            <div class="yt-frame"><div id="ytHost"></div><button class="yt-unmute" id="ytUnmute" hidden>Нажмите, чтобы слушать</button></div>
+            <div class="yt-info"><b id="ytTitle"></b><span id="ytBy"></span></div>
+            <div class="yt-ctrl">
+              <button class="btn btn-ghost" id="ytToggle"></button>
+              <button class="btn btn-ghost" id="ytChange">Сменить</button>
+              <button class="btn btn-ghost" id="ytStop">Выключить</button>
+            </div>
+            <input type="range" id="ytVol" min="0" max="100" value="50" aria-label="Громкость общей музыки у вас">
+          </div>
+        </div>
       </div>
 
       <div class="rate-box" id="rateBox" hidden></div>

@@ -539,3 +539,18 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .bgm #bgmPick { flex: 1; min-width: 0; justify-content: flex-start; height: 42px; font-size: 13.5px; }
 .bgm #bgmPick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bgm .bgm-play { width: 42px; height: 42px; padding: 0; flex: none; }
+
+/* ---------- общая музыка из YouTube ---------- */
+.room-music { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
+.yt-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.yt-add input { height: 42px; font-size: 13.5px; }
+.yt-add .btn { height: 42px; font-size: 13.5px; }
+.yt-card { display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 16px; background: var(--s1); border: 1px solid var(--bd); }
+.yt-frame { position: relative; aspect-ratio: 16/9; border-radius: 11px; overflow: hidden; background: #000; }
+.yt-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+.yt-unmute { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.6); color: #fff; font-weight: 800; font-size: 14px; }
+.yt-unmute:hover { background: rgba(0,0,0,.45); }
+.yt-info b { display: block; font-size: 14px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.yt-info span { color: var(--tx3); font-size: 12.5px; }
+.yt-ctrl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.yt-ctrl .btn { height: 36px; font-size: 12.5px; padding: 0 6px; }
