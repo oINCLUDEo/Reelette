@@ -217,7 +217,8 @@ input::placeholder, textarea::placeholder { color: var(--tx3); }
 .seg-ind, .tabs-ind { will-change: transform, width; }
 .tabs { align-self: flex-start; }
 
-input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 6px; background: linear-gradient(90deg, var(--acc) var(--p, 25%), var(--s3) 0); outline: none; }
+/* заливка доходит до центра кругляша: его центр смещён на половину ширины (10px) от краёв дорожки */
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; margin: 7px 0; padding: 0; border-radius: 6px; background: linear-gradient(90deg, var(--acc) calc(10px + (100% - 20px) * var(--f, .25)), var(--s3) 0); outline: none; }
 input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--btn); box-shadow: 0 0 0 5px var(--glow); cursor: pointer; }
 input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; border-radius: 50%; background: var(--btn); cursor: pointer; }
 

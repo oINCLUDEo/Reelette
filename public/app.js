@@ -681,7 +681,7 @@ function initRoom(roomId) {
     settings.duration = v; ls.set('dur', v);
     dur.value = v;
     $('#durVal').textContent = v ? `${v} с` : 'сразу';
-    dur.style.setProperty('--p', `${(v - dur.min) / (dur.max - dur.min) * 100}%`);
+    dur.style.setProperty('--f', (v - dur.min) / (dur.max - dur.min));
   }
   dur.addEventListener('input', () => setDur(Number(dur.value)));
   setDur(settings.duration);
