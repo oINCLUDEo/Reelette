@@ -15,6 +15,13 @@ const KP_KEY = process.env.KINOPOISK_API_KEY || '';
 const TMDB_KEY = process.env.TMDB_API_KEY || '';
 const PROVIDER = (process.env.MOVIE_PROVIDER || (KP_KEY ? 'kinopoisk' : TMDB_KEY ? 'tmdb' : 'none')).toLowerCase();
 
+const auth = require('./auth')({
+  dataDir: DATA_DIR,
+  clientId: process.env.DISCORD_CLIENT_ID,
+  clientSecret: process.env.DISCORD_CLIENT_SECRET,
+  publicUrl: process.env.PUBLIC_URL,
+});
+
 const MAX_FILMS = 200;
 const MAX_HISTORY = 50;
 
@@ -53,11 +60,18 @@ const id = (n = 8) => crypto.randomBytes(16).toString('base64url').replace(/[-_]
 const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 
+// Таймеры и флаг серии живут только в памяти, в файл не пишутся.
+const runtimes = new Map();
+function runtime(r) {
+  if (!runtimes.has(r.id)) runtimes.set(r.id, { finish: null, next: null, series: false });
+  return runtimes.get(r.id);
+}
+
 function publicState(r) {
   return {
-    id: r.id, name: r.name, createdAt: r.createdAt,
+    id: r.id, name: r.name, createdAt: r.createdAt, owner: r.owner || '',
     films: r.films, history: r.history, eliminated: r.eliminated,
-    angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin,
+    angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
   };
 }
 
@@ -70,7 +84,7 @@ function broadcast(roomId, msg) {
 }
 function presence(roomId) {
   const seen = new Map();
-  for (const c of clients.get(roomId) || []) if (!seen.has(c.cid)) seen.set(c.cid, c.name);
+  for (const c of clients.get(roomId) || []) if (!seen.has(c.cid)) seen.set(c.cid, { name: c.name, avatar: c.avatar });
   broadcast(roomId, { type: 'presence', people: [...seen.values()] });
 }
 function pushState(r) { save(); broadcast(r.id, { type: 'state', state: publicState(r) }); }
@@ -90,11 +104,13 @@ function pickWeighted(list) {
   return list[list.length - 1];
 }
 
-function startSpin(r, { mode, duration, auto, by }) {
+function startSpin(r, { mode, duration, auto, by, delay }) {
   const list = activeFilms(r);
   if (list.length < 2) return 'Нужно хотя бы два фильма в колесе';
   mode = mode === 'elimination' ? 'elimination' : 'normal';
   duration = Math.min(60, Math.max(3, num(duration, 12)));
+  delay = Math.min(15, Math.max(0, Math.round(num(delay, 0))));
+  const rt = runtime(r);
 
   let landed;
   if (mode === 'normal') {
@@ -108,27 +124,32 @@ function startSpin(r, { mode, duration, auto, by }) {
 
   r.spin = {
     sid: id(6), mode, duration, auto: Boolean(auto) && mode === 'elimination', by: str(by, 32),
-    startedAt: Date.now(),
+    startedAt: Date.now() + delay * 1000, delay,
     snapshot: list.map(f => ({ id: f.id, weight: f.weight })),
     filmId: landed.id,
     offset: 0.12 + (crypto.randomInt(0, 1000) / 1000) * 0.76,
     turns: Math.max(3, Math.round(duration * 0.9)),
   };
+  rt.series = r.spin.auto;
   broadcast(r.id, { type: 'spin', spin: r.spin, now: Date.now() });
+  pushState(r);
 
   const sid = r.spin.sid;
-  setTimeout(() => finishSpin(r, sid), duration * 1000 + 150);
+  rt.finish = setTimeout(() => finishSpin(r, sid), (delay + duration) * 1000 + 150);
   return null;
 }
 
 function finishSpin(r, sid) {
   if (!r.spin || r.spin.sid !== sid) return;
   const s = r.spin;
+  const rt = runtime(r);
+  rt.finish = null;
   r.angle = endAngle(s);
   r.spin = null;
   const film = r.films.find(f => f.id === s.filmId);
 
   if (s.mode === 'normal') {
+    rt.series = false;
     recordWin(r, film, 'normal');
     broadcast(r.id, { type: 'result', mode: 'normal', film });
   } else {
@@ -138,9 +159,13 @@ function finishSpin(r, sid) {
     if (left.length === 1) {
       recordWin(r, left[0], 'elimination');
       r.plan = null;
+      rt.series = false;
       broadcast(r.id, { type: 'result', mode: 'final', film: left[0] });
-    } else if (s.auto) {
-      setTimeout(() => { if (!r.spin) startSpin(r, { mode: 'elimination', duration: s.duration, auto: true, by: s.by }); }, 2600);
+    } else if (rt.series) {
+      rt.next = setTimeout(() => {
+        rt.next = null;
+        if (rooms[r.id] && !r.spin && rt.series) startSpin(r, { mode: 'elimination', duration: s.duration, auto: true, by: s.by });
+      }, 2600);
     }
   }
   pushState(r);
@@ -258,7 +283,7 @@ function serveStatic(res, file) {
   return true;
 }
 
-function makeFilm(b, addedBy) {
+function makeFilm(b, addedBy, addedById) {
   return {
     id: id(8),
     title: str(b.title, 160) || 'Без названия',
@@ -269,7 +294,7 @@ function makeFilm(b, addedBy) {
     url: /^https:\/\//.test(b.url || '') ? str(b.url, 500) : '',
     source: str(b.source, 20), sourceId: str(b.sourceId, 40),
     weight: Math.min(1000, Math.max(1, Math.round(num(b.weight, 1)))),
-    addedBy, addedAt: Date.now(),
+    addedBy, addedById: addedById || '', addedAt: Date.now(),
   };
 }
 const norm = s => s.toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, '');
@@ -277,6 +302,9 @@ const norm = s => s.toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/g
 async function api(req, res, url) {
   const parts = url.pathname.split('/').filter(Boolean).slice(1); // без "api"
   const m = req.method;
+
+  const me = auth.user(req);
+  if (parts[0] === 'me') return json(res, 200, { user: me, discord: auth.enabled });
 
   if (parts[0] === 'config') return json(res, 200, { provider: PROVIDER === 'none' || (!KP_KEY && !TMDB_KEY) ? 'none' : PROVIDER });
 
@@ -291,7 +319,7 @@ async function api(req, res, url) {
 
   if (parts.length === 1 && m === 'POST') {
     const b = await readBody(req);
-    const r = { id: id(8), name: str(b.name, 60) || 'Киновечер', createdAt: Date.now(), films: [], history: [], eliminated: [], angle: 0, webhook: '', spin: null, plan: null };
+    const r = { id: id(8), name: str(b.name, 60) || 'Киновечер', owner: me?.id || '', createdAt: Date.now(), films: [], history: [], eliminated: [], angle: 0, webhook: '', spin: null, plan: null };
     rooms[r.id] = r; save();
     return json(res, 201, { id: r.id });
   }
@@ -304,7 +332,9 @@ async function api(req, res, url) {
 
   if (sub === 'events' && m === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-    const c = { res, name: str(url.searchParams.get('name'), 32) || 'Гость', cid: str(url.searchParams.get('cid'), 32) || id(6) };
+    const c = me
+      ? { res, name: me.name, avatar: me.avatar, cid: 'd' + me.id }
+      : { res, name: str(url.searchParams.get('name'), 32) || 'Гость', avatar: '', cid: str(url.searchParams.get('cid'), 32) || id(6) };
     if (!clients.has(r.id)) clients.set(r.id, new Set());
     clients.get(r.id).add(c);
     send(res, { type: 'state', state: publicState(r), now: Date.now() });
@@ -314,7 +344,8 @@ async function api(req, res, url) {
   }
 
   const b = m === 'GET' || m === 'DELETE' ? {} : await readBody(req);
-  const who = str(b.by, 32) || 'Гость';
+  const who = me?.name || str(b.by, 32) || 'Гость';
+  b.by = who;
 
   if (!sub && m === 'PATCH') {
     if (b.name !== undefined) r.name = str(b.name, 60) || r.name;
@@ -326,6 +357,32 @@ async function api(req, res, url) {
     pushState(r); return json(res, 200, { ok: true });
   }
 
+  if (!sub && m === 'DELETE') {
+    if (r.owner && r.owner !== me?.id) return json(res, 403, { error: 'Удалить комнату может только тот, кто её создал' });
+    const rt = runtime(r);
+    clearTimeout(rt.finish); clearTimeout(rt.next);
+    runtimes.delete(r.id);
+    delete rooms[r.id];
+    save();
+    broadcast(r.id, { type: 'deleted' });
+    for (const c of clients.get(r.id) || []) c.res.end();
+    clients.delete(r.id);
+    return json(res, 200, { ok: true });
+  }
+
+  // Отменяет отсчёт перед прокрутом или останавливает серию после текущего прокрута.
+  if (sub === 'stop' && m === 'POST') {
+    const rt = runtime(r);
+    rt.series = false;
+    clearTimeout(rt.next); rt.next = null;
+    if (r.spin && Date.now() < r.spin.startedAt) {
+      clearTimeout(rt.finish); rt.finish = null;
+      r.spin = null;
+      broadcast(r.id, { type: 'cancel', by: who });
+    }
+    pushState(r); return json(res, 200, { ok: true });
+  }
+
   if (r.spin && sub !== 'spin') return json(res, 409, { error: 'Колесо крутится, подождите' });
 
   if (sub === 'films' && !parts[3] && m === 'POST') {
@@ -333,7 +390,7 @@ async function api(req, res, url) {
     const added = [], merged = [];
     for (const raw of list.slice(0, 100)) {
       if (r.films.length >= MAX_FILMS) break;
-      const f = makeFilm(raw, who);
+      const f = makeFilm(raw, who, me?.id);
       const dup = r.films.find(x => (f.sourceId && x.sourceId === f.sourceId) || norm(x.title) === norm(f.title) && (x.year || '') === (f.year || ''));
       if (dup) { dup.weight = Math.min(1000, dup.weight + 1); merged.push(dup.title); continue; }
       r.films.push(await enrich(f)); added.push(f.title);
@@ -366,6 +423,8 @@ async function api(req, res, url) {
 
   if (sub === 'reset' && m === 'POST') {
     r.eliminated = []; r.plan = null;
+    const rt = runtime(r);
+    rt.series = false; clearTimeout(rt.next); rt.next = null;
     pushState(r); return json(res, 200, { ok: true });
   }
 
@@ -381,6 +440,7 @@ async function api(req, res, url) {
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
+    if (url.pathname.startsWith('/auth/') && await auth.handle(req, res, url)) return;
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (url.pathname === '/' || /^\/r\/[A-Za-z0-9]+\/?$/.test(url.pathname)) return serveStatic(res, 'index.html');
     if (!serveStatic(res, decodeURIComponent(url.pathname))) { res.writeHead(404); res.end('Not found'); }
@@ -388,4 +448,4 @@ http.createServer(async (req, res) => {
     console.error(e);
     if (!res.headersSent) json(res, 400, { error: e.message });
   }
-}).listen(PORT, () => console.log(`Reelette: http://localhost:${PORT}  (поиск фильмов: ${PROVIDER})`));
+}).listen(PORT, () => console.log(`Reelette: http://localhost:${PORT}  (поиск фильмов: ${PROVIDER}, вход через Discord: ${auth.enabled ? 'да' : 'нет'})`));

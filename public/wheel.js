@@ -100,7 +100,8 @@ class Wheel {
     const to = from + spin.turns + delta;
     const dur = spin.duration * 1000;
     if (elapsedMs >= dur) { this.rot = target; this.anim = null; done?.(); return; }
-    this.anim = { from, to, dur, start: performance.now() - Math.max(0, elapsedMs), done };
+    this.rot = from;
+    this.anim = { from, to, dur, start: performance.now() - elapsedMs, done };
   }
 
   setAngle(a) { if (!this.anim) this.rot = a; }
@@ -137,7 +138,7 @@ class Wheel {
     if (this.items.length !== before) this.dirty = true;
 
     if (this.anim) {
-      const t = Math.min(1, (now - this.anim.start) / this.anim.dur);
+      const t = Math.min(1, Math.max(0, (now - this.anim.start) / this.anim.dur)); // до старта (отсчёт) t = 0
       this.rot = this.anim.from + (this.anim.to - this.anim.from) * Wheel.ease(t);
       if (t >= 1) { const d = this.anim.done; this.anim = null; this.rot %= 1; d?.(); }
     } else if (this.idleSpeed) this.rot += this.idleSpeed * dt;

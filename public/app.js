@@ -63,15 +63,58 @@ function toast(text, bad = false) {
   setTimeout(() => { el.style.transition = 'opacity .4s'; el.style.opacity = 0; }, 2600);
   setTimeout(() => el.remove(), 3100);
 }
-function openModal(id) { $(id).hidden = false; }
-function closeModal(id) { $(id).hidden = true; }
+// Окна: показываем элемент, на следующем кадре включаем переход; при закрытии ждём конец перехода.
+const modalEl = m => (typeof m === 'string' ? $(m) : m);
+function openModal(m) {
+  const el = modalEl(m);
+  clearTimeout(el._t);
+  el.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('open')));
+}
+function closeModal(m) {
+  const el = modalEl(m);
+  if (!el || el.hidden) return;
+  el.classList.remove('open');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.hidden = true; }, 300);
+}
+const anyModalOpen = () => $$('.modal:not([hidden])').length > 0;
+function messageModal(html) {
+  document.body.insertAdjacentHTML('beforeend', `<div class="modal" data-fixed><div class="modal-card small-card">${html}</div></div>`);
+  openModal(document.body.lastElementChild);
+}
 document.addEventListener('click', e => {
   const m = e.target.closest('.modal');
-  if (m && (e.target === m || e.target.closest('[data-close]')) && m.id !== 'nameModal') m.hidden = true;
+  if (m && (e.target === m || e.target.closest('[data-close]')) && m.id !== 'nameModal' && !m.hasAttribute('data-fixed')) closeModal(m);
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') $$('.modal:not([hidden])').forEach(m => { if (m.id !== 'nameModal') m.hidden = true; });
+  if (e.key === 'Escape') $$('.modal.open').forEach(m => { if (m.id !== 'nameModal' && !m.hasAttribute('data-fixed')) closeModal(m); });
 });
+
+// Индикатор в переключателях подстраивается под ширину выбранной кнопки.
+function placeSeg(seg) {
+  const on = seg.querySelector('button.on');
+  const ind = seg.querySelector('.seg-ind, .tabs-ind');
+  if (!on || !ind || !on.offsetWidth) return;
+  ind.style.width = on.offsetWidth + 'px';
+  ind.style.transform = `translateX(${on.offsetLeft - 4}px)`;
+}
+addEventListener('resize', () => $$('.seg, .tabs').forEach(placeSeg));
+document.fonts?.ready.then(() => $$('.seg, .tabs').forEach(placeSeg));
+
+// Аккаунт: Discord, если настроен на сервере, иначе гость.
+const account = { user: null, discord: false };
+const accountReady = api('/me').then(r => Object.assign(account, r)).catch(() => {});
+const loginUrl = () => `/auth/discord?back=${encodeURIComponent(location.pathname)}`;
+async function logout() {
+  await fetch('/auth/logout', { method: 'POST' }).catch(() => {});
+  location.reload();
+}
+if (new URLSearchParams(location.search).has('login_error')) {
+  const why = new URLSearchParams(location.search).get('login_error');
+  history.replaceState(null, '', location.pathname);
+  setTimeout(() => toast(why === 'cancel' ? 'Вход через Discord отменён' : 'Не удалось войти через Discord', why !== 'cancel'), 300);
+}
 function hue(s) { let h = 0; for (const ch of s) h = (h * 31 + ch.codePointAt(0)) % 360; return h; }
 function posterStyle(f) { return f.poster ? `background-image:url('${esc(f.poster)}')` : `--c:hsl(${hue(f.title)} 35% 24%)`; }
 function initial(t) { return esc((t || '?').trim()[0]?.toUpperCase() || '?'); }
@@ -93,12 +136,26 @@ function initHome() {
   demo.setItems(['Интерстеллар', 'Субмарина', 'Джанго освобождённый', 'Нечто', 'Сумерки', 'Чёрный лебедь', 'Пираты Карибского моря', 'Зелёная книга', 'Реквием по мечте', 'Револьвер']
     .map((t, i) => ({ id: 'd' + i, title: t, weight: 1 + (i % 3) })), { snap: true });
 
-  const recent = ls.get('rooms', []);
-  if (recent.length) {
-    $('#recent').hidden = false;
-    $('#recentList').innerHTML = recent.slice(0, 6).map(r => `<a class="bu" href="/r/${esc(r.id)}"><b>${esc(r.name)}</b><span>${timeAgo(r.at)}</span></a>`).join('');
+  function renderRecent() {
+    const recent = ls.get('rooms', []);
+    $('#recent').hidden = !recent.length;
+    $('#recentList').innerHTML = recent.slice(0, 9).map(r => `<div class="item"><a href="/r/${esc(r.id)}"><b>${esc(r.name)}</b><span>${timeAgo(r.at)}</span></a><button class="forget" data-forget="${esc(r.id)}" title="Убрать из списка">${ICON.x}</button></div>`).join('');
   }
+  renderRecent();
+  $('#recentList').addEventListener('click', e => {
+    const b = e.target.closest('[data-forget]');
+    if (!b) return;
+    ls.set('rooms', ls.get('rooms', []).filter(r => r.id !== b.dataset.forget));
+    renderRecent();
+  });
   requestAnimationFrame(revealCheck); setTimeout(revealCheck, 80);
+
+  accountReady.then(() => {
+    const box = $('#homeAcct');
+    if (account.user) box.innerHTML = `<span class="user-chip"><img src="${esc(account.user.avatar)}" alt="">${esc(account.user.name)}</span><button class="ghost sm" id="homeLogout">Выйти</button>`;
+    else if (account.discord) box.innerHTML = `<a class="btn btn-discord" href="${loginUrl()}"><svg class="dc"><use href="#discord"/></svg>Войти через Discord</a>`;
+    $('#homeLogout')?.addEventListener('click', logout);
+  });
 
   $('#createForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -121,7 +178,9 @@ function initRoom(roomId) {
   let serverOffset = 0;
   let es = null;
   let provider = 'none';
-  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', false), sound: ls.get('sound', true) };
+  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', false), sound: ls.get('sound', true), delay: ls.get('delay', 0) };
+  let countdown = null; // секунд до старта, пока идёт отсчёт
+  let countdownTimer = null;
 
   // ---- звук щелчка ----
   let actx = null;
@@ -153,6 +212,20 @@ function initRoom(roomId) {
     },
   });
 
+  // короткий сигнал отсчёта, на старте выше
+  function beep(go) {
+    if (!settings.sound) return;
+    try {
+      actx ||= new AudioContext();
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine'; o.frequency.value = go ? 1046 : 660;
+      g.gain.setValueAtTime(0.12, actx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + (go ? 0.35 : 0.15));
+      o.connect(g).connect(actx.destination);
+      o.start(); o.stop(actx.currentTime + 0.4);
+    } catch {}
+  }
+
   // ---- подключение ----
   function connect() {
     es?.close();
@@ -178,6 +251,18 @@ function initRoom(roomId) {
       renderPeople(msg.people);
     } else if (msg.type === 'result') {
       showResult(msg);
+    } else if (msg.type === 'cancel') {
+      stopCountdown();
+      wheel.anim = null;
+      spinningSid = null;
+      wheel.setAngle(state.angle);
+      syncWheel();
+      toast(msg.by ? `${msg.by} отменил(а) прокрут` : 'Прокрут отменён');
+      render();
+    } else if (msg.type === 'deleted') {
+      es.close();
+      ls.set('rooms', ls.get('rooms', []).filter(r => r.id !== roomId));
+      messageModal('<h2>Комнату удалили. <span class="m">Её больше нет на сервере.</span></h2><a class="btn btn-primary" href="/">На главную</a>');
     }
   }
 
@@ -197,7 +282,10 @@ function initRoom(roomId) {
     const byId = new Map(state.films.map(f => [f.id, f]));
     wheel.setItems(spin.snapshot.map(s => ({ ...byId.get(s.id), weight: s.weight })).filter(f => f.id), { snap: true });
     const elapsed = Date.now() + serverOffset - spin.startedAt;
-    $$('.modal.winner').forEach(m => (m.hidden = true));
+    $$('.modal.winner').forEach(closeModal);
+    stopCountdown();
+    if (elapsed < 0) startCountdown(spin);
+    else window.setBackdropActive?.(true);
     wheel.spin(spin, state.angle, elapsed, () => {
       spinningSid = null;
       window.setBackdropActive?.(false);
@@ -208,9 +296,35 @@ function initRoom(roomId) {
       }
       render();
     });
-    window.setBackdropActive?.(true);
-    $('#stageStatus').textContent = spin.by ? `Крутит ${spin.by}` : 'Колесо крутится';
     render();
+  }
+
+  function startCountdown(spin) {
+    const step = () => {
+      const left = spin.startedAt - (Date.now() + serverOffset);
+      if (left <= 0) {
+        stopCountdown();
+        beep(true);
+        window.setBackdropActive?.(true);
+        render();
+        return;
+      }
+      const sec = Math.ceil(left / 1000);
+      if (sec !== countdown) {
+        countdown = sec;
+        beep(false);
+        render();
+        const b = $('#spinBtn');
+        b.classList.remove('beat'); void b.offsetWidth; b.classList.add('beat');
+      }
+    };
+    countdownTimer = setInterval(step, 50);
+    step();
+  }
+  function stopCountdown() {
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+    countdown = null;
   }
 
   // ---- результат ----
@@ -295,10 +409,20 @@ function initRoom(roomId) {
       : '<p class="note">Пока ничего. Победители будут появляться здесь.</p>';
 
     const btn = $('#spinBtn');
+    const counting = countdown !== null;
     btn.disabled = spinning || active.length < 2;
-    btn.classList.toggle('busy', spinning);
-    $('#spinBtn .hub-label').textContent = spinning ? 'Крутится' : settings.mode === 'elimination' && state.eliminated.length ? 'Дальше' : 'Крутить';
-    $('#hubSub').textContent = spinning ? '' : active.length < 2 ? 'нужно 2 фильма' : `${active.length} ${plural(active.length, 'фильм', 'фильма', 'фильмов')}`;
+    btn.classList.toggle('busy', spinning && !counting);
+    btn.classList.toggle('count', counting);
+    $('#spinBtn .hub-label').textContent = counting ? String(countdown) : spinning ? 'Крутится' : settings.mode === 'elimination' && state.eliminated.length ? 'Дальше' : 'Крутить';
+    $('#hubSub').textContent = counting || spinning ? '' : active.length < 2 ? 'нужно 2 фильма' : `${active.length} ${plural(active.length, 'фильм', 'фильма', 'фильмов')}`;
+
+    $('#stopBtn').hidden = !counting && !state.series;
+    $('#stopBtn').textContent = counting ? 'Отменить прокрут' : 'Остановить серию';
+    if (spinning) {
+      const by = state.spin?.by || '';
+      $('#stageStatus').textContent = counting ? (by ? `${by} запускает колесо` : 'Колесо сейчас запустится')
+        : state.series ? `Серия до победителя, осталось ${active.length}` : by ? `Крутит ${by}` : 'Колесо крутится';
+    }
     $('#resetBtn').hidden = !state.eliminated.length || spinning;
     $('#addBtn').disabled = spinning;
 
@@ -311,7 +435,7 @@ function initRoom(roomId) {
   }
 
   function renderPeople(people) {
-    $('#people').innerHTML = people.slice(0, 6).map(n => `<span class="ava" style="background:hsl(${hue(n)} 55% 42%)" data-tip="${esc(n)}">${initial(n)}</span>`).join('')
+    $('#people').innerHTML = people.slice(0, 6).map(p => `<span class="ava" style="background:hsl(${hue(p.name)} 55% 42%)" data-tip="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
       + (people.length > 6 ? `<span class="ava" style="background:#333">+${people.length - 6}</span>` : '');
   }
 
@@ -365,13 +489,14 @@ function initRoom(roomId) {
   // ---- добавление ----
   $('#addBtn').addEventListener('click', () => {
     openModal('#addModal');
-    setTimeout(() => $('#searchInput').focus(), 50);
+    requestAnimationFrame(() => placeSeg($('#addTabs')));
+    setTimeout(() => $('#searchInput').focus({ preventScroll: true }), 120);
   });
   $('#addTabs').addEventListener('click', e => {
     const b = e.target.closest('[data-tab]');
     if (!b) return;
     $$('#addTabs button').forEach(x => x.classList.toggle('on', x === b));
-    $('#addTabs').dataset.v = b.dataset.tab;
+    placeSeg($('#addTabs'));
     $$('#addModal [data-pane]').forEach(p => (p.hidden = p.dataset.pane !== b.dataset.tab));
   });
 
@@ -441,8 +566,8 @@ function initRoom(roomId) {
   // ---- управление ----
   function setMode(m) {
     settings.mode = m; ls.set('mode', m);
-    $('#modeSeg').dataset.v = m;
     $$('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+    placeSeg($('#modeSeg'));
     $('#modeNote').textContent = m === 'normal'
       ? 'Один прокрут выбирает один фильм. Шанс фильма равен его доле в колесе.'
       : 'Каждый прокрут убирает один фильм, последний оставшийся побеждает. Шансы на победу такие же, как в обычном режиме.';
@@ -462,6 +587,22 @@ function initRoom(roomId) {
   dur.addEventListener('input', () => setDur(Number(dur.value)));
   setDur(settings.duration);
 
+  function setDelay(v) {
+    settings.delay = v; ls.set('delay', v);
+    $$('#delaySeg button').forEach(b => b.classList.toggle('on', Number(b.dataset.delay) === v));
+    placeSeg($('#delaySeg'));
+  }
+  $('#delaySeg').addEventListener('click', e => { const b = e.target.closest('[data-delay]'); if (b) setDelay(Number(b.dataset.delay)); });
+  setDelay(settings.delay);
+
+  $('#stopBtn').addEventListener('click', async () => {
+    const counting = countdown !== null;
+    try {
+      await api(`/rooms/${roomId}/stop`, { method: 'POST', body: { by: me.name } });
+      if (!counting) toast('Серия остановится после текущего прокрута');
+    } catch (e) { toast(e.message, true); }
+  });
+
   $('#autoSpin').checked = settings.auto;
   $('#autoSpin').addEventListener('change', e => { settings.auto = e.target.checked; ls.set('auto', settings.auto); });
   $('#soundOn').checked = settings.sound;
@@ -471,12 +612,12 @@ function initRoom(roomId) {
     if ($('#spinBtn').disabled) return;
     actx ||= new AudioContext(); // разблокировать звук по клику
     try {
-      await api(`/rooms/${roomId}/spin`, { method: 'POST', body: { mode: settings.mode, duration: settings.duration, auto: settings.auto, by: me.name } });
+      await api(`/rooms/${roomId}/spin`, { method: 'POST', body: { mode: settings.mode, duration: settings.duration, auto: settings.auto, delay: settings.delay, by: me.name } });
     } catch (e) { toast(e.message, true); }
   }
   $('#spinBtn').addEventListener('click', spin);
   document.addEventListener('keydown', e => {
-    if (e.code !== 'Space' || e.target.closest('input, textarea, button') || $$('.modal:not([hidden])').length) return;
+    if (e.code !== 'Space' || e.target.closest('input, textarea, button') || anyModalOpen()) return;
     e.preventDefault(); spin();
   });
 
@@ -492,6 +633,12 @@ function initRoom(roomId) {
   function openSettings() {
     $('#setName').value = state?.name || '';
     $('#setNick').value = me.name;
+    $('#nickField').hidden = Boolean(account.user);
+    $('#accountBox').innerHTML = account.user
+      ? `<img src="${esc(account.user.avatar)}" alt=""><div><b>${esc(account.user.name)}</b><span>Вход через Discord</span></div><button class="btn btn-ghost" id="logoutBtn">Выйти</button>`
+      : account.discord ? `<span class="ava" style="background:hsl(${hue(me.name)} 55% 42%)">${initial(me.name)}</span><div><b>${esc(me.name)}</b><span>Гость</span></div><a class="btn btn-discord" href="${loginUrl()}"><svg class="dc"><use href="#discord"/></svg>Войти</a>` : '';
+    $('#logoutBtn')?.addEventListener('click', logout);
+    $('#deleteRoom').hidden = Boolean(state?.owner && state.owner !== account.user?.id);
     $('#setHook').value = '';
     $('#hookState').textContent = state?.hasWebhook ? 'подключён' : '';
     $('#setHook').placeholder = state?.hasWebhook ? 'Вставьте новый, чтобы заменить' : 'https://discord.com/api/webhooks/…';
@@ -517,6 +664,14 @@ function initRoom(roomId) {
     if (!confirm('Очистить историю выпавших фильмов?')) return;
     await api(`/rooms/${roomId}/clear`, { method: 'POST', body: { what: 'history' } }).catch(e => toast(e.message, true));
   });
+  $('#deleteRoom').addEventListener('click', async () => {
+    if (!confirm(`Удалить комнату «${state.name}» вместе со всеми фильмами и историей? Это нельзя отменить.`)) return;
+    try {
+      await api(`/rooms/${roomId}`, { method: 'DELETE' });
+      ls.set('rooms', ls.get('rooms', []).filter(r => r.id !== roomId));
+      location.href = '/';
+    } catch (e) { toast(e.message, true); }
+  });
   $('#clearFilms').addEventListener('click', async () => {
     if (!confirm('Удалить все фильмы из колеса?')) return;
     await api(`/rooms/${roomId}/clear`, { method: 'POST', body: { what: 'films' } }).catch(e => toast(e.message, true));
@@ -530,14 +685,17 @@ function initRoom(roomId) {
     if (provider === 'none') $('#searchInput').placeholder = 'Название фильма (поиск постеров не настроен)';
   }).catch(() => {});
 
-  api(`/rooms/${roomId}`).then(() => {
-    if (me.name) connect();
+  Promise.all([api(`/rooms/${roomId}`), accountReady]).then(() => {
+    if (account.user) { me.name = account.user.name; connect(); }
+    else if (me.name) connect();
     else {
+      $$('.discord-login, .discord-or').forEach(el => (el.hidden = !account.discord));
+      $('.discord-login').href = loginUrl();
       openModal('#nameModal');
-      setTimeout(() => $('#nameInput').focus(), 50);
+      setTimeout(() => $('#nameInput').focus({ preventScroll: true }), 120);
     }
   }).catch(() => {
-    document.body.insertAdjacentHTML('beforeend', '<div class="modal"><div class="modal-card small-card"><h2>Комната не найдена. <span class="muted">Возможно, ссылка неполная.</span></h2><a class="btn btn-primary" href="/">На главную</a></div></div>');
+    messageModal('<h2>Комната не найдена. <span class="m">Возможно, её удалили или ссылка неполная.</span></h2><a class="btn btn-primary" href="/">На главную</a>');
   });
 
   $('#nameForm').addEventListener('submit', e => {

@@ -14,6 +14,7 @@
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="arr" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="discord" viewBox="0 0 24 24"><path fill="currentColor" d="M19.3 5.3A17 17 0 0 0 15 4l-.5 1a16 16 0 0 0-5 0L9 4a17 17 0 0 0-4.3 1.3C2 9.4 1.3 13.4 1.6 17.3a17 17 0 0 0 5.3 2.7l1.1-1.8a11 11 0 0 1-1.7-.8l.4-.3a12 12 0 0 0 10.6 0l.4.3-1.7.8 1.1 1.8a17 17 0 0 0 5.3-2.7c.4-4.5-.7-8.5-3.1-12ZM8.7 14.9c-1 0-1.9-1-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1Zm6.6 0c-1 0-1.9-1-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1Z"/></symbol>
   <symbol id="plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
   <symbol id="logo" viewBox="0 0 32 32"><path fill="currentColor" fill-rule="evenodd" d="M16 1a15 15 0 1 1 0 30 15 15 0 0 1 0-30Zm0 3.2a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm0 16.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM7.8 12.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm16.4 0a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2ZM16 14.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6Z"/></symbol>
 </svg>
@@ -22,6 +23,7 @@
 <div id="home" hidden>
   <header class="nav"><div class="bar">
     <a class="brand" href="/"><svg><use href="#logo"/></svg>Reelette</a>
+    <div class="act" id="homeAcct"></div>
   </div></header>
 
   <section class="sheet hero grainy">
@@ -85,6 +87,7 @@
           <div class="pointer" id="pointer"><svg viewBox="0 0 40 52"><path d="M20 50 3 14A18 18 0 1 1 37 14Z"/></svg></div>
         </div>
         <div class="stage-status" id="stageStatus"></div>
+        <button id="stopBtn" class="ghost sm stop-btn" hidden></button>
       </div>
     </section>
 
@@ -102,6 +105,17 @@
       <div class="field">
         <span class="label">Длительность <b id="durVal">12 с</b></span>
         <input type="range" id="duration" min="4" max="40" value="12">
+      </div>
+
+      <div class="field">
+        <span class="label">Отсчёт перед прокрутом</span>
+        <div class="seg" id="delaySeg">
+          <span class="seg-ind"></span>
+          <button data-delay="0">Сразу</button>
+          <button data-delay="3">3 с</button>
+          <button data-delay="5">5 с</button>
+          <button data-delay="10">10 с</button>
+        </div>
       </div>
 
       <div class="checks">
@@ -160,8 +174,10 @@
 <div class="modal" id="nameModal" hidden>
   <form class="modal-card small-card" id="nameForm">
     <h2>Как вас зовут? <span class="m">Имя увидят остальные в комнате.</span></h2>
+    <a class="btn btn-discord btn-block discord-login" hidden><svg class="dc"><use href="#discord"/></svg>Войти через Discord</a>
+    <div class="or discord-or" hidden><span>или как гость</span></div>
     <input id="nameInput" maxlength="32" placeholder="Например, Никита" autocomplete="off" required>
-    <button class="btn btn-primary btn-block" type="submit">Войти</button>
+    <button class="btn btn-ghost btn-block" type="submit">Войти как гость</button>
   </form>
 </div>
 
@@ -170,9 +186,10 @@
     <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     <h2>Настройки</h2>
     <label class="field"><span class="label">Название комнаты</span><input id="setName" maxlength="60"></label>
-    <label class="field"><span class="label">Ваше имя</span><input id="setNick" maxlength="32"></label>
+    <div class="account" id="accountBox"></div>
+    <label class="field" id="nickField"><span class="label">Ваше имя</span><input id="setNick" maxlength="32"></label>
     <label class="field"><span class="label">Вебхук Discord <span id="hookState"></span></span><input id="setHook" placeholder="https://discord.com/api/webhooks/…"></label>
-    <p class="note">Если указать вебхук, победитель будет приходить в канал Discord с постером и описанием.</p>
+    <p class="note">Победитель будет приходить в канал Discord с постером и описанием. Бот не нужен: в Discord откройте настройки канала → Интеграция → Вебхуки → Новый вебхук → Копировать URL вебхука.</p>
     <div class="field"><span class="label">Палитра</span>
       <div class="pals" id="pals">
         <button data-p="night"><i style="background:#7C6BFF"></i>Ночь</button>
@@ -184,6 +201,7 @@
     <div class="danger">
       <button id="clearHistory" class="btn btn-ghost">Очистить историю</button>
       <button id="clearFilms" class="btn btn-ghost">Удалить все фильмы</button>
+      <button id="deleteRoom" class="btn btn-ghost">Удалить комнату</button>
     </div>
   </div>
 </div>
