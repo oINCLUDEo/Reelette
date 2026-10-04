@@ -829,3 +829,16 @@ body.karaoke-on .stage-in { padding-top: 18px; }
 .k-lines p.next { opacity: 1; color: var(--tx); }
 .k-lyr-view { mask-image: linear-gradient(180deg, transparent, #000 16%, #000 84%, transparent); -webkit-mask-image: linear-gradient(180deg, transparent, #000 16%, #000 84%, transparent); }
 .k-offset .nav-icon.wide { width: 32px; font-size: 12px; }
+
+/* ---------- шапка комнаты: компактнее для узких и квадратных экранов ---------- */
+#room .brand-name { display: none; }
+.karaoke-btn svg { width: 19px; height: 19px; }
+.nk-who { flex: none; max-width: 200px; }
+.nk-who b { max-width: 200px; }
+.nk-song { flex: 0 1 auto; }
+@media (max-width: 1400px) { .nav-karaoke .k-upnext, .eq.right { display: none !important; } }
+@media (max-width: 1350px) {
+  #inviteBtn { width: 44px; padding: 0; }
+  #inviteBtn span { display: none; }
+}
+@media (max-width: 1150px) { .nk-song { display: none; } .nav-karaoke { gap: 12px; } }
