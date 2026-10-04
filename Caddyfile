@@ -1,0 +1,4 @@
+{$DOMAIN} {
+	# SSE (синхронизация колеса) Caddy проксирует без буферизации сам
+	reverse_proxy reelette:3000
+}

@@ -6,7 +6,30 @@ services:
     env_file:
       - path: .env
         required: false
+    # наружу сайт отдаёт Caddy; порт 3000 доступен только с самого сервера
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./data:/data
+
+  # HTTPS: Caddy сам получает и продлевает сертификат Let's Encrypt для DOMAIN
+  caddy:
+    image: caddy:2-alpine
+    container_name: reelette-caddy
+    restart: unless-stopped
+    depends_on:
+      - reelette
+    environment:
+      DOMAIN: ${DOMAIN:-reelette.ulya.space}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
