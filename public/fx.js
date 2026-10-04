@@ -1,11 +1,5 @@
-// Эффекты под музыку: разбираем звук на полосы (бас, середина) и ловим сильные доли.
-// Источники: музыка прокрута (наш Web Audio) и, по желанию, звук этой вкладки (общая музыка YouTube) —
-// звук чужого плеера браузер не отдаёт напрямую, поэтому его нужно «расшарить» через getDisplayMedia.
+// Эффекты под музыку прокрута: бас, середина и сильные доли из нашего Web Audio (audio.js).
 (() => {
-  let enabled = true;
-  try { enabled = JSON.parse(localStorage.getItem('kk_fx') ?? 'true'); } catch {}
-  let capture = null;
-  let listeners = [];
   const level = { bass: 0, mid: 0 };
   const hist = [];
   let lastBeat = 0;
@@ -26,14 +20,8 @@
 
   function frame(now) {
     requestAnimationFrame(frame);
-    let bass = 0, mid = 0;
-    if (enabled) {
-      for (const an of [window.Sfx?.analyser?.(), capture?.analyser]) {
-        if (!an) continue;
-        const b = bands(an);
-        bass = Math.max(bass, b.bass); mid = Math.max(mid, b.mid);
-      }
-    }
+    const an = window.Sfx?.analyser?.();
+    const { bass, mid } = an ? bands(an) : { bass: 0, mid: 0 };
     // сильная доля: бас заметно выше своего среднего за последние ~0,7 с
     hist.push(bass);
     if (hist.length > 42) hist.shift();
@@ -48,41 +36,4 @@
     window.setBackdropFx?.({ level: level.bass, mid: level.mid, beat });
   }
   requestAnimationFrame(frame);
-
-  async function startCapture() {
-    const ctx = window.Sfx.unlock();
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: true, audio: true, preferCurrentTab: true, selfBrowserSurface: 'include', systemAudio: 'include',
-    });
-    const tracks = stream.getAudioTracks();
-    if (!tracks.length) {
-      stream.getTracks().forEach(t => t.stop());
-      throw new Error('noaudio');
-    }
-    // картинка не нужна, но если остановить видеодорожку, браузер может закрыть и звук
-    stream.getVideoTracks().forEach(t => { t.enabled = false; });
-    const src = ctx.createMediaStreamSource(new MediaStream(tracks));
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.6;
-    src.connect(analyser); // в динамики не подключаем, иначе будет эхо
-    tracks[0].addEventListener('ended', stopCapture);
-    capture = { stream, analyser };
-    listeners.forEach(f => f());
-  }
-  function stopCapture() {
-    if (!capture) return;
-    capture.stream.getTracks().forEach(t => t.stop());
-    capture = null;
-    listeners.forEach(f => f());
-  }
-
-  window.Fx = {
-    get enabled() { return enabled; },
-    setEnabled(on) { enabled = on; try { localStorage.setItem('kk_fx', JSON.stringify(on)); } catch {} },
-    canCapture: Boolean(navigator.mediaDevices?.getDisplayMedia),
-    get capturing() { return Boolean(capture); },
-    startCapture, stopCapture,
-    onChange(f) { listeners.push(f); },
-  };
 })();

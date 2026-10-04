@@ -1147,7 +1147,7 @@ function initRoom(roomId) {
     settings.mode = m; ls.set('mode', m);
     $$('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
     placeSeg($('#modeSeg'));
-    $('#modeNote').textContent = m === 'normal'
+    $('#modeHint').dataset.hint = m === 'normal'
       ? 'Один прокрут выбирает один фильм. Шанс фильма равен его доле в колесе.'
       : m === 'elimination' ? 'Каждый прокрут убирает один фильм, последний оставшийся побеждает. Шансы на победу такие же, как в обычном режиме.'
       : 'Фильмы выходят парами, все голосуют. Проигравший вылетает, пока не останется один. При ничьей победителя выбирает жребий с учётом веса.';
@@ -1187,20 +1187,6 @@ function initRoom(roomId) {
 
   $('#autoSpin').checked = settings.auto;
   $('#autoSpin').addEventListener('change', e => { settings.auto = e.target.checked; ls.set('auto', settings.auto); });
-  // эффекты под музыку
-  $('#fxOn').checked = Fx.enabled;
-  $('#fxOn').addEventListener('change', e => { Fx.setEnabled(e.target.checked); if (!e.target.checked) Fx.stopCapture(); });
-  $('#fxCap').hidden = !Fx.canCapture;
-  const fxCapUi = () => { $('#fxCap').classList.toggle('on', Fx.capturing); $('#fxCap').title = Fx.capturing ? 'Эффекты слушают эту музыку. Нажмите, чтобы выключить' : 'Эффекты под эту музыку: браузер попросит поделиться звуком вкладки'; };
-  Fx.onChange(fxCapUi);
-  $('#fxCap').addEventListener('click', async () => {
-    if (Fx.capturing) return Fx.stopCapture();
-    if (!Fx.enabled) { Fx.setEnabled(true); $('#fxOn').checked = true; }
-    toast('Выберите «Эта вкладка» и включите «Поделиться звуком вкладки»');
-    try { await Fx.startCapture(); toast('Эффекты подхватили музыку'); }
-    catch (e) { if (e.message === 'noaudio') toast('Звук не передан: включите «Поделиться звуком вкладки»', true); }
-  });
-
   $('#musicOn').checked = settings.music;
   $('#musicOn').addEventListener('change', e => {
     settings.music = e.target.checked; ls.set('music', settings.music);

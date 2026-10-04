@@ -489,10 +489,6 @@ async function fetchDetails(f) {
     const vids = (j.videos?.results || []).filter(v => v.site === 'YouTube');
     const pick = ['Trailer', 'Teaser'].flatMap(t => [vids.find(v => v.type === t && v.iso_639_1 === 'ru'), vids.find(v => v.type === t)]).find(Boolean) || vids[0];
     f.trailer = pick ? str(pick.key, 20) : '';
-    if (KP_KEY) {
-      try { await kinopoiskDescription(f); } catch (e) { console.warn(`Описание с Кинопоиска для «${f.title}»: ${e.message}`); }
-      f.kpChecked = true;
-    }
   } else if (f.source === 'kinopoisk' && KP_KEY) {
     const base = `https://kinopoiskapiunofficial.tech/api/v2.2/films/${encodeURIComponent(f.sourceId)}`;
     const j = await getJson(base, { 'X-API-KEY': KP_KEY });
@@ -510,24 +506,7 @@ async function fetchDetails(f) {
   f.detailsAt = Date.now();
 }
 
-// Детали нужны новым фильмам, а при ключе Кинопоиска — и старым фильмам из TMDB, у которых ещё нет описания оттуда.
-const needsDetails = f => !f.detailsAt || (f.source === 'tmdb' && KP_KEY && !f.kpChecked);
-
-// Находим фильм из TMDB на Кинопоиске по названию и году и берём оттуда русское описание.
-async function kinopoiskDescription(f) {
-  const H = { 'X-API-KEY': KP_KEY };
-  const found = async q => (await getJson(`https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=${encodeURIComponent(q)}&page=1`, H)).films || [];
-  const sameYear = c => f.year && String(c.year || '').startsWith(f.year);
-  let list = await found(f.title);
-  let hit = list.find(sameYear);
-  if (!hit && f.original) { list = await found(f.original); hit = list.find(sameYear); }
-  if (!hit && !f.year) hit = list[0];
-  if (!hit) return;
-  const d = await getJson(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${hit.filmId}`, H);
-  const text = str(d.description || d.shortDescription || '', 2000);
-  if (text) f.overview = text;
-  f.kpId = String(hit.filmId);
-}
+const needsDetails = f => !f.detailsAt;
 
 const enrichQueue = [];
 const enrichQueued = new Set();

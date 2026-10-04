@@ -68,7 +68,6 @@
           <button class="nav-icon" id="ytToggle"></button>
           <button class="nav-icon" id="ytNext" title="Следующий трек у всех"><svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg></button>
           <button class="nav-icon q-btn" id="ytChange" title="Очередь и добавить трек"><svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h8"/><path d="M19 15v6M16 18h6"/></svg><i id="ytQCount" hidden></i></button>
-          <button class="nav-icon fx-cap" id="fxCap" title="Эффекты под эту музыку: браузер попросит поделиться звуком вкладки"><svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="2.5"/></svg></button>
           <button class="nav-icon" id="ytStop" title="Выключить у всех"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
         </div>
         <input type="range" id="ytVol" min="0" max="100" value="50" title="Громкость у вас" aria-label="Громкость общей музыки у вас">
@@ -129,75 +128,68 @@
     </section>
 
     <aside class="sheet b controls">
-      <div class="field">
-        <span class="label">Режим</span>
+      <section class="ctl">
+        <div class="ctl-head">Режим <button type="button" class="hint" id="modeHint" data-hint="" aria-label="Подсказка">?</button></div>
         <div class="seg" id="modeSeg">
           <span class="seg-ind"></span>
           <button data-mode="normal">Обычный</button>
           <button data-mode="elimination">Выбывание</button>
           <button data-mode="duel">Дуэль</button>
         </div>
-        <p class="note" id="modeNote"></p>
-      </div>
+        <label class="check" id="autoWrap"><input type="checkbox" id="autoSpin"><span class="box"></span><span class="check-text">Крутить до победителя <button type="button" class="hint" data-hint="Прокруты идут подряд без остановок, пока не останется один фильм. Серию можно остановить кнопкой под колесом." aria-label="Подсказка">?</button></span></label>
+        <button id="resetBtn" class="btn btn-ghost btn-block" hidden>Вернуть выбывших в колесо</button>
+      </section>
 
-      <div class="field">
-        <label class="check check-title"><input type="checkbox" id="fairOn" checked><span class="box"></span>Равные шансы</label>
-        <p class="note">Колесо делится поровну между участниками: два фильма одного весят столько же, сколько шестьдесят у другого.</p>
-      </div>
-
-      <div class="field filters">
-        <label class="check check-title"><input type="checkbox" id="filtersOn"><span class="box"></span>Фильтры</label>
-        <div id="filtersBody" class="filters-body" hidden>
-          <span class="label">Длина</span>
-          <div class="seg" id="fRuntime">
-            <span class="seg-ind"></span>
-            <button data-v="0">Любая</button>
-            <button data-v="105">до 1:45</button>
-            <button data-v="120">до 2 ч</button>
-            <button data-v="150">до 2:30</button>
-          </div>
-          <span class="label">Год</span>
-          <div class="seg" id="fYear">
-            <span class="seg-ind"></span>
-            <button data-v="0">Любой</button>
-            <button data-v="2000">2000+</button>
-            <button data-v="2010">2010+</button>
-            <button data-v="2020">2020+</button>
-          </div>
-          <span class="label">Жанры</span>
-          <div class="chips" id="fGenres"></div>
-          <p class="note" id="filtersNote"></p>
+      <section class="ctl" id="spinCtl">
+        <div class="field" id="durField">
+          <span class="label">Длительность <b id="durVal">12 с</b></span>
+          <input type="range" id="duration" min="0" max="40" value="12">
         </div>
-      </div>
-
-      <div class="field" id="durField">
-        <span class="label">Длительность <b id="durVal">12 с</b></span>
-        <input type="range" id="duration" min="0" max="40" value="12">
-      </div>
-
-      <div class="field" id="delayField">
-        <span class="label">Отсчёт перед прокрутом</span>
-        <div class="seg" id="delaySeg">
-          <span class="seg-ind"></span>
-          <button data-delay="0">Сразу</button>
-          <button data-delay="3">3 с</button>
-          <button data-delay="5">5 с</button>
-          <button data-delay="10">10 с</button>
+        <div class="field" id="delayField">
+          <span class="label">Отсчёт перед прокрутом</span>
+          <div class="seg" id="delaySeg">
+            <span class="seg-ind"></span>
+            <button data-delay="0">Сразу</button>
+            <button data-delay="3">3 с</button>
+            <button data-delay="5">5 с</button>
+            <button data-delay="10">10 с</button>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div class="checks">
-        <label class="check" id="autoWrap"><input type="checkbox" id="autoSpin"><span class="box"></span>Крутить до победителя</label>
-      </div>
+      <section class="ctl">
+        <label class="check"><input type="checkbox" id="fairOn" checked><span class="box"></span><span class="check-text">Равные шансы <button type="button" class="hint" data-hint="Колесо делится поровну между участниками: два фильма одного весят столько же, сколько шестьдесят у другого. Голоса и оценки действуют поверх." aria-label="Подсказка">?</button></span></label>
+        <div class="filters">
+          <label class="check"><input type="checkbox" id="filtersOn"><span class="box"></span><span class="check-text">Фильтры <button type="button" class="hint" data-hint="Крутятся только фильмы, подходящие по длине, году и жанрам. Фильтры общие для всей комнаты." aria-label="Подсказка">?</button></span></label>
+          <div id="filtersBody" class="filters-body" hidden>
+            <span class="label">Длина</span>
+            <div class="seg" id="fRuntime">
+              <span class="seg-ind"></span>
+              <button data-v="0">Любая</button>
+              <button data-v="105">до 1:45</button>
+              <button data-v="120">до 2 ч</button>
+              <button data-v="150">до 2:30</button>
+            </div>
+            <span class="label">Год</span>
+            <div class="seg" id="fYear">
+              <span class="seg-ind"></span>
+              <button data-v="0">Любой</button>
+              <button data-v="2000">2000+</button>
+              <button data-v="2010">2010+</button>
+              <button data-v="2020">2020+</button>
+            </div>
+            <span class="label">Жанры</span>
+            <div class="chips" id="fGenres"></div>
+            <p class="note" id="filtersNote"></p>
+          </div>
+        </div>
+      </section>
 
-      <button id="resetBtn" class="btn btn-ghost btn-block" hidden>Вернуть выбывших в колесо</button>
-
-      <div class="field sound-field">
-        <span class="label">Звук</span>
-        <label class="check"><input type="checkbox" id="soundOn" checked><span class="box"></span>Щелчки и сигналы</label>
-        <label class="check"><input type="checkbox" id="musicOn"><span class="box"></span>Музыка при прокруте</label>
-        <label class="check"><input type="checkbox" id="fxOn" checked><span class="box"></span>Эффекты под музыку</label>
-      </div>
+      <section class="ctl">
+        <div class="ctl-head">Звук</div>
+        <label class="check"><input type="checkbox" id="soundOn" checked><span class="box"></span><span class="check-text">Щелчки и сигналы</span></label>
+        <label class="check"><input type="checkbox" id="musicOn"><span class="box"></span><span class="check-text">Музыка при прокруте <button type="button" class="hint" data-hint="Музыка собирается прямо в браузере, её темп следует за скоростью колеса. Кольцо вокруг колеса пульсирует в такт." aria-label="Подсказка">?</button></span></label>
+      </section>
 
       <div class="rate-box" id="rateBox" hidden></div>
 
