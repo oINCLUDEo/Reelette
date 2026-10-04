@@ -78,8 +78,8 @@ function publicState(r) {
     films: r.films, history: r.history, eliminated: r.eliminated,
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
-    rules: { votes: VOTES_PER_PERSON, bonus: VOTE_BONUS, cap: VOTE_CAP },
-    fair: r.fair !== false, modifier: activeModifier(r), music: r.music || null,
+    rules: { votes: VOTES_PER_PERSON, points: VOTE_POINTS, cap: VOTE_CAP },
+    fair: r.fair !== false, modifier: activeModifier(r), music: r.music || null, queue: r.queue || [],
   };
 }
 
@@ -87,6 +87,10 @@ function publicState(r) {
 // У каждого 3 голоса, на фильм не больше одного своего. Голос даёт +25% к шансу, засчитывается до 4 голосов (максимум ×2).
 const VOTES_PER_PERSON = 3;
 const VOTE_BONUS = 0.25;
+// Голос добавляет фильму фиксированные 4 пункта к колесу (колесо = 100 пунктов + голоса),
+// поэтому весит одинаково, сколько бы фильмов ни было у автора.
+const VOTE_POINTS = 4;
+const votePoints = f => VOTE_POINTS * Math.min(VOTE_CAP, (f.votes || []).length);
 const VOTE_CAP = 4;
 const voteMul = f => 1 + VOTE_BONUS * Math.min(VOTE_CAP, (f.votes || []).length);
 const effWeight = f => f.weight * voteMul(f);
@@ -112,8 +116,9 @@ function activeModifier(r) {
   return { pid: author, name: h.film.addedBy || '', title: h.film.title, avg: Math.round(avg * 10) / 10, count: scores.length, factor: ratingFactor(avg) };
 }
 
-// Шансы на колесе. С «равными шансами» колесо сначала делится поровну между авторами,
-// внутри доли автора — между его фильмами по весу. Голоса и оценка действуют поверх.
+// Шансы на колесе. Основа — 100 пунктов: с «равными шансами» поровну между авторами,
+// внутри доли автора между его фильмами по весу. Каждый голос добавляет фильму VOTE_POINTS пунктов.
+// Бонус или штраф за оценку умножает всё, что приходится на фильмы автора.
 function chanceWeights(r, list) {
   const mod = activeModifier(r);
   const modOf = pid => (mod && mod.pid === pid ? mod.factor : 1);
@@ -127,10 +132,11 @@ function chanceWeights(r, list) {
     }
     for (const [p, fs] of groups) {
       const sum = fs.reduce((a, f) => a + f.weight, 0) || 1;
-      for (const f of fs) w.set(f.id, (100 / groups.size) * modOf(p) * (f.weight / sum) * voteMul(f));
+      for (const f of fs) w.set(f.id, ((100 / groups.size) * (f.weight / sum) + votePoints(f)) * modOf(p));
     }
   } else {
-    for (const f of list) w.set(f.id, f.weight * voteMul(f) * modOf(personOf(f)));
+    const sum = list.reduce((a, f) => a + f.weight, 0) || 1;
+    for (const f of list) w.set(f.id, (100 * f.weight / sum + votePoints(f)) * modOf(personOf(f)));
   }
   return w;
 }
@@ -427,6 +433,41 @@ async function searchMovies(q) {
 }
 
 const fmtRuntime = m => (m >= 60 ? `${Math.floor(m / 60)} ч ${m % 60} мин` : `${m} мин`);
+// Трек по ссылке: проверяем через oEmbed, что видео существует и его можно встраивать.
+async function fetchTrack(url) {
+  if (/youtube\.com\/jam|music\.youtube\.com\/.*jam/i.test(String(url || ''))) return { error: 'Джемы YouTube Music открываются только в приложении. Добавляйте треки сюда по ссылкам, очередь общая для всех' };
+  const vid = ytKey(url);
+  if (!vid) return { error: /list=/.test(String(url || '')) ? 'Это ссылка на плейлист без трека. Откройте нужный трек и скопируйте его ссылку' : 'Не похоже на ссылку на YouTube' };
+  let meta = {};
+  try {
+    const o = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + vid)}`, { signal: AbortSignal.timeout(6000) });
+    if (o.status === 401 || o.status === 403) return { error: 'Автор запретил встраивать это видео, возьмите другое' };
+    if (o.status === 404 || o.status === 400) return { error: 'Видео не найдено или оно приватное' };
+    if (o.ok) meta = await o.json();
+  } catch { /* YouTube не ответил: включаем без названия */ }
+  return { vid, title: str(meta.title || '', 160) || 'Трек с YouTube', author: str(meta.author_name || '', 80) };
+}
+function playTrack(r, track) {
+  r.music = { vid: track.vid, title: track.title, author: track.author, by: track.by, startedAt: Date.now(), pausedAt: null, duration: 0 };
+  scheduleMusic(r);
+}
+// Трек закончился или его пропустили: следующий из очереди, а если очередь пуста — текущий по кругу.
+function advanceMusic(r) {
+  if (!rooms[r.id] || !r.music) return;
+  r.queue ||= [];
+  if (r.queue.length) playTrack(r, r.queue.shift());
+  else { r.music.startedAt = Date.now(); r.music.pausedAt = null; scheduleMusic(r); }
+  pushState(r);
+}
+function scheduleMusic(r) {
+  const rt = runtime(r);
+  clearTimeout(rt.musicT);
+  const mu = r.music;
+  if (!mu || mu.pausedAt != null || !mu.duration) return;
+  const left = mu.duration * 1000 - (Date.now() - mu.startedAt);
+  rt.musicT = setTimeout(() => advanceMusic(r), Math.max(0, left) + 400);
+}
+
 function ytKey(u) {
   const s = String(u || '').trim();
   if (/^[\w-]{11}$/.test(s)) return s;
@@ -619,7 +660,7 @@ async function api(req, res, url) {
   if (!sub && m === 'DELETE') {
     if (ownerKey(r) && !isOwner(r, me, b)) return json(res, 403, { error: 'Удалить комнату может только тот, кто её создал' });
     const rt = runtime(r);
-    clearTimeout(rt.finish); clearTimeout(rt.next); clearTimeout(rt.duelAuto); clearTimeout(rt.duelNext);
+    clearTimeout(rt.finish); clearTimeout(rt.next); clearTimeout(rt.duelAuto); clearTimeout(rt.duelNext); clearTimeout(rt.musicT);
     runtimes.delete(r.id);
     delete rooms[r.id];
     save();
@@ -650,34 +691,52 @@ async function api(req, res, url) {
     pushState(r); return json(res, 200, { ok: true });
   }
 
-  // ---- общая музыка из YouTube: у всех один трек и одна позиция ----
+  // ---- общая музыка из YouTube: у всех один трек и одна позиция, общая очередь ----
   // startedAt — момент, когда трек был на нуле; pausedAt — позиция в секундах, если на паузе.
   if (sub === 'music' && m === 'POST') {
     const action = parts[3];
+    r.queue ||= [];
     if (!action) {
-      const vid = ytKey(b.url);
-      if (!vid) return json(res, 400, { error: 'Не похоже на ссылку на YouTube' });
-      let meta = {};
-      try {
-        const o = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + vid)}`, { signal: AbortSignal.timeout(6000) });
-        if (o.status === 401 || o.status === 403) return json(res, 400, { error: 'Автор запретил встраивать это видео, возьмите другое' });
-        if (o.status === 404 || o.status === 400) return json(res, 400, { error: 'Видео не найдено или оно приватное' });
-        if (o.ok) meta = await o.json();
-      } catch { /* YouTube не ответил: включаем без названия */ }
-      r.music = {
-        vid, title: str(meta.title || '', 160) || 'Трек с YouTube', author: str(meta.author_name || '', 80),
-        by: who, startedAt: Date.now(), pausedAt: null,
-      };
+      const t = await fetchTrack(b.url);
+      if (t.error) return json(res, 400, { error: t.error });
+      const track = { ...t, by: who };
+      if (!r.music || b.now) playTrack(r, track);
+      else {
+        if (r.queue.length >= 50) return json(res, 400, { error: 'В очереди уже 50 треков' });
+        r.queue.push({ ...track, qid: id(6) });
+      }
+      pushState(r); return json(res, 200, { ok: true, queued: Boolean(r.music && r.music.vid !== track.vid) && !b.now });
+    }
+    if (action === 'remove') { r.queue = r.queue.filter(q => q.qid !== str(b.qid, 12)); pushState(r); return json(res, 200, { ok: true }); }
+    if (action === 'up') {
+      const i = r.queue.findIndex(q => q.qid === str(b.qid, 12));
+      if (i > 0) r.queue.unshift(...r.queue.splice(i, 1));
       pushState(r); return json(res, 200, { ok: true });
     }
     if (!r.music) return json(res, 409, { error: 'Музыка не играет' });
+    if (action === 'next') { advanceMusic(r); return json(res, 200, { ok: true }); }
+    if (action === 'duration') {
+      // длительность знает только плеер: первый, кто загрузил трек, сообщает её серверу
+      const d = num(b.duration, 0);
+      if (r.music.vid === str(b.vid, 11) && !r.music.duration && d > 1 && d < 6 * 3600) {
+        r.music.duration = d;
+        scheduleMusic(r);
+        save();
+      }
+      return json(res, 200, { ok: true });
+    }
     if (action === 'toggle') {
       if (r.music.pausedAt != null) { r.music.startedAt = Date.now() - r.music.pausedAt * 1000; r.music.pausedAt = null; }
       else r.music.pausedAt = Math.max(0, (Date.now() - r.music.startedAt) / 1000);
       r.music.by = who;
+      scheduleMusic(r);
       pushState(r); return json(res, 200, { ok: true });
     }
-    if (action === 'stop') { r.music = null; pushState(r); return json(res, 200, { ok: true }); }
+    if (action === 'stop') {
+      r.music = null; r.queue = [];
+      clearTimeout(runtime(r).musicT);
+      pushState(r); return json(res, 200, { ok: true });
+    }
   }
 
   // оценка фильма после просмотра, можно менять
@@ -809,4 +868,7 @@ http.createServer(async (req, res) => {
     console.error(e);
     if (!res.headersSent) json(res, 400, { error: e.message });
   }
-}).listen(PORT, () => console.log(`Reelette: http://localhost:${PORT}  (поиск фильмов: ${PROVIDER}, вход через Discord: ${auth.enabled ? 'да' : 'нет'})`));
+}).listen(PORT, () => {
+  for (const r of Object.values(rooms)) scheduleMusic(r);
+  console.log(`Reelette: http://localhost:${PORT}  (поиск фильмов: ${PROVIDER}, вход через Discord: ${auth.enabled ? 'да' : 'нет'})`);
+});

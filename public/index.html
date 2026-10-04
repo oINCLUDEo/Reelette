@@ -66,17 +66,20 @@
         <div class="yt-info"><b id="ytTitle"></b><span id="ytBy"></span></div>
         <div class="yt-ctrl">
           <button class="nav-icon" id="ytToggle"></button>
-          <button class="nav-icon" id="ytChange" title="Сменить трек"><svg viewBox="0 0 24 24"><path d="M17 3l4 4-4 4"/><path d="M3 11V9a2 2 0 0 1 2-2h16"/><path d="M7 21l-4-4 4-4"/><path d="M21 13v2a2 2 0 0 1-2 2H3"/></svg></button>
+          <button class="nav-icon" id="ytNext" title="Следующий трек у всех"><svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg></button>
+          <button class="nav-icon q-btn" id="ytChange" title="Очередь и добавить трек"><svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h8"/><path d="M19 15v6M16 18h6"/></svg><i id="ytQCount" hidden></i></button>
           <button class="nav-icon" id="ytStop" title="Выключить у всех"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
         </div>
         <input type="range" id="ytVol" min="0" max="100" value="50" title="Громкость у вас" aria-label="Громкость общей музыки у вас">
       </div>
       <form class="yt-add" id="ytAdd" hidden>
         <span class="label">Общая музыка <span class="m">слышат все в комнате</span></span>
+        <input id="ytUrl" placeholder="Ссылка на трек на YouTube" autocomplete="off">
         <div class="yt-add-row">
-          <input id="ytUrl" placeholder="Ссылка на YouTube" autocomplete="off">
-          <button class="btn btn-primary" type="submit">Включить</button>
+          <button class="btn btn-primary" type="submit" data-mode="queue" id="ytQueueBtn">В очередь</button>
+          <button class="btn btn-ghost" type="submit" data-mode="now" id="ytNowBtn">Включить сейчас</button>
         </div>
+        <div class="yt-queue" id="ytQueue"></div>
       </form>
     </div>
     <div class="act">

@@ -604,3 +604,19 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .yt-add-row .btn { height: 42px; font-size: 13.5px; }
 @media (max-width: 1100px) { .nav-music #ytVol, .nav-music .yt-info span { display: none; } }
 @media (max-width: 860px) { .nav-music .music-btn span, .nav-music .yt-info { display: none; } }
+
+/* очередь музыки */
+.q-btn { position: relative; }
+.q-btn i { position: absolute; top: 1px; right: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--acc); color: #fff; font: 800 10px/16px var(--f-ui); font-style: normal; }
+.nav-music .yt-add .yt-add-row { grid-template-columns: 1fr 1fr; }
+.nav-music .yt-add > input { height: 42px; font-size: 13.5px; }
+.yt-queue { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
+.yt-queue:empty { display: none; }
+.yt-queue .label { margin: 6px 0 2px; }
+.q-item { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 5px; border-radius: 11px; }
+.q-item:hover { background: var(--s1); }
+.q-item img { width: 48px; height: 36px; border-radius: 7px; object-fit: cover; }
+.q-item b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-item span { color: var(--tx3); font-size: 12px; }
+.q-item .nav-icon { width: 30px; height: 30px; }
+.nav-icon:disabled { opacity: .4; pointer-events: none; }

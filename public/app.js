@@ -297,8 +297,8 @@ function initRoom(roomId) {
     return state ? state.films.filter(f => !state.eliminated.includes(f.id) && matchesFilters(f)) : [];
   }
   // ---- голоса: тот же расчёт веса, что на сервере ----
-  const rules = () => state?.rules || { votes: 3, bonus: 0.25, cap: 4 };
-  const effWeight = f => f.weight * (1 + rules().bonus * Math.min(rules().cap, (f.votes || []).length));
+  const rules = () => state?.rules || { votes: 3, points: 4, cap: 4 };
+  const votePoints = f => (rules().points ?? 4) * Math.min(rules().cap, (f.votes || []).length);
   const myPid = () => (account.user ? 'd' + account.user.id : 'g' + me.cid);
   const myVotesUsed = () => state.films.reduce((n, f) => n + (f.votes || []).filter(v => v.id === myPid()).length, 0);
   const iVoted = f => (f.votes || []).some(v => v.id === myPid());
@@ -314,7 +314,6 @@ function initRoom(roomId) {
   const isBy = (f, pid, name) => personOf(f) === pid || (!f.addedById && f.addedBy === name);
 
   // Шансы: тот же расчёт, что на сервере (chanceWeights в server.js)
-  const voteMul = f => 1 + rules().bonus * Math.min(rules().cap, (f.votes || []).length);
   function chanceWeights(list) {
     const mod = state?.modifier;
     const modOf = pid => (mod && mod.pid === pid ? mod.factor : 1);
@@ -328,9 +327,12 @@ function initRoom(roomId) {
       }
       for (const [p, fs] of groups) {
         const sum = fs.reduce((a, f) => a + f.weight, 0) || 1;
-        for (const f of fs) w.set(f.id, (100 / groups.size) * modOf(p) * (f.weight / sum) * voteMul(f));
+        for (const f of fs) w.set(f.id, ((100 / groups.size) * (f.weight / sum) + votePoints(f)) * modOf(p));
       }
-    } else for (const f of list) w.set(f.id, f.weight * voteMul(f) * modOf(personOf(f)));
+    } else {
+      const sum = list.reduce((a, f) => a + f.weight, 0) || 1;
+      for (const f of list) w.set(f.id, (100 * f.weight / sum + votePoints(f)) * modOf(personOf(f)));
+    }
     return w;
   }
   const fmtFactor = x => '×' + String(x).replace('.', ',');
@@ -464,7 +466,7 @@ function initRoom(roomId) {
     const out = new Set(state.eliminated);
 
     const used = myVotesUsed(), R = rules();
-    $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: R.votes }, (_, i) => `<i class="${i < R.votes - used ? 'on' : ''}"></i>`).join('')}</span><span class="m">${used < R.votes ? `осталось ${R.votes - used}, каждый +${Math.round(R.bonus * 100)}% к шансу` : 'все отданы, голос можно снять'}</span>`;
+    $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: R.votes }, (_, i) => `<i class="${i < R.votes - used ? 'on' : ''}"></i>`).join('')}</span><span class="m">${used < R.votes ? `осталось ${R.votes - used}, каждый даёт фильму около ${R.points ?? 4}% колеса` : 'все отданы, голос можно снять'}</span>`;
 
     const mod = state.modifier;
     $('#modBanner').hidden = !mod || mod.factor === 1;
@@ -504,7 +506,7 @@ function initRoom(roomId) {
         <div class="film-side">
           <span class="film-pct">${pct}</span>
           <div class="film-actions">
-            <button class="vote-btn${mine ? ' on' : ''}${nv ? ' has' : ''}" data-vote-film title="${mine ? 'Снять свой голос' : `Хочу посмотреть: +${Math.round(rules().bonus * 100)}% к шансу`}">${ICON.heart}<b>${nv || ''}</b></button>
+            <button class="vote-btn${mine ? ' on' : ''}${nv ? ' has' : ''}" data-vote-film title="${mine ? 'Снять свой голос' : `Хочу посмотреть: около +${rules().points ?? 4}% колеса этому фильму`}">${ICON.heart}<b>${nv || ''}</b></button>
             ${amOwner ? `<div class="stepper"><button data-w="-1" title="Меньше">${ICON.minus}</button><b>${f.weight}</b><button data-w="1" title="Больше">${ICON.plus}</button></div>` : ''}
           </div>
         </div>
@@ -588,8 +590,34 @@ function initRoom(roomId) {
   }
   function ytExpected(m) {
     const pos = m.pausedAt != null ? m.pausedAt : (Date.now() + serverOffset - m.startedAt) / 1000;
-    const d = ytReady ? yt.getDuration() : 0;
-    return d > 1 ? pos % d : pos;
+    const d = m.duration || (ytReady ? yt.getDuration() : 0);
+    if (d <= 1) return pos;
+    // по кругу, только пока очередь пуста; иначе сервер сам переключит на следующий трек
+    return state?.queue?.length ? Math.min(pos, d - 0.5) : pos % d;
+  }
+  const ytReported = new Set();
+  function reportDuration(m) {
+    if (!ytReady || m.duration || ytReported.has(m.vid) || ytVid !== m.vid) return;
+    const d = yt.getDuration();
+    if (d > 1) { ytReported.add(m.vid); api(`/rooms/${roomId}/music/duration`, { method: 'POST', body: { vid: m.vid, duration: d } }).catch(() => {}); }
+  }
+  function renderQueue() {
+    const q = state?.queue || [];
+    const m = state?.music;
+    $('#ytQCount').hidden = !q.length;
+    $('#ytQCount').textContent = q.length;
+    $('#ytQueueBtn').hidden = !m;
+    $('#ytNowBtn').textContent = m ? 'Включить сейчас' : 'Включить';
+    $('#ytNowBtn').className = m ? 'btn btn-ghost' : 'btn btn-primary';
+    $('#ytNext').disabled = !m;
+    $('#ytQueue').innerHTML = !m ? '' : q.length
+      ? `<span class="label">Дальше в очереди <span class="m">${q.length}</span></span>` + q.map((t, i) => `<div class="q-item">
+          <img src="https://i.ytimg.com/vi/${esc(t.vid)}/default.jpg" alt="">
+          <div><b>${esc(t.title)}</b><span>${esc(t.by)}</span></div>
+          ${i ? `<button type="button" class="nav-icon" data-qup="${esc(t.qid)}" title="Играть следующим"><svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></button>` : ''}
+          <button type="button" class="nav-icon" data-qrm="${esc(t.qid)}" title="Убрать из очереди"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        </div>`).join('')
+      : '<p class="note">Очередь пуста. Треки из очереди играют по порядку, когда закончится текущий.</p>';
   }
   function ytVolume() {
     if (!ytReady) return;
@@ -601,6 +629,7 @@ function initRoom(roomId) {
     const m = state?.music;
     $('#ytCard').hidden = !m;
     $('#ytAdd').hidden = !ytChanging;
+    renderQueue();
     $('#musicBtn').hidden = Boolean(m);
     if (!m) {
       if (yt) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $('#ytHost').innerHTML = ''; }
@@ -623,7 +652,8 @@ function initRoom(roomId) {
             onReady: () => { ytReady = true; ytVolume(); syncMusic(); },
             onStateChange: e => {
               // трек закончился, а общая музыка не на паузе: начинаем заново (по кругу)
-              if (e.data === 0 && state?.music && state.music.pausedAt == null) { yt.seekTo(0, true); yt.playVideo(); }
+              if (e.data === 0 && state?.music && state.music.pausedAt == null && !state.queue?.length) { yt.seekTo(0, true); yt.playVideo(); }
+              if (e.data === 1 && state?.music) reportDuration(state.music);
               if (e.data === 1) $('#ytUnmute').hidden = true;
             },
             onError: e => toast(e.data === 101 || e.data === 150 ? 'Автор запретил встраивать это видео' : 'YouTube не смог воспроизвести трек', true),
@@ -633,6 +663,7 @@ function initRoom(roomId) {
       }
       if (!ytReady) return;
       if (ytVid !== m.vid) { ytVid = m.vid; yt.loadVideoById({ videoId: m.vid, startSeconds: ytExpected(m) }); return; }
+      reportDuration(m);
       const exp = ytExpected(m), cur = yt.getCurrentTime(), st = yt.getPlayerState();
       if (m.pausedAt != null) {
         if (st === 1 || st === 3) yt.pauseVideo();
@@ -652,15 +683,23 @@ function initRoom(roomId) {
     e.preventDefault();
     const url = $('#ytUrl').value.trim();
     if (!url) return;
+    const now = e.submitter?.dataset.mode === 'now' || !state?.music;
     try {
-      await api(`/rooms/${roomId}/music`, { method: 'POST', body: { url, by: me.name } });
+      const r = await api(`/rooms/${roomId}/music`, { method: 'POST', body: { url, now, by: me.name } });
       $('#ytUrl').value = '';
-      ytChanging = false;
       Sfx.unlock();
+      if (r.queued) toast('Трек добавлен в очередь');
+      else { ytChanging = false; syncMusic(); }
     } catch (err) { toast(err.message, true); }
   });
+  $('#ytQueue').addEventListener('click', e => {
+    const up = e.target.closest('[data-qup]'), rm = e.target.closest('[data-qrm]');
+    if (up) api(`/rooms/${roomId}/music/up`, { method: 'POST', body: { qid: up.dataset.qup } }).catch(err => toast(err.message, true));
+    if (rm) api(`/rooms/${roomId}/music/remove`, { method: 'POST', body: { qid: rm.dataset.qrm } }).catch(err => toast(err.message, true));
+  });
+  $('#ytNext').addEventListener('click', () => api(`/rooms/${roomId}/music/next`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
   $('#ytToggle').addEventListener('click', () => api(`/rooms/${roomId}/music/toggle`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
-  $('#ytStop').addEventListener('click', () => api(`/rooms/${roomId}/music/stop`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
+  $('#ytStop').addEventListener('click', () => confirm('Выключить музыку у всех и очистить очередь?') && api(`/rooms/${roomId}/music/stop`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
   const openMusicForm = () => { ytChanging = !ytChanging; syncMusic(); if (ytChanging) setTimeout(() => $('#ytUrl').focus(), 30); };
   $('#ytChange').addEventListener('click', openMusicForm);
   $('#musicBtn').addEventListener('click', openMusicForm);
@@ -894,7 +933,7 @@ function initRoom(roomId) {
     const total = active.reduce((s, x) => s + W.get(x.id), 0);
     const inWheel = !fromHistory && active.some(x => x.id === f.id);
     const votes = f.votes || [];
-    const votersLine = votes.length ? `<div class="voters-line">Хотят посмотреть: ${votes.map(v => `<button class="person" data-person="${esc(v.id)}" data-name="${esc(v.name)}">${esc(v.name)}</button>`).join(', ')}${!fromHistory ? ` <span class="m">+${Math.round(rules().bonus * Math.min(rules().cap, votes.length) * 100)}% к шансу</span>` : ''}</div>` : '';
+    const votersLine = votes.length ? `<div class="voters-line">Хотят посмотреть: ${votes.map(v => `<button class="person" data-person="${esc(v.id)}" data-name="${esc(v.name)}">${esc(v.name)}</button>`).join(', ')}${!fromHistory ? ` <span class="m">около +${votePoints(f)}% колеса</span>` : ''}</div>` : '';
     $('#filmDetail').innerHTML = `<div class="detail">
       ${f.poster ? `<img src="${esc(f.poster)}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"></div>`}
       <div>
