@@ -1,0 +1,12 @@
+services:
+  kinokoleso:
+    build: .
+    container_name: kinokoleso
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data

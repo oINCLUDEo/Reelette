@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ru" data-pal="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Киноколесо</title>
+<meta name="description" content="Колесо для выбора фильма на киновечер с друзьями">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Wix+Madefor+Display:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="arr" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="logo" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 16 16 2A14 14 0 0 1 28.1 9Z" fill="currentColor"/><path d="M16 16 3.9 23A14 14 0 0 1 3.9 9Z" fill="currentColor" opacity=".45"/><circle cx="16" cy="16" r="3.2" fill="currentColor"/></symbol>
+</svg>
+
+<!-- ===== Главная ===== -->
+<div id="home" hidden>
+  <header class="nav"><div class="bar">
+    <a class="brand" href="/"><svg><use href="#logo"/></svg>Киноколесо</a>
+  </div></header>
+
+  <section class="sheet hero grainy">
+    <canvas class="neb" aria-hidden="true"></canvas>
+    <span class="shade"></span>
+    <div class="in hero-in">
+      <div class="hero-copy">
+        <h1><span class="mk"><span class="g">Колесо для киновечера.</span></span><span class="mk"><span class="m">Друзья кидают фильмы, колесо выбирает.</span></span></h1>
+        <form id="createForm" class="create bu">
+          <input id="roomName" maxlength="60" placeholder="Название комнаты, например «Пятница»" autocomplete="off">
+          <button class="sweep" type="submit"><span class="sq"></span><span class="ar"><svg><use href="#arr"/></svg></span><span class="tx">Создать комнату</span></button>
+        </form>
+        <p class="sub bu">Ссылку на комнату отправьте друзьям в Discord. Добавленные фильмы и вращение колеса видны у всех сразу.</p>
+      </div>
+      <div class="hero-wheel bu">
+        <div class="wheel-box"><canvas id="demoWheel"></canvas><div class="pointer"><svg viewBox="0 0 40 52"><path d="M20 50 3 14A18 18 0 1 1 37 14Z"/></svg></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet b" id="recent" hidden>
+    <div class="in">
+      <h2 class="h2"><span class="mk"><span>Ваши комнаты.</span></span><span class="mk"><span class="m">Последние, куда вы заходили.</span></span></h2>
+      <div id="recentList" class="recent-list"></div>
+    </div>
+  </section>
+</div>
+
+<!-- ===== Комната ===== -->
+<div id="room" hidden>
+  <header class="nav"><div class="bar">
+    <a class="brand" href="/"><svg><use href="#logo"/></svg><span class="brand-name">Киноколесо</span></a>
+    <button id="roomTitle" class="room-title" title="Переименовать"></button>
+    <div class="act">
+      <div id="people" class="people"></div>
+      <button id="inviteBtn" class="ghost sm"><svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg><span>Пригласить</span></button>
+      <button id="settingsBtn" class="ghost sm icon" title="Настройки"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
+    </div>
+  </div></header>
+
+  <div class="layout">
+    <aside class="sheet b films-panel">
+      <div class="panel-head">
+        <h2>Фильмы <span class="m" id="filmCount"></span></h2>
+        <button id="addBtn" class="sweep sm"><span class="sq"></span><span class="ar"><svg><use href="#plus"/></svg></span><span class="tx">Добавить</span></button>
+      </div>
+      <div id="filmList" class="film-list"></div>
+      <div id="filmEmpty" class="empty" hidden>
+        <p>Колесо пустое. <span class="m">Добавьте пару фильмов, чтобы его крутить.</span></p>
+      </div>
+    </aside>
+
+    <section class="sheet stage grainy">
+      <canvas class="neb" aria-hidden="true"></canvas>
+      <span class="shade"></span>
+      <div class="stage-in">
+        <div class="current"><span id="currentTitle">&nbsp;</span></div>
+        <div class="wheel-box" id="wheelBox">
+          <canvas id="wheel"></canvas>
+          <div class="pointer" id="pointer"><svg viewBox="0 0 40 52"><path d="M20 50 3 14A18 18 0 1 1 37 14Z"/></svg></div>
+        </div>
+        <div class="spin-row">
+          <button id="spinBtn" class="sweep"><span class="sq"></span><span class="ar"><svg><use href="#arr"/></svg></span><span class="tx">Крутить</span></button>
+          <button id="resetBtn" class="ghost" hidden>Вернуть выбывших</button>
+        </div>
+        <div class="stage-status" id="stageStatus"></div>
+      </div>
+    </section>
+
+    <aside class="sheet b controls">
+      <div class="field">
+        <span class="label">Режим</span>
+        <div class="seg" id="modeSeg">
+          <span class="seg-ind"></span>
+          <button data-mode="normal">Обычный</button>
+          <button data-mode="elimination">На выбывание</button>
+        </div>
+        <p class="note" id="modeNote"></p>
+      </div>
+
+      <div class="field">
+        <span class="label">Длительность <b id="durVal">12 с</b></span>
+        <input type="range" id="duration" min="4" max="40" value="12">
+      </div>
+
+      <div class="checks">
+        <label class="check" id="autoWrap"><input type="checkbox" id="autoSpin"><span class="box"></span>Крутить до победителя без остановок</label>
+        <label class="check"><input type="checkbox" id="soundOn" checked><span class="box"></span>Звук щелчков</label>
+      </div>
+
+      <div class="history">
+        <h3>Уже выпадало</h3>
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ===== Модалки ===== -->
+<div class="modal" id="addModal" hidden>
+  <div class="modal-card add-card">
+    <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <h2>Добавить фильм <span class="m" id="providerNote"></span></h2>
+    <div class="tabs" id="addTabs">
+      <span class="tabs-ind"></span>
+      <button class="on" data-tab="search">Поиск</button>
+      <button data-tab="list">Списком</button>
+    </div>
+    <div data-pane="search">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <input id="searchInput" placeholder="Название фильма или сериала" autocomplete="off">
+      </div>
+      <div id="searchResults" class="results"></div>
+    </div>
+    <div data-pane="list" hidden>
+      <textarea id="bulkInput" rows="8" placeholder="По одному фильму на строку&#10;Интерстеллар&#10;Джанго освобождённый&#10;Субмарина"></textarea>
+      <button id="bulkBtn" class="btn btn-primary btn-block">Добавить всё</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="filmModal" hidden>
+  <div class="modal-card film-card">
+    <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div id="filmDetail"></div>
+  </div>
+</div>
+
+<div class="modal winner" id="winModal" hidden>
+  <div class="modal-card win-card grainy">
+    <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div id="winDetail"></div>
+  </div>
+</div>
+
+<div class="modal" id="nameModal" hidden>
+  <form class="modal-card small-card" id="nameForm">
+    <h2>Как вас зовут? <span class="m">Имя увидят остальные в комнате.</span></h2>
+    <input id="nameInput" maxlength="32" placeholder="Например, Никита" autocomplete="off" required>
+    <button class="btn btn-primary btn-block" type="submit">Войти</button>
+  </form>
+</div>
+
+<div class="modal" id="settingsModal" hidden>
+  <div class="modal-card small-card">
+    <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <h2>Настройки</h2>
+    <label class="field"><span class="label">Название комнаты</span><input id="setName" maxlength="60"></label>
+    <label class="field"><span class="label">Ваше имя</span><input id="setNick" maxlength="32"></label>
+    <label class="field"><span class="label">Вебхук Discord <span id="hookState"></span></span><input id="setHook" placeholder="https://discord.com/api/webhooks/…"></label>
+    <p class="note">Если указать вебхук, победитель будет приходить в канал Discord с постером и описанием.</p>
+    <div class="field"><span class="label">Палитра</span>
+      <div class="pals" id="pals">
+        <button data-p="night"><i style="background:#7C6BFF"></i>Ночь</button>
+        <button data-p="mono"><i style="background:linear-gradient(90deg,#000 50%,#fff 50%)"></i>Чёрно-белая</button>
+        <button data-p="ember"><i style="background:linear-gradient(90deg,#111 50%,#FF4D00 50%)"></i>Ч/б с оранжевым</button>
+      </div>
+    </div>
+    <button id="saveSettings" class="btn btn-primary btn-block">Сохранить</button>
+    <div class="danger">
+      <button id="clearHistory" class="btn btn-ghost">Очистить историю</button>
+      <button id="clearFilms" class="btn btn-ghost">Удалить все фильмы</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="/bg.js"></script>
+<script src="/wheel.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
