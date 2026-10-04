@@ -13,8 +13,6 @@ const DATA_FILE = path.join(DATA_DIR, 'rooms.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const KP_KEY = process.env.KINOPOISK_API_KEY || '';
 const TMDB_KEY = process.env.TMDB_API_KEY || '';
-// Страна для блока «Где посмотреть» (данные TMDB о легальных сервисах)
-const WATCH_REGION = (process.env.WATCH_REGION || 'RU').toUpperCase();
 const PROVIDER = (process.env.MOVIE_PROVIDER || (KP_KEY ? 'kinopoisk' : TMDB_KEY ? 'tmdb' : 'none')).toLowerCase();
 
 // Docker env_file не снимает кавычки и пробелы, чистим сами
@@ -483,7 +481,7 @@ async function fetchDetails(f) {
     const [type, tid] = f.sourceId.split('/');
     if (!/^(movie|tv)$/.test(type) || !/^\d+$/.test(tid)) return;
     const bearer = TMDB_KEY.length > 40;
-    const u = `https://api.themoviedb.org/3/${type}/${tid}?language=ru-RU&append_to_response=videos,watch/providers&include_video_language=ru,en,null${bearer ? '' : `&api_key=${TMDB_KEY}`}`;
+    const u = `https://api.themoviedb.org/3/${type}/${tid}?language=ru-RU&append_to_response=videos&include_video_language=ru,en,null${bearer ? '' : `&api_key=${TMDB_KEY}`}`;
     const j = await getJson(u, bearer ? { Authorization: `Bearer ${TMDB_KEY}` } : {});
     f.runtime = Number(j.runtime || j.episode_run_time?.[0] || 0) || 0;
     if (j.genres?.length) f.genres = j.genres.map(g => str(g.name, 30).toLowerCase()).slice(0, 3);
@@ -491,15 +489,10 @@ async function fetchDetails(f) {
     const vids = (j.videos?.results || []).filter(v => v.site === 'YouTube');
     const pick = ['Trailer', 'Teaser'].flatMap(t => [vids.find(v => v.type === t && v.iso_639_1 === 'ru'), vids.find(v => v.type === t)]).find(Boolean) || vids[0];
     f.trailer = pick ? str(pick.key, 20) : '';
-    const wp = j['watch/providers']?.results?.[WATCH_REGION];
-    const seen = new Set();
-    const list = wp ? [['flatrate', 'подписка'], ['free', 'бесплатно'], ['ads', 'с рекламой'], ['rent', 'аренда'], ['buy', 'покупка']]
-      .flatMap(([k, kind]) => (wp[k] || []).map(p => ({ ...p, kind })))
-      .filter(p => !seen.has(p.provider_id) && seen.add(p.provider_id)) : [];
-    f.watch = list.length ? {
-      link: str(wp.link || '', 300),
-      providers: list.slice(0, 8).map(p => ({ name: str(p.provider_name, 40), logo: p.logo_path ? `https://image.tmdb.org/t/p/w92${p.logo_path}` : '', kind: p.kind, url: str(wp.link || '', 300) })),
-    } : null;
+    if (KP_KEY) {
+      try { await kinopoiskDescription(f); } catch (e) { console.warn(`Описание с Кинопоиска для «${f.title}»: ${e.message}`); }
+      f.kpChecked = true;
+    }
   } else if (f.source === 'kinopoisk' && KP_KEY) {
     const base = `https://kinopoiskapiunofficial.tech/api/v2.2/films/${encodeURIComponent(f.sourceId)}`;
     const j = await getJson(base, { 'X-API-KEY': KP_KEY });
@@ -512,13 +505,28 @@ async function fetchDetails(f) {
       const v = await getJson(base + '/videos', { 'X-API-KEY': KP_KEY });
       f.trailer = (v.items || []).map(x => ytKey(x.url)).find(Boolean) || '';
     } catch { f.trailer = ''; }
-    try {
-      const ex = await getJson(base + '/external_sources?page=1', { 'X-API-KEY': KP_KEY });
-      const items = (ex.items || []).filter(x => /^https:\/\//.test(x.url || ''));
-      f.watch = items.length ? { link: '', providers: items.slice(0, 8).map(x => ({ name: str(x.platform || '', 40), logo: /^https:/.test(x.logoUrl || '') ? x.logoUrl : '', kind: '', url: str(x.url, 300) })) } : null;
-    } catch { f.watch = null; }
+    f.kpId = String(f.sourceId);
   } else return;
   f.detailsAt = Date.now();
+}
+
+// Детали нужны новым фильмам, а при ключе Кинопоиска — и старым фильмам из TMDB, у которых ещё нет описания оттуда.
+const needsDetails = f => !f.detailsAt || (f.source === 'tmdb' && KP_KEY && !f.kpChecked);
+
+// Находим фильм из TMDB на Кинопоиске по названию и году и берём оттуда русское описание.
+async function kinopoiskDescription(f) {
+  const H = { 'X-API-KEY': KP_KEY };
+  const found = async q => (await getJson(`https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=${encodeURIComponent(q)}&page=1`, H)).films || [];
+  const sameYear = c => f.year && String(c.year || '').startsWith(f.year);
+  let list = await found(f.title);
+  let hit = list.find(sameYear);
+  if (!hit && f.original) { list = await found(f.original); hit = list.find(sameYear); }
+  if (!hit && !f.year) hit = list[0];
+  if (!hit) return;
+  const d = await getJson(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${hit.filmId}`, H);
+  const text = str(d.description || d.shortDescription || '', 2000);
+  if (text) f.overview = text;
+  f.kpId = String(hit.filmId);
 }
 
 const enrichQueue = [];
@@ -527,7 +535,7 @@ const enrichFailed = new Set(); // не повторяем до перезапу
 let enrichActive = 0;
 function queueEnrich(r) {
   for (const f of r.films) {
-    if (!f.source || !f.sourceId || (f.detailsAt && f.watch !== undefined) || enrichQueued.has(f.id) || enrichFailed.has(f.id)) continue;
+    if (!f.source || !f.sourceId || !needsDetails(f) || enrichQueued.has(f.id) || enrichFailed.has(f.id)) continue;
     if ((f.source === 'tmdb' && !TMDB_KEY) || (f.source === 'kinopoisk' && !KP_KEY)) continue;
     enrichQueued.add(f.id);
     enrichQueue.push([r, f]);

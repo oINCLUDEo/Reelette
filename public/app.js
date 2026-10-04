@@ -94,17 +94,11 @@ document.addEventListener('click', e => {
   if (t) { e.stopPropagation(); openTrailer(t.dataset.trailer); }
 }, true);
 const fmtRuntime = m => (m >= 60 ? `${Math.floor(m / 60)} ч ${m % 60} мин` : `${m} мин`);
-// «Где посмотреть»: легальные сервисы из TMDB или Кинопоиска и поиск на Кинопоиске
-const watchBlock = f => {
-  const ps = f.watch?.providers || [];
-  const kp = `https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(f.title + (f.year ? ' ' + f.year : ''))}`;
-  return `<div class="watch">
-    <span class="label">Где посмотреть</span>
-    <div class="watch-list">
-      ${ps.map(p => `<a class="watch-item" href="${esc(p.url || f.watch.link || kp)}" target="_blank" rel="noopener" title="${esc(p.name)}${p.kind ? ', ' + esc(p.kind) : ''}">${p.logo ? `<img src="${esc(p.logo)}" alt="">` : ''}<span>${esc(p.name)}</span></a>`).join('')}
-      <a class="watch-item kp" href="${kp}" target="_blank" rel="noopener">Найти на Кинопоиске</a>
-    </div>
-  </div>`;
+// Кинопоиск: страница фильма, если он там найден, иначе поиск по названию и году
+const kpBtn = f => {
+  const id = f.kpId || (f.source === 'kinopoisk' ? f.sourceId : '');
+  const href = id ? `https://www.kinopoisk.ru/film/${encodeURIComponent(id)}/` : `https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(f.title + (f.year ? ' ' + f.year : ''))}`;
+  return `<a class="btn btn-ghost" href="${href}" target="_blank" rel="noopener">${id ? 'На Кинопоиске' : 'Найти на Кинопоиске'}</a>`;
 };
 const trailerBtn = f => (f.trailer ? `<button class="btn btn-ghost" data-trailer="${esc(f.trailer)}"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>Трейлер</button>` : '');
 const anyModalOpen = () => $$('.modal:not([hidden])').length > 0;
@@ -442,10 +436,10 @@ function initRoom(roomId) {
           <div class="win-title">${esc(f.title)}</div>
           ${facts(f)}
           ${kind === 'win' && f.overview ? `<p>${esc(f.overview)}</p>` : ''}
-          ${kind === 'win' ? watchBlock(f) : ''}
           ${kind === 'win' ? `<div class="detail-actions">
             ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Открыть страницу фильма</a>` : ''}
             ${trailerBtn(f)}
+            ${kpBtn(f)}
             ${state.films.some(x => x.id === f.id) && canDelete(f) ? `<button class="btn btn-ghost" data-remove="${esc(f.id)}">Убрать из колеса</button>` : ''}
           </div>` : ''}
         </div>
@@ -956,10 +950,10 @@ function initRoom(roomId) {
         ${inWheel ? `<div class="facts"><span>Вес <b>${f.weight}</b></span><span>Голосов <b>${votes.length}</b></span><span>Шанс <b>${(W.get(f.id) / total * 100).toFixed(1)}%</b></span></div>` : ''}
         ${votersLine}
         <p>${f.overview ? esc(f.overview) : '<span class="muted">Описания нет.</span>'}</p>
-        ${watchBlock(f)}
         <div class="detail-actions">
           ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Страница фильма</a>` : ''}
           ${trailerBtn(f)}
+          ${kpBtn(f)}
           ${!fromHistory ? `<button class="btn btn-ghost${iVoted(f) ? ' on' : ''}" data-vote-detail>${ICON.heart}${iVoted(f) ? 'Снять голос' : 'Хочу посмотреть'}</button>` : ''}
           ${!fromHistory && canDelete(f) ? `<button class="btn btn-ghost" data-rm>Удалить из колеса</button>` : ''}
         </div>
