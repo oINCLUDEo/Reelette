@@ -278,6 +278,8 @@ function initRoom(roomId) {
       syncWheel();
       toast(msg.by ? `${msg.by} отменил(а) прокрут` : 'Прокрут отменён');
       render();
+    } else if (msg.type === 'music-skip') {
+      toast(`«${msg.title}» нельзя проиграть на сайте, включаю следующий`, true);
     } else if (msg.type === 'duel-stop') {
       toast(msg.by ? `${msg.by} остановил(а) дуэль` : 'Дуэль остановлена');
     } else if (msg.type === 'deleted') {
@@ -370,7 +372,12 @@ function initRoom(roomId) {
   function nick(pid, name, p = prof(pid)) {
     const v = nickVars(p);
     const fx = p.effect && p.effect !== 'none' ? ` fx-${p.effect}` : '';
-    return `<span class="nick ${v.cls}${fx}" style="${v.style}">${esc(name)}</span>`;
+    const font = p.font && p.font !== 'default' ? ` nf-${p.font}` : '';
+    const text = p.effect === 'wave' ? [...String(name)].map((ch, i) => `<span style="--i:${i}">${esc(ch)}</span>`).join('') : esc(name);
+    const b = p.badge && typeof BADGES !== 'undefined' ? BADGES.find(x => x.id === p.badge) : null;
+    return `<span class="nick ${v.cls}${fx}${font}" style="${v.style}">${text}</span>`
+      + (p.icon ? `<span class="nick-ico">${esc(p.icon)}</span>` : '')
+      + (b ? `<i class="nick-badge" title="${esc(b.name)}"><svg viewBox="0 0 24 24">${b.icon}</svg></i>` : '');
   }
   const frameCls = (pid, p = prof(pid)) => (p.frame && p.frame !== 'none' ? ` frame-${p.frame}` : '');
   const frameVars = (pid, p = prof(pid)) => nickVars(p).style;
@@ -618,6 +625,8 @@ function initRoom(roomId) {
   // Сервер хранит, когда трек был на нуле (startedAt) или на какой секунде пауза (pausedAt).
   // Каждый плеер считает ожидаемую позицию сам и подтягивается, если ушёл больше чем на 2,5 с.
   let yt = null, ytReady = false, ytVid = null, ytDucked = false, ytChanging = false;
+  const ytBroken = new Set(); // видео, которые YouTube отказался играть: не пытаемся грузить снова
+  let ytReloadAt = 0;
   function loadYT(cb) {
     if (window.YT?.Player) return cb();
     if (!loadYT.queue) {
@@ -633,8 +642,8 @@ function initRoom(roomId) {
     const pos = m.pausedAt != null ? m.pausedAt : (Date.now() + serverOffset - m.startedAt) / 1000;
     const d = m.duration || (ytReady ? yt.getDuration() : 0);
     if (d <= 1) return pos;
-    // по кругу, только пока очередь пуста; иначе сервер сам переключит на следующий трек
-    return state?.queue?.length ? Math.min(pos, d - 0.5) : pos % d;
+    // трек не повторяется: после конца сервер включит следующий или выключит музыку
+    return Math.min(pos, d - 0.3);
   }
   const ytReported = new Set();
   function reportDuration(m) {
@@ -696,19 +705,30 @@ function initRoom(roomId) {
           events: {
             onReady: () => { ytReady = true; ytVolume(); syncMusic(); },
             onStateChange: e => {
-              // трек закончился, а общая музыка не на паузе: начинаем заново (по кругу)
-              if (e.data === 0 && state?.music && state.music.pausedAt == null && !state.queue?.length) { yt.seekTo(0, true); yt.playVideo(); }
+              // трек доиграл: сообщаем серверу, он включит следующий из очереди или выключит музыку
+              if (e.data === 0 && state?.music) api(`/rooms/${roomId}/music/ended`, { method: 'POST', body: { vid: state.music.vid } }).catch(() => {});
               if (e.data === 1 && state?.music) reportDuration(state.music);
               if (e.data === 1) $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = true));
             },
-            onError: e => toast(e.data === 101 || e.data === 150 ? 'Автор запретил встраивать это видео' : 'YouTube не смог воспроизвести трек', true),
+            onError: () => {
+              const vid = state?.music?.vid;
+              if (!vid || ytBroken.has(vid)) return;
+              ytBroken.add(vid);
+              api(`/rooms/${roomId}/music/failed`, { method: 'POST', body: { vid } }).catch(() => {});
+            },
           },
         });
         return;
       }
       if (!ytReady) return;
+      if (ytBroken.has(m.vid)) return;
       const playing = yt.getVideoData?.()?.video_id;
-      if (ytVid !== m.vid || (playing && playing !== m.vid)) { ytVid = m.vid; yt.loadVideoById({ videoId: m.vid, startSeconds: ytExpected(m) }); return; }
+      // чужое видео (кликнули по подсказке YouTube) возвращаем не чаще раза в 8 секунд, чтобы не мигало
+      if (ytVid !== m.vid || (playing && playing !== m.vid && Date.now() - ytReloadAt > 8000)) {
+        ytVid = m.vid; ytReloadAt = Date.now();
+        yt.loadVideoById({ videoId: m.vid, startSeconds: ytExpected(m) });
+        return;
+      }
       reportDuration(m);
       const exp = ytExpected(m), cur = yt.getCurrentTime(), st = yt.getPlayerState();
       if (m.pausedAt != null) {
@@ -716,6 +736,7 @@ function initRoom(roomId) {
         if (Math.abs(cur - exp) > 1) yt.seekTo(exp, true);
         $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = true));
       } else {
+        if (st === 0) { $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = true)); return; } // доиграл, ждём сервер
         if (Math.abs(cur - exp) > 2.5) yt.seekTo(exp, true);
         if (st !== 1 && st !== 3) yt.playVideo();
         // браузер не дал включить звук без клика: просим нажать
@@ -1063,15 +1084,17 @@ function initRoom(roomId) {
   ];
 
   const PROFILE_COLORS = ['', '#FF5A6E', '#FF9F45', '#FFD54A', '#3DDC97', '#38BDF8', '#7C6BFF', '#C084FC', '#F472B6', 'grad:sunset', 'grad:neon', 'grad:gold', 'grad:ice', 'grad:rainbow'];
-  const PROFILE_EFFECTS = [['none', 'Без эффекта'], ['glow', 'Свечение'], ['shimmer', 'Перелив'], ['pulse', 'Пульс'], ['glitch', 'Глитч']];
-  const PROFILE_FRAMES = [['none', 'Без рамки'], ['accent', 'Акцент'], ['neon', 'Неон'], ['gold', 'Золото'], ['rainbow', 'Радуга']];
-  const PROFILE_BANNERS = [['none', 'Без фона'], ['aurora', 'Сияние'], ['sunset', 'Закат'], ['ocean', 'Океан'], ['ember', 'Угли'], ['night', 'Ночь']];
+  const PROFILE_EFFECTS = [['none', 'Без эффекта'], ['glow', 'Свечение'], ['shimmer', 'Перелив'], ['pulse', 'Пульс'], ['glitch', 'Глитч'], ['wave', 'Волна'], ['flicker', 'Неон'], ['rainbow', 'Радуга']];
+  const PROFILE_FONTS = [['default', 'Обычный'], ['unbounded', 'Unbounded'], ['pixel', 'Пиксель'], ['pacifico', 'Pacifico'], ['russo', 'Russo']];
+  const PROFILE_ICONS = ['', '👑', '🔥', '⭐', '🎤', '🎬', '💀', '👾', '🐸', '🌙', '⚡', '🍿', '🦄', '🎧'];
+  const PROFILE_FRAMES = [['none', 'Без рамки'], ['accent', 'Акцент'], ['neon', 'Неон'], ['gold', 'Золото'], ['rainbow', 'Радуга'], ['fire', 'Огонь'], ['ice', 'Лёд'], ['toxic', 'Токсик'], ['holo', 'Голограмма']];
+  const PROFILE_BANNERS = [['none', 'Без фона'], ['aurora', 'Сияние'], ['sunset', 'Закат'], ['ocean', 'Океан'], ['ember', 'Угли'], ['night', 'Ночь'], ['live', 'Живое сияние'], ['stars', 'Звёзды']];
   let profDraft = null, profEditing = false;
 
   function openProfile(pid, name) {
     if (!state) return;
     profEditing = false;
-    profDraft = { ...{ color: '', effect: 'none', frame: 'none', banner: 'none', status: '' }, ...prof(pid) };
+    profDraft = { ...{ color: '', effect: 'none', frame: 'none', banner: 'none', font: 'default', icon: '', badge: '', status: '' }, ...prof(pid) };
     renderProfile(pid, name);
     openModal('#profileModal');
   }
@@ -1115,6 +1138,9 @@ function initRoom(roomId) {
         <div class="pe-row"><span class="label">Цвет ника</span><div class="pe-swatches">${PROFILE_COLORS.map(c => `<button type="button" class="sw${(p.color || '') === c ? ' on' : ''}" data-pc="${c}" title="${c ? (c.startsWith('grad:') ? 'Градиент' : c) : 'Обычный'}" style="background:${c ? (c.startsWith('grad:') ? GRADS[c.slice(5)][0] : c) : 'var(--s3)'}">${c ? '' : '×'}</button>`).join('')}</div></div>
         <div class="pe-row"><span class="label">Эффект ника</span><div class="chips">${PROFILE_EFFECTS.map(([k, t]) => `<button type="button" class="chip${p.effect === k ? ' on' : ''}" data-pe="${k}">${t}</button>`).join('')}</div></div>
         <div class="pe-row"><span class="label">Рамка аватара</span><div class="chips">${PROFILE_FRAMES.map(([k, t]) => `<button type="button" class="chip${p.frame === k ? ' on' : ''}" data-pf="${k}">${t}</button>`).join('')}</div></div>
+        <div class="pe-row"><span class="label">Шрифт ника</span><div class="chips">${PROFILE_FONTS.map(([k, t]) => `<button type="button" class="chip nf-prev nf-${k}${(p.font || 'default') === k ? ' on' : ''}" data-pn="${k}">${t}</button>`).join('')}</div></div>
+        <div class="pe-row"><span class="label">Значок у ника</span><div class="pe-swatches">${PROFILE_ICONS.map(ic => `<button type="button" class="sw ico${(p.icon || '') === ic ? ' on' : ''}" data-pi="${ic}">${ic || '×'}</button>`).join('')}</div></div>
+        <div class="pe-row"><span class="label">Бейдж у ника <span class="m">из полученных в этой комнате</span></span><div class="chips"><button type="button" class="chip${!p.badge ? ' on' : ''}" data-pbadge="">Не показывать</button>${earned.map(b => `<button type="button" class="chip${p.badge === b.id ? ' on' : ''}" data-pbadge="${b.id}">${b.name}</button>`).join('') || '<span class="note">Пока нет бейджей</span>'}</div></div>
         <div class="pe-row"><span class="label">Фон профиля</span><div class="chips">${PROFILE_BANNERS.map(([k, t]) => `<button type="button" class="chip${p.banner === k ? ' on' : ''}" data-pb="${k}">${t}</button>`).join('')}</div></div>
         <label class="field"><span class="label">Статус</span><input id="peStatus" maxlength="60" placeholder="Например: сегодня пою Земфиру" value="${esc(p.status || '')}"></label>
         <div class="pe-actions"><button type="button" class="btn btn-primary" data-psave>Сохранить</button><button type="button" class="btn btn-ghost" data-pcancel>Отмена</button></div>
@@ -1158,6 +1184,9 @@ function initRoom(roomId) {
     else if (t.dataset.pe) profDraft.effect = t.dataset.pe;
     else if (t.dataset.pf) profDraft.frame = t.dataset.pf;
     else if (t.dataset.pb) profDraft.banner = t.dataset.pb;
+    else if (t.dataset.pn) profDraft.font = t.dataset.pn;
+    else if (t.dataset.pi !== undefined) profDraft.icon = t.dataset.pi;
+    else if (t.dataset.pbadge !== undefined) profDraft.badge = t.dataset.pbadge;
     else if (t.matches('[data-psave]')) {
       try {
         await api('/profile', { method: 'POST', body: { ...profDraft, cid: me.cid } });

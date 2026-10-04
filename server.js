@@ -33,9 +33,12 @@ function saveProfiles() {
   }, 300);
 }
 const PROFILE_GRADS = ['sunset', 'neon', 'gold', 'ice', 'rainbow'];
-const PROFILE_EFFECTS = ['none', 'glow', 'shimmer', 'pulse', 'glitch'];
-const PROFILE_FRAMES = ['none', 'accent', 'neon', 'gold', 'rainbow'];
-const PROFILE_BANNERS = ['none', 'aurora', 'sunset', 'ocean', 'ember', 'night'];
+const PROFILE_EFFECTS = ['none', 'glow', 'shimmer', 'pulse', 'glitch', 'wave', 'flicker', 'rainbow'];
+const PROFILE_FRAMES = ['none', 'accent', 'neon', 'gold', 'rainbow', 'fire', 'ice', 'toxic', 'holo'];
+const PROFILE_BANNERS = ['none', 'aurora', 'sunset', 'ocean', 'ember', 'night', 'live', 'stars'];
+const PROFILE_FONTS = ['default', 'unbounded', 'pixel', 'pacifico', 'russo'];
+const PROFILE_ICONS = ['', '👑', '🔥', '⭐', '🎤', '🎬', '💀', '👾', '🐸', '🌙', '⚡', '🍿', '🦄', '🎧'];
+const PROFILE_BADGES = ['', 'critic', 'hitmaker', 'taste', 'collector', 'singer', 'star', 'soul'];
 function cleanProfile(b) {
   const c = String(b.color || '');
   return {
@@ -43,6 +46,9 @@ function cleanProfile(b) {
     effect: PROFILE_EFFECTS.includes(b.effect) ? b.effect : 'none',
     frame: PROFILE_FRAMES.includes(b.frame) ? b.frame : 'none',
     banner: PROFILE_BANNERS.includes(b.banner) ? b.banner : 'none',
+    font: PROFILE_FONTS.includes(b.font) ? b.font : 'default',
+    icon: PROFILE_ICONS.includes(b.icon) ? b.icon : '',
+    badge: PROFILE_BADGES.includes(b.badge) ? b.badge : '',
     status: typeof b.status === 'string' ? b.status.trim().slice(0, 60) : '',
   };
 }
@@ -583,7 +589,7 @@ function advanceMusic(r) {
   if (!rooms[r.id] || !r.music) return;
   r.queue ||= [];
   if (r.queue.length) playTrack(r, r.queue.shift());
-  else { r.music.startedAt = Date.now(); r.music.pausedAt = null; scheduleMusic(r); }
+  else { r.music = null; clearTimeout(runtime(r).musicT); }
   pushState(r);
 }
 function scheduleMusic(r) {
@@ -847,7 +853,7 @@ async function api(req, res, url) {
     rt.rx ||= new Map();
     const now = Date.now();
     const recent = (rt.rx.get(pid) || []).filter(t => now - t < 2500);
-    if (recent.length >= 6) return json(res, 429, { error: 'Слишком часто' });
+    if (recent.length >= 10) return json(res, 429, { error: 'Слишком часто' });
     recent.push(now);
     rt.rx.set(pid, recent);
     r.reacts ||= {};
@@ -919,6 +925,14 @@ async function api(req, res, url) {
       pushState(r); return json(res, 200, { ok: true });
     }
     if (action === 'next') { advanceMusic(r); return json(res, 200, { ok: true }); }
+    if (action === 'ended' || action === 'failed') {
+      const same = r.music.vid === str(b.vid, 11) && r.music.pausedAt == null;
+      if (same && (action === 'failed' || Date.now() - r.music.startedAt > 5000)) {
+        if (action === 'failed') broadcast(r.id, { type: 'music-skip', title: r.music.title });
+        advanceMusic(r);
+      }
+      return json(res, 200, { ok: true });
+    }
     if (action === 'duration') {
       // длительность знает только плеер: первый, кто загрузил трек, сообщает её серверу
       const d = num(b.duration, 0);

@@ -917,3 +917,34 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 .pe .chips .chip { cursor: pointer; }
 .pe-actions { display: flex; gap: 8px; }
 .pe-actions .btn { flex: 1; height: 42px; }
+
+/* ---------- оформление: шрифты, новые эффекты, значок и бейдж у ника ---------- */
+.nick.nf-unbounded, .nf-prev.nf-unbounded { font-family: 'Unbounded', var(--f-head); font-weight: 700; letter-spacing: -.02em; }
+.nick.nf-pixel, .nf-prev.nf-pixel { font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: .7em; letter-spacing: 0; line-height: 1.4; }
+.nick.nf-pacifico, .nf-prev.nf-pacifico { font-family: 'Pacifico', cursive; font-weight: 400; letter-spacing: 0; }
+.nick.nf-russo, .nf-prev.nf-russo { font-family: 'Russo One', sans-serif; font-weight: 400; letter-spacing: 0; }
+.nick.fx-wave > span { display: inline-block; animation: nWave 1.7s ease-in-out infinite; animation-delay: calc(var(--i) * 70ms); white-space: pre; }
+@keyframes nWave { 0%, 55%, 100% { transform: none; } 25% { transform: translateY(-.22em); } }
+.nick.fx-flicker { animation: nFlicker 4.5s infinite; filter: drop-shadow(0 0 6px var(--ngl)); }
+@keyframes nFlicker { 0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; filter: drop-shadow(0 0 7px var(--ngl)); } 20%, 24%, 55% { opacity: .35; filter: none; } }
+.nick.fx-rainbow { background: linear-gradient(90deg, #FF5A6E, #FFD54A, #3DDC97, #38BDF8, #C084FC, #FF5A6E) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: nRainbow 3s linear infinite; }
+@keyframes nRainbow { to { background-position: -200% 0; } }
+.nick-ico { margin-left: .3em; font-size: .9em; -webkit-text-fill-color: initial; filter: none; }
+.nick-badge { display: inline-grid; place-items: center; width: 1.15em; height: 1.15em; margin-left: .3em; vertical-align: -.12em; border-radius: 6px; background: var(--s2); color: var(--acc-hi); font-style: normal; }
+.nick-badge svg { width: .8em; height: .8em; }
+.sw.ico { background: var(--s2); font-size: 16px; color: var(--tx2); }
+
+/* новые рамки */
+.frame-fire { animation: fFire 1.4s ease-in-out infinite; }
+@keyframes fFire { 0%, 100% { box-shadow: 0 0 0 2px #FF7A18, 0 -3px 12px #FF4D00, 0 0 18px rgba(255,77,0,.6); } 50% { box-shadow: 0 0 0 2px #FFC93C, 0 -5px 16px #FF7A18, 0 0 10px rgba(255,201,60,.6); } }
+.frame-ice { box-shadow: 0 0 0 2px #BAE6FD, 0 0 0 4px rgba(125,211,252,.35), 0 0 16px rgba(125,211,252,.7) !important; }
+.frame-toxic { animation: fToxic 1.8s ease-in-out infinite; }
+@keyframes fToxic { 0%, 100% { box-shadow: 0 0 0 2px #A3E635, 0 0 8px #84CC16; } 50% { box-shadow: 0 0 0 2px #D9F99D, 0 0 20px #84CC16; } }
+.frame-holo { animation: fHolo 3s linear infinite; }
+@keyframes fHolo { 0% { box-shadow: 0 0 0 2px #F0ABFC, 0 0 14px #F0ABFC; } 33% { box-shadow: 0 0 0 2px #67E8F9, 0 0 14px #67E8F9; } 66% { box-shadow: 0 0 0 2px #C4B5FD, 0 0 14px #C4B5FD; } 100% { box-shadow: 0 0 0 2px #F0ABFC, 0 0 14px #F0ABFC; } }
+
+/* новые фоны профиля */
+.profile-card.bn-live::before { height: 190px; background: linear-gradient(120deg, rgba(34,211,238,.45), rgba(168,85,247,.5), rgba(244,114,182,.45), rgba(34,211,238,.45)) 0 0 / 300% 100%; animation: bnLive 9s linear infinite; mask-image: linear-gradient(180deg, #000, transparent); -webkit-mask-image: linear-gradient(180deg, #000, transparent); }
+@keyframes bnLive { to { background-position: -300% 0; } }
+.profile-card.bn-stars::before { height: 190px; background: radial-gradient(1.5px 1.5px at 12% 30%, #fff, transparent), radial-gradient(1px 1px at 28% 70%, #fff, transparent), radial-gradient(1.5px 1.5px at 46% 20%, #fff, transparent), radial-gradient(1px 1px at 63% 55%, #fff, transparent), radial-gradient(2px 2px at 80% 25%, #fff, transparent), radial-gradient(1px 1px at 90% 70%, #fff, transparent), radial-gradient(70% 120% at 50% 0%, rgba(79,70,229,.45), transparent 70%); animation: bnStars 3s ease-in-out infinite alternate; }
+@keyframes bnStars { from { opacity: .7; } to { opacity: 1; } }
