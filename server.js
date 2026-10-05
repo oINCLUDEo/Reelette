@@ -38,7 +38,7 @@ const PROFILE_FRAMES = ['none', 'accent', 'neon', 'gold', 'rainbow', 'fire', 'ic
 const PROFILE_BANNERS = ['none', 'aurora', 'sunset', 'ocean', 'ember', 'night', 'live', 'stars'];
 const PROFILE_FONTS = ['default', 'unbounded', 'pixel', 'pacifico', 'russo'];
 const PROFILE_ICONS = ['', '👑', '🔥', '⭐', '🎤', '🎬', '💀', '👾', '🐸', '🌙', '⚡', '🍿', '🦄', '🎧'];
-const PROFILE_BADGES = ['', 'critic', 'hitmaker', 'taste', 'collector', 'singer', 'star', 'soul'];
+const PROFILE_BADGES = ['', 'critic', 'hitmaker', 'taste', 'collector', 'singer', 'star', 'soul', 'quiz'];
 function cleanProfile(b) {
   const c = String(b.color || '');
   return {
@@ -76,7 +76,8 @@ function loadEnv(file) {
 let rooms = {};
 try { rooms = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { rooms = {}; }
 for (const r of Object.values(rooms)) {
-  r.spin = null; r.plan = null; r.duel = null;
+  r.spin = null; r.plan = null; r.duel = null; r.quiz = null;
+  if (r.music?.quiz) r.music = null;
   for (const h of r.history || []) { h.hid ||= crypto.randomBytes(4).toString('hex'); h.ratings ||= {}; }
 }
 
@@ -88,7 +89,7 @@ function save() {
       fs.mkdirSync(DATA_DIR, { recursive: true });
       const tmp = DATA_FILE + '.tmp';
       const out = {};
-      for (const [id, r] of Object.entries(rooms)) out[id] = { ...r, spin: null, plan: null, duel: null };
+      for (const [id, r] of Object.entries(rooms)) out[id] = { ...r, spin: null, plan: null, duel: null, quiz: null };
       fs.writeFileSync(tmp, JSON.stringify(out));
       fs.renameSync(tmp, DATA_FILE);
     } catch (e) {
@@ -116,7 +117,10 @@ function publicState(r) {
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
     rules: { votes: VOTES_PER_PERSON, points: VOTE_POINTS, cap: VOTE_CAP },
-    fair: r.fair !== false, modifier: activeModifier(r), music: r.music || null, queue: r.queue || [], lastTrack: r.music ? null : r.lastTrack || null,
+    fair: r.fair !== false, modifier: activeModifier(r),
+    // во время раунда «Угадай мелодию» название трека не отдаём
+    music: r.music?.quiz && r.quiz?.state === 'playing' ? { ...r.music, title: 'Угадай мелодию', author: '' } : r.music || null,
+    quiz: publicQuiz(r), quizWins: r.quizWins || {}, chat: r.chat || [], queue: r.queue || [], lastTrack: r.music ? null : r.lastTrack || null,
     karaoke: Boolean(r.karaoke), perfs: (r.perfs || []).slice(0, 40),
     hits: r.hits || [], reacts: r.reacts || {}, profiles,
   };
@@ -513,6 +517,125 @@ function playTrack(r, track) {
   scheduleMusic(r);
 }
 
+// ---------- «Угадай мелодию» ----------
+const QUIZ_ROUNDS = [5, 10, 15];
+const QUIZ_LENS = [10, 15, 20];
+const qnorm = x => String(x || '').toLowerCase().replace(/ё/g, 'е')
+  .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ').replace(/\b(feat|ft)\b.*$/, ' ')
+  .replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
+function lev(a, b) {
+  a = a.slice(0, 80); b = b.slice(0, 80);
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0]; row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return row[b.length];
+}
+const similar = (a, b) => (a && b ? 1 - lev(a, b) / Math.max(a.length, b.length) : 0);
+// кириллицу переводим в латиницу, чтобы «данза кудуро» засчитывалось за «Danza Kuduro»
+const TR = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
+const translit = x => [...x].map(ch => TR[ch] ?? ch).join('');
+const similarAny = (a, b) => Math.max(similar(a, b), similar(translit(a), translit(b)));
+// Ответ: название песни и исполнитель. «Исполнитель - Песня» в названии видео разбиваем на части.
+function quizAnswers(t) {
+  const { q, artist } = songQuery(t.title, t.author);
+  const parts = q.split(/\s+[-–—]\s+/);
+  const song = parts.length > 1 ? parts.slice(1).join(' ') : q;
+  return { song: qnorm(song), artist: qnorm(parts.length > 1 ? parts[0] : artist), full: qnorm(q) };
+}
+// Насколько версия похожа на ответ: 1 — точно, от 0,78 считаем верной (опечатки прощаем).
+function quizScore(guess, ans) {
+  const g = qnorm(guess);
+  if (g.length < 2) return 0;
+  let best = 0;
+  for (const c of [ans.song, ans.full, ans.artist && ans.song ? `${ans.artist} ${ans.song}` : '']) {
+    if (!c) continue;
+    best = Math.max(best, similarAny(g, c));
+    if (c.length >= 4 && g.length >= Math.max(3, c.length * 0.6) && c.includes(g)) best = Math.max(best, 0.9);
+  }
+  if (ans.artist && ans.artist.length >= 3) best = Math.max(best, similarAny(g, ans.artist) >= 0.85 ? 0.85 : 0);
+  return best;
+}
+const quizHint = ans => ans.song.split(' ').filter(Boolean).map(w => w[0].toUpperCase() + '•'.repeat(Math.max(0, Math.min(w.length - 1, 8)))).join(' ');
+function publicQuiz(r) {
+  const z = r.quiz;
+  if (!z) return null;
+  const rd = z.round;
+  return {
+    qid: z.qid, by: z.by, rounds: z.order.length, len: z.len, state: z.state, scores: z.scores, winner: z.winner || '',
+    round: rd ? {
+      n: rd.n, startsAt: rd.startsAt, endsAt: rd.endsAt, guessed: rd.guessed, reveal: rd.reveal,
+      hint: z.state !== 'playing' || Date.now() >= rd.hintAt ? quizHint(rd.answer) : '',
+    } : null,
+  };
+}
+function quizClear(r) {
+  const rt = runtime(r);
+  clearTimeout(rt.quizT); clearTimeout(rt.quizHintT);
+}
+function startQuiz(r, b, who) {
+  const pool = new Map();
+  for (const h of r.hits || []) pool.set(h.vid, { vid: h.vid, title: h.title, author: h.author || '' });
+  for (const q of r.queue || []) pool.set(q.vid, { vid: q.vid, title: q.title, author: q.author || '' });
+  if (pool.size < 3) return 'Нужно хотя бы 3 трека, которые играли в комнате или стоят в очереди';
+  const rounds = Math.min(QUIZ_ROUNDS.includes(Number(b.rounds)) ? Number(b.rounds) : 10, pool.size);
+  r.quiz = {
+    qid: id(6), by: who, len: QUIZ_LENS.includes(Number(b.len)) ? Number(b.len) : 15,
+    order: shuffle([...pool.values()]).slice(0, rounds), idx: -1, scores: {}, state: 'between', round: null,
+  };
+  clearTimeout(runtime(r).musicT);
+  quizNext(r);
+  return null;
+}
+function quizNext(r) {
+  const z = r.quiz;
+  if (!z) return;
+  quizClear(r);
+  z.idx++;
+  if (z.idx >= z.order.length) return quizFinish(r);
+  const t = z.order[z.idx];
+  const now = Date.now();
+  const offset = 25 + crypto.randomInt(0, 40); // фрагмент из середины, а не вступление
+  r.music = { vid: t.vid, title: t.title, author: t.author, by: 'Угадай мелодию', startedAt: now - offset * 1000, pausedAt: null, duration: 0, quiz: true };
+  z.state = 'playing';
+  z.round = {
+    n: z.idx + 1, startsAt: now, endsAt: now + (z.len + 2) * 1000, hintAt: now + Math.round(z.len * 0.65 * 1000) + 1000,
+    guessed: [], tries: {}, answer: quizAnswers(t), reveal: null,
+  };
+  const rt = runtime(r), qid = z.qid, n = z.round.n;
+  rt.quizT = setTimeout(() => quizReveal(r, qid, n), (z.len + 2) * 1000);
+  rt.quizHintT = setTimeout(() => { if (r.quiz?.qid === qid && r.quiz.state === 'playing') pushState(r); }, z.round.hintAt - now + 50);
+  pushState(r);
+}
+function quizReveal(r, qid, n, note) {
+  const z = r.quiz;
+  if (!z || z.qid !== qid || z.state !== 'playing' || z.round.n !== n) return;
+  quizClear(r);
+  const t = z.order[z.idx];
+  z.state = 'reveal';
+  z.round.reveal = { vid: t.vid, title: t.title, author: t.author, note: note || '' };
+  pushState(r);
+  runtime(r).quizT = setTimeout(() => { if (r.quiz?.qid === qid) quizNext(r); }, 7000);
+}
+function quizFinish(r) {
+  const z = r.quiz;
+  quizClear(r);
+  if (r.music?.quiz) r.music = null;
+  z.state = 'final';
+  const top = Object.entries(z.scores).sort((a, b) => b[1].pts - a[1].pts)[0];
+  if (top && top[1].pts > 0) {
+    z.winner = top[0];
+    r.quizWins ||= {};
+    r.quizWins[top[0]] = (r.quizWins[top[0]] || 0) + 1;
+  }
+  pushState(r);
+}
+
 // ---------- тексты песен для караоке: LRCLIB (открытая база текстов с таймингами) ----------
 const LRC_UA = { 'User-Agent': 'Reelette karaoke (https://github.com/oINCLUDEo/Reelette)' };
 // Название с YouTube чистим от «(Karaoke Version)», «[Official Video]» и т. п., канал «… - Topic» — это исполнитель.
@@ -586,7 +709,7 @@ function bestLyrics(list, { q, artist, duration }) {
 }
 // Трек закончился или его пропустили: следующий из очереди, а если очередь пуста — текущий по кругу.
 function advanceMusic(r) {
-  if (!rooms[r.id] || !r.music) return;
+  if (!rooms[r.id] || !r.music || r.music.quiz) return;
   r.queue ||= [];
   if (r.queue.length) playTrack(r, r.queue.shift());
   else {
@@ -849,6 +972,79 @@ async function api(req, res, url) {
 
   // ---- общая музыка из YouTube: у всех один трек и одна позиция, общая очередь ----
   // startedAt — момент, когда трек был на нуле; pausedAt — позиция в секундах, если на паузе.
+  // чат комнаты: сообщения пролетают по сцене, последние 50 хранятся
+  if (sub === 'chat' && m === 'POST') {
+    const text = str(b.text, 200).replace(/\s+/g, ' ');
+    if (!text) return json(res, 400, { error: 'Пустое сообщение' });
+    const pid = personKey(me, b) || 'anon';
+    const rt = runtime(r);
+    rt.chatRx ||= new Map();
+    const now = Date.now();
+    const recent = (rt.chatRx.get(pid) || []).filter(t => now - t < 5000);
+    if (recent.length >= 5) return json(res, 429, { error: 'Не так быстро' });
+    recent.push(now); rt.chatRx.set(pid, recent);
+    const msg = { id: id(6), pid, name: who, text, at: now };
+    r.chat ||= [];
+    r.chat.push(msg);
+    r.chat = r.chat.slice(-50);
+    save();
+    broadcast(r.id, { type: 'chat', msg });
+    return json(res, 200, { ok: true });
+  }
+
+  // «Угадай мелодию»
+  if (sub === 'quiz' && m === 'POST') {
+    const action = parts[3];
+    if (action === 'start') {
+      if (r.spin || r.duel) return json(res, 409, { error: 'Дождитесь конца прокрута или дуэли' });
+      if (r.quiz && r.quiz.state !== 'final') return json(res, 409, { error: 'Игра уже идёт' });
+      const err = startQuiz(r, b, who);
+      return err ? json(res, 400, { error: err }) : json(res, 200, { ok: true });
+    }
+    const z = r.quiz;
+    if (!z) return json(res, 409, { error: 'Игра не идёт' });
+    if (action === 'stop') {
+      quizClear(r);
+      r.quiz = null;
+      if (r.music?.quiz) r.music = null;
+      pushState(r); return json(res, 200, { ok: true });
+    }
+    if (action === 'skip') {
+      if (z.state === 'playing') quizReveal(r, z.qid, z.round.n);
+      else if (z.state === 'reveal') quizNext(r);
+      return json(res, 200, { ok: true });
+    }
+    if (action === 'guess') {
+      if (z.state !== 'playing') return json(res, 200, { ok: true, late: true });
+      const rd = z.round;
+      const pid = personKey(me, b) || 'anon';
+      if (rd.guessed.some(g => g.pid === pid)) return json(res, 200, { ok: true, already: true });
+      rd.tries[pid] = (rd.tries[pid] || 0) + 1;
+      if (rd.tries[pid] > 25) return json(res, 429, { error: 'Слишком много попыток' });
+      const text = str(b.text, 80);
+      const score = quizScore(text, rd.answer);
+      if (score >= 0.78) {
+        const pts = [3, 2][rd.guessed.length] || 1;
+        rd.guessed.push({ pid, name: who, pts });
+        z.scores[pid] ||= { name: who, pts: 0 };
+        z.scores[pid].pts += pts;
+        z.scores[pid].name = who;
+        broadcast(r.id, { type: 'quiz-guess', ok: true, pid, name: who, pts });
+        // угадали все, кто в комнате, — раунд заканчиваем раньше
+        const present = new Set([...(clients.get(r.id) || [])].map(c => c.pid));
+        if (present.size && [...present].every(p => rd.guessed.some(g => g.pid === p))) {
+          const qid = z.qid, n = rd.n;
+          setTimeout(() => quizReveal(r, qid, n), 900);
+        }
+        pushState(r);
+        return json(res, 200, { ok: true, correct: true, pts });
+      }
+      // неверная версия пролетает по сцене как сообщение
+      broadcast(r.id, { type: 'chat', msg: { id: id(6), pid, name: who, text, at: Date.now(), guess: true, close: score >= 0.55 } });
+      return json(res, 200, { ok: true, correct: false, close: score >= 0.55 });
+    }
+  }
+
   // реакции: летят у всех, не хранятся; у каждого лимит, считаем для бейджа
   if (sub === 'react' && m === 'POST') {
     const kind = str(b.kind, 12);
@@ -884,6 +1080,7 @@ async function api(req, res, url) {
   if (sub === 'music' && m === 'POST') {
     const action = parts[3];
     r.queue ||= [];
+    if (r.quiz && r.music?.quiz && ['next', 'restart', 'toggle'].includes(action)) return json(res, 409, { error: 'Идёт «Угадай мелодию»' });
     if (!action) {
       const t = await fetchTrack(b.url);
       if (t.error) return json(res, 400, { error: t.error });
@@ -942,6 +1139,11 @@ async function api(req, res, url) {
       pushState(r); return json(res, 200, { ok: true });
     }
     if (action === 'next') { advanceMusic(r); return json(res, 200, { ok: true }); }
+    if (r.music.quiz && r.quiz) {
+      if (action === 'failed' && r.music.vid === str(b.vid, 11) && r.quiz.state === 'playing') quizReveal(r, r.quiz.qid, r.quiz.round.n, 'Этот трек не играет на сайте, раунд пропущен');
+      if (['ended', 'failed', 'duration'].includes(action)) return json(res, 200, { ok: true });
+      if (['next', 'restart', 'toggle'].includes(action)) return json(res, 409, { error: 'Идёт «Угадай мелодию»' });
+    }
     if (action === 'ended' || action === 'failed') {
       const same = r.music.vid === str(b.vid, 11) && r.music.pausedAt == null;
       if (same && (action === 'failed' || Date.now() - r.music.startedAt > 5000)) {

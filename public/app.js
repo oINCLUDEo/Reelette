@@ -254,6 +254,16 @@ function initRoom(roomId) {
     if (msg.now) serverOffset = msg.now - Date.now();
     if (msg.type === 'profiles') { profilesMap = msg.profiles || {}; render(); return; }
     if (msg.type === 'react') { spawnReaction(msg.kind, msg.pid, msg.name); return; }
+    if (msg.type === 'chat') {
+      flyMessage(msg.msg);
+      if (!msg.msg.guess && state) { state.chat = [...(state.chat || []), msg.msg].slice(-50); if (!$('#chatLog').hidden) renderChatLog(); }
+      return;
+    }
+    if (msg.type === 'quiz-guess') {
+      flyMessage({ pid: msg.pid, name: msg.name, text: `угадал(а)! +${msg.pts}`, win: true });
+      if (msg.pid === myPid()) Sfx.win?.();
+      return;
+    }
     if (msg.type === 'state') {
       state = msg.state;
       profilesMap = state.profiles || profilesMap;
@@ -602,13 +612,18 @@ function initRoom(roomId) {
     $('.stage').classList.toggle('dueling', Boolean(duel));
     $('#duelBox').hidden = !duel;
     if (duel) renderDuel(duel);
-    const karaoke = Boolean(state.karaoke);
-    $('.stage').classList.toggle('karaoke-on', karaoke);
-    document.body.classList.toggle('karaoke-on', karaoke);
+    const quiz = state.quiz;
+    const karaoke = Boolean(state.karaoke) && !quiz;
+    const stageMode = karaoke || Boolean(quiz); // сцена на всю страницу
+    $('.stage').classList.toggle('karaoke-on', stageMode);
+    document.body.classList.toggle('karaoke-on', stageMode);
     $('#karaokeBox').hidden = !karaoke;
     $('#navKaraoke').hidden = !karaoke;
-    $('#karaokeBtn').classList.toggle('on', karaoke);
+    $('#quizBox').hidden = !quiz;
+    $('#karaokeBtn').classList.toggle('on', Boolean(state.karaoke));
+    $('#quizBtn').classList.toggle('on', Boolean(quiz));
     if (karaoke) renderKaraoke();
+    if (quiz) renderQuiz(quiz);
     renderFilters(spinning || Boolean(duel));
 
     if (duel) $('#stageStatus').textContent = '';
@@ -678,7 +693,7 @@ function initRoom(roomId) {
   let ytHostCur = '#ytHost';
   function syncMusic() {
     const m = state?.music;
-    const hostSel = state?.karaoke ? '#kHost' : '#ytHost';
+    const hostSel = state?.quiz ? '#qHost' : state?.karaoke ? '#kHost' : '#ytHost';
     if (yt && ytHostCur !== hostSel) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $(ytHostCur).innerHTML = ''; }
     $('#ytCard').hidden = !m;
     $('#ytAdd').hidden = !ytChanging;
@@ -711,7 +726,7 @@ function initRoom(roomId) {
               // трек доиграл: сообщаем серверу, он включит следующий из очереди или выключит музыку
               if (e.data === 0 && state?.music) api(`/rooms/${roomId}/music/ended`, { method: 'POST', body: { vid: state.music.vid } }).catch(() => {});
               if (e.data === 1 && state?.music) reportDuration(state.music);
-              if (e.data === 1) $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = true));
+              if (e.data === 1) $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => (el.hidden = true));
             },
             onError: () => {
               const vid = state?.music?.vid;
@@ -737,19 +752,19 @@ function initRoom(roomId) {
       if (m.pausedAt != null) {
         if (st === 1 || st === 3) yt.pauseVideo();
         if (Math.abs(cur - exp) > 1) yt.seekTo(exp, true);
-        $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = true));
+        $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => (el.hidden = true));
       } else {
         const dur = m.duration || yt.getDuration() || 0;
-        if (st === 0 && (!dur || exp >= dur - 1.5)) { $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = true)); return; } // доиграл, ждём сервер
+        if (st === 0 && (!dur || exp >= dur - 1.5)) { $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => (el.hidden = true)); return; } // доиграл, ждём сервер
         if (Math.abs(cur - exp) > 2.5) yt.seekTo(exp, true);
         if (st !== 1 && st !== 3) yt.playVideo();
         // браузер не дал включить звук без клика: просим нажать
-        $$('#ytUnmute, #kUnmute').forEach(el => (el.hidden = st === 1 || st === 3));
+        $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => (el.hidden = st === 1 || st === 3));
       }
     });
   }
   setInterval(() => { if (state?.music) syncMusic(); }, 4000);
-  $$('#ytUnmute, #kUnmute').forEach(el => el.addEventListener('click', () => { Sfx.unlock(); if (ytReady) { yt.playVideo(); ytVolume(); } setTimeout(syncMusic, 600); }));
+  $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => el.addEventListener('click', () => { Sfx.unlock(); if (ytReady) { yt.playVideo(); ytVolume(); } setTimeout(syncMusic, 600); }));
 
   // ---- караоке: сцена с большим плеером, очередь певцов, оценки выступлений ----
   function renderKaraoke() {
@@ -810,6 +825,129 @@ function initRoom(roomId) {
     renderHits();
     $('#kBoard').innerHTML = top.length ? `<span class="label">Звёзды вечера</span>` + top.map((e, i) => `<div class="k-star"><i>${i + 1}</i><b>${nick(e.pid, e.name)}</b><span>${e.songs} ${plural(e.songs, 'песня', 'песни', 'песен')}</span><em>${e.avg.toFixed(1).replace('.', ',')}</em></div>`).join('') : '';
   }
+  // ---- летающие сообщения: чат и версии в «Угадай мелодию» ----
+  const laneFree = Array(7).fill(0);
+  function flyMessage(msg) {
+    const layer = $('#reactLayer');
+    if (!layer || layer.childElementCount > 60) return;
+    const now = performance.now();
+    let lane = 0;
+    for (let i = 1; i < laneFree.length; i++) if (laneFree[i] < laneFree[lane]) lane = i;
+    const el = document.createElement('div');
+    el.className = 'fly-msg' + (msg.win ? ' win' : msg.guess ? ' guess' : '') + (msg.close ? ' close' : '') + (msg.pid === myPid() ? ' mine' : '');
+    el.style.top = `${6 + lane * 9}%`;
+    el.innerHTML = `<span class="fm-n">${nick(msg.pid || '', msg.name || '')}</span><span class="fm-t">${esc(msg.text)}</span>`;
+    layer.append(el);
+    const dist = layer.clientWidth + el.offsetWidth + 40;
+    const dur = Math.min(14, 7 + dist / 260);
+    el.style.setProperty('--dist', `${dist}px`);
+    el.style.animationDuration = `${dur}s`;
+    laneFree[lane] = Math.max(now, laneFree[lane]) + (el.offsetWidth + 60) / dist * dur * 1000;
+    el.addEventListener('animationend', () => el.remove());
+  }
+  function renderChatLog() {
+    const list = (state?.chat || []).slice(-50);
+    $('#chatLog').innerHTML = list.length
+      ? list.map(m => `<div class="cl-item"><b>${nick(m.pid, m.name)}</b><span>${esc(m.text)}</span><time>${new Date(m.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('')
+      : '<p class="note">Сообщений пока нет.</p>';
+    $('#chatLog').scrollTop = 1e6;
+  }
+  $('#chatForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const text = $('#chatInput').value.trim();
+    if (!text) return;
+    $('#chatInput').value = '';
+    try { await api(`/rooms/${roomId}/chat`, { method: 'POST', body: { text, cid: me.cid, by: me.name } }); }
+    catch (err) { toast(err.message, true); }
+  });
+  $('#chatLogBtn').addEventListener('click', () => { $('#chatLog').hidden = !$('#chatLog').hidden; if (!$('#chatLog').hidden) renderChatLog(); });
+  document.addEventListener('click', e => { if (!$('#chatLog').hidden && !e.target.closest('#reactBar')) $('#chatLog').hidden = true; });
+
+  // ---- «Угадай мелодию» ----
+  const qzSettings = { rounds: 10, len: 15 };
+  const segPick = (sel, key) => $(sel).addEventListener('click', e => {
+    const b = e.target.closest('[data-v]');
+    if (!b) return;
+    qzSettings[key] = Number(b.dataset.v);
+    $$(`${sel} button`).forEach(x => x.classList.toggle('on', x === b));
+    placeSeg($(sel));
+  });
+  segPick('#qzRoundsSeg', 'rounds');
+  segPick('#qzLenSeg', 'len');
+  $('#quizBtn').addEventListener('click', () => {
+    if (state?.quiz && state.quiz.state !== 'final') return toast('Игра уже идёт');
+    const pool = new Set([...(state?.hits || []).map(h => h.vid), ...(state?.queue || []).map(q => q.vid)]).size;
+    $('#qzPool').textContent = pool >= 3
+      ? `В игре ${pool} ${plural(pool, 'трек', 'трека', 'треков')}: всё, что играло в комнате (радио и караоке), и то, что стоит в очереди.`
+      : 'Нужно хотя бы 3 трека, которые играли в комнате или стоят в очереди. Включите пару песен в общей музыке.';
+    $('#qzStart').disabled = pool < 3;
+    openModal('#quizModal');
+    requestAnimationFrame(() => { placeSeg($('#qzRoundsSeg')); placeSeg($('#qzLenSeg')); });
+  });
+  $('#qzStart').addEventListener('click', async () => {
+    Sfx.unlock();
+    try { await api(`/rooms/${roomId}/quiz/start`, { method: 'POST', body: { ...qzSettings, by: me.name } }); closeModal('#quizModal'); }
+    catch (e) { toast(e.message, true); }
+  });
+  $('#qzSkip').addEventListener('click', () => api(`/rooms/${roomId}/quiz/skip`, { method: 'POST' }).catch(e => toast(e.message, true)));
+  $('#qzStop').addEventListener('click', () => {
+    if (state?.quiz?.state !== 'final' && !confirm('Закончить игру у всех?')) return;
+    api(`/rooms/${roomId}/quiz/stop`, { method: 'POST' }).catch(e => toast(e.message, true));
+  });
+  $('#qzGuess').addEventListener('submit', async e => {
+    e.preventDefault();
+    const text = $('#qzInput').value.trim();
+    if (!text) return;
+    $('#qzInput').value = '';
+    Sfx.unlock();
+    try {
+      const r = await api(`/rooms/${roomId}/quiz/guess`, { method: 'POST', body: { text, cid: me.cid, by: me.name } });
+      if (r.correct) toast(`Верно! +${r.pts}`);
+      else if (r.close) toast('Почти! Попробуйте точнее');
+    } catch (err) { toast(err.message, true); }
+  });
+  $('#qzCover').addEventListener('click', e => {
+    if (e.target.closest('[data-qagain]')) { $('#quizBtn').click(); }
+    if (e.target.closest('[data-qexit]')) api(`/rooms/${roomId}/quiz/stop`, { method: 'POST' }).catch(() => {});
+  });
+  function renderQuiz(z) {
+    const rd = z.round;
+    const final = z.state === 'final', playing = z.state === 'playing', reveal = z.state === 'reveal';
+    $('#qzRound').textContent = final ? 'Итоги' : `${rd?.n || 0} из ${z.rounds}`;
+    $('#qzSkip').hidden = final;
+    $('#qzStop').textContent = final ? 'Выйти' : 'Закончить';
+    const mineGuessed = rd?.guessed?.some(g => g.pid === myPid());
+    $('#qzInput').disabled = !playing || mineGuessed;
+    $('#qzGuess').querySelector('button').disabled = !playing || mineGuessed;
+    $('#qzInput').placeholder = mineGuessed ? 'Вы уже угадали, ждём остальных' : 'Название трека или исполнитель';
+    const scores = Object.entries(z.scores || {}).sort((a, b) => b[1].pts - a[1].pts);
+    $('#qzScores').innerHTML = scores.length
+      ? scores.map(([pid, v], i) => `<div class="k-star"><i>${i + 1}</i><b>${nick(pid, v.name)}</b><span></span><em>${v.pts}</em></div>`).join('')
+      : '<p class="note">Пока никто не угадал.</p>';
+    const cover = $('#qzCover');
+    cover.classList.toggle('open', reveal);
+    if (final) {
+      const w = z.winner && z.scores[z.winner];
+      cover.innerHTML = `<span class="eq big" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="qz-k">Игра окончена</span><b class="qz-title">${w ? nick(z.winner, w.name) : 'Никто не угадал'}</b>${w ? `<span class="qz-sub">победитель, ${w.pts} ${plural(w.pts, 'очко', 'очка', 'очков')}</span>` : ''}<div class="qz-actions"><button class="btn btn-primary" data-qagain>Ещё игра</button><button class="btn btn-ghost" data-qexit>Выйти</button></div>`;
+    } else if (playing) {
+      cover.innerHTML = `<span class="eq big" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="qz-k">Что это за трек?</span><b class="qz-title">Угадай мелодию</b>${rd.hint ? `<span class="qz-hint">${esc(rd.hint)}</span>` : '<span class="qz-sub">Подсказка появится ближе к концу раунда</span>'}`;
+    } else cover.innerHTML = '';
+    const guessed = rd?.guessed || [];
+    $('#qzStatus').innerHTML = reveal && rd.reveal
+      ? `<span class="qz-ans">Это было: <b>${esc(rd.reveal.title)}</b></span>${rd.reveal.note ? `<em>${esc(rd.reveal.note)}</em>` : ''}${guessed.length ? `<span>Угадали: ${guessed.map(g => `${nick(g.pid, g.name)} +${g.pts}`).join(', ')}</span>` : '<span>Никто не угадал</span>'}`
+      : playing && guessed.length ? `<span>Угадали: ${guessed.map(g => `${nick(g.pid, g.name)} +${g.pts}`).join(', ')}</span>` : '';
+  }
+  (function quizFrame() {
+    requestAnimationFrame(quizFrame);
+    const z = state?.quiz;
+    if (!z || z.state !== 'playing' || !z.round) { if (z) { $('#qzBar').style.width = z.state === 'reveal' ? '0' : '0'; $('#qzSecs').textContent = ''; } return; }
+    const now = Date.now() + serverOffset;
+    const total = z.round.endsAt - z.round.startsAt;
+    const left = Math.max(0, z.round.endsAt - now);
+    $('#qzBar').style.width = `${left / total * 100}%`;
+    $('#qzSecs').textContent = `${Math.ceil(left / 1000)} с`;
+  })();
+
   // ---- реакции: всплывают у всех над сценой ----
   const RX = { clap: '👏', fire: '🔥', laugh: '😂', love: '😍', wow: '😮', skull: '💀', party: '🎉' };
   function spawnReaction(kind, pid, name) {
@@ -1035,7 +1173,7 @@ function initRoom(roomId) {
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && ytChanging) { ytChanging = false; syncMusic(); } });
   function setYtVol(v) {
-    for (const el of [$('#ytVol'), $('#kVol')]) { el.value = v; el.style.setProperty('--f', v / 100); }
+    for (const el of [$('#ytVol'), $('#kVol'), $('#qVol')]) { el.value = v; el.style.setProperty('--f', v / 100); }
     ls.set('ytVol', v);
     ytVolume();
   }
@@ -1090,6 +1228,7 @@ function initRoom(roomId) {
     { id: 'collector', name: 'Коллекционер', need: 'добавить 20 фильмов', icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>', test: x => x.added >= 20, prog: x => `${Math.min(20, x.added)}/20` },
     { id: 'singer', name: 'Меломан', need: 'спеть 5 песен', icon: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>', test: x => x.perfs >= 5, prog: x => `${Math.min(5, x.perfs)}/5` },
     { id: 'star', name: 'Звезда сцены', need: 'средний балл выступлений от 8 (минимум 2)', icon: '<rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0M12 17v4M8.5 21h7"/>', test: x => x.perfAvg >= 8 && x.perfRated >= 2, prog: x => (x.perfAvg ? x.perfAvg.toFixed(1).replace('.', ',') : '—') },
+    { id: 'quiz', name: 'Знаток', need: 'выиграть «Угадай мелодию»', icon: '<path d="M9 18V5l11-2v8"/><circle cx="6" cy="18" r="3"/><path d="M14 17l2 2 4-4"/>', test: x => x.quizWins >= 1, prog: x => `${x.quizWins}/1` },
     { id: 'soul', name: 'Душа компании', need: 'отправить 50 реакций', icon: '<path d="M12 20.5s-7.5-4.6-7.5-10.3A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3Z"/>', test: x => x.reacts >= 50, prog: x => `${Math.min(50, x.reacts)}/50` },
   ];
 
@@ -1133,7 +1272,7 @@ function initRoom(roomId) {
     const stats = {
       ratedGiven: state.history.filter(h => h.ratings?.[pid]).length, wins: wins.length, avgOfHis, ratedN: rated.length,
       added: added.length, perfs: myPerfs.length, perfRated: perfScores.length,
-      perfAvg: perfScores.length ? perfScores.reduce((a, b) => a + b, 0) / perfScores.length : 0, reacts: state.reacts?.[pid] || 0,
+      perfAvg: perfScores.length ? perfScores.reduce((a, b) => a + b, 0) / perfScores.length : 0, reacts: state.reacts?.[pid] || 0, quizWins: state.quizWins?.[pid] || 0,
     };
     const earned = BADGES.filter(b => b.test(stats));
     const locked = BADGES.filter(b => !b.test(stats));
@@ -1604,7 +1743,7 @@ function initRoom(roomId) {
   $('#soundOn').addEventListener('change', e => { settings.sound = e.target.checked; ls.set('sound', settings.sound); });
 
   async function spin() {
-    if ($('#spinBtn').disabled || state?.karaoke) return;
+    if ($('#spinBtn').disabled || state?.karaoke || state?.quiz) return;
     Sfx.unlock(); // браузер разрешает звук только после клика
     if (settings.mode === 'duel') {
       try { await api(`/rooms/${roomId}/duel/start`, { method: 'POST', body: { by: me.name } }); }

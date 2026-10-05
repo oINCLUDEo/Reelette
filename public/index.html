@@ -95,6 +95,7 @@
       <span class="eq right" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
     </div>
     <div class="act">
+      <button class="ghost sm icon karaoke-btn" id="quizBtn" title="Угадай мелодию: угадываем треки, которые играли в комнате" aria-label="Угадай мелодию"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v8"/><circle cx="6" cy="18" r="3"/><path d="M15.5 15.2a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.3M18 21.5v.01"/></svg></button>
       <button class="ghost sm icon karaoke-btn" id="karaokeBtn" title="Караоке: большой плеер на сцене, очередь певцов, тексты и оценки" aria-label="Караоке"><svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0"/><path d="M12 17v4M8.5 21h7"/></svg></button>
       <div id="people" class="people"></div>
       <button id="inviteBtn" class="ghost sm"><svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg><span>Пригласить</span></button>
@@ -121,6 +122,38 @@
       <span class="shade"></span>
       <div class="react-layer" id="reactLayer" aria-hidden="true"></div>
       <div class="stage-in">
+        <div class="quiz" id="quizBox" hidden>
+          <div class="qz-top">
+            <div class="qz-round"><span>Раунд</span><b id="qzRound"></b></div>
+            <div class="qz-timer"><i id="qzBar"></i></div>
+            <span class="qz-secs" id="qzSecs"></span>
+            <button class="ghost sm" id="qzSkip">Дальше</button>
+            <button class="ghost sm" id="qzStop">Закончить</button>
+          </div>
+          <div class="qz-main">
+            <div class="qz-left">
+              <div class="k-video qz-video">
+                <div id="qHost"></div>
+                <div class="k-shield"></div>
+                <div class="qz-cover" id="qzCover"></div>
+                <button class="yt-unmute" id="qUnmute" hidden>Нажмите, чтобы слушать</button>
+              </div>
+              <form class="qz-guess" id="qzGuess">
+                <input id="qzInput" placeholder="Название трека или исполнитель" autocomplete="off" maxlength="80">
+                <button class="btn btn-primary" type="submit">Ответить</button>
+              </form>
+              <div class="qz-status" id="qzStatus"></div>
+            </div>
+            <div class="qz-side">
+              <span class="label">Счёт</span>
+              <div class="qz-scores" id="qzScores"></div>
+              <label class="k-vol" title="Громкость у вас">
+                <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+                <input type="range" id="qVol" min="0" max="100" value="50" aria-label="Громкость у вас">
+              </label>
+            </div>
+          </div>
+        </div>
         <div class="karaoke" id="karaokeBox" hidden>
           <div class="k-main">
             <div class="k-left">
@@ -194,6 +227,9 @@
         <div class="stage-status" id="stageStatus"></div>
         <div class="react-bar" id="reactBar" aria-label="Реакции">
           <button data-rx="clap" title="Аплодисменты">👏</button><button data-rx="fire" title="Огонь">🔥</button><button data-rx="laugh" title="Смешно">😂</button><button data-rx="love" title="Люблю">😍</button><button data-rx="wow" title="Вау">😮</button><button data-rx="skull" title="Это конец">💀</button><button data-rx="party" title="Праздник">🎉</button>
+          <form class="chat-form" id="chatForm"><input id="chatInput" maxlength="200" placeholder="Написать всем…" autocomplete="off"></form>
+          <button type="button" class="chat-log-btn" id="chatLogBtn" title="История чата"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
+          <div class="chat-log" id="chatLog" hidden></div>
         </div>
         <button id="stopBtn" class="ghost sm stop-btn" hidden></button>
       </div>
@@ -308,6 +344,21 @@
   <div class="modal-card film-card">
     <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     <div id="filmDetail"></div>
+  </div>
+</div>
+
+<div class="modal" id="quizModal" hidden>
+  <div class="modal-card small-card">
+    <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <h2>Угадай мелодию <span class="m">Играет фрагмент трека, кто первым напишет название или исполнителя, получает больше очков.</span></h2>
+    <div class="field"><span class="label">Раундов</span>
+      <div class="seg" id="qzRoundsSeg"><span class="seg-ind"></span><button data-v="5">5</button><button data-v="10" class="on">10</button><button data-v="15">15</button></div>
+    </div>
+    <div class="field"><span class="label">Длина фрагмента</span>
+      <div class="seg" id="qzLenSeg"><span class="seg-ind"></span><button data-v="10">10 с</button><button data-v="15" class="on">15 с</button><button data-v="20">20 с</button></div>
+    </div>
+    <p class="note" id="qzPool"></p>
+    <button class="btn btn-primary btn-block" id="qzStart">Начать</button>
   </div>
 </div>
 
