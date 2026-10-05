@@ -339,8 +339,7 @@ function initRoom(roomId) {
 
   // Шансы: тот же расчёт, что на сервере (chanceWeights в server.js)
   function chanceWeights(list) {
-    const mod = state?.modifier;
-    const modOf = pid => (mod && mod.pid === pid ? mod.factor : 1);
+    const modOf = pid => state?.modifiers?.[pid]?.factor || 1;
     const w = new Map();
     if (state?.fair !== false) {
       const groups = new Map();
@@ -397,14 +396,27 @@ function initRoom(roomId) {
 
   // на выбывании колесо показывает шанс вылететь (как на сервере)
   const elimView = () => settings.mode === 'elimination' || Boolean(state?.eliminated?.length);
+  // тот же расчёт, что elimWeights на сервере
   function elimWeights(W, list) {
-    const inv = new Map();
-    let sum = 0;
-    for (const f of list) { const v = 1 / Math.max(1e-6, W.get(f.id) || 0); inv.set(f.id, v); sum += v; }
-    for (const [k, v] of inv) inv.set(k, (v / sum) * 100);
-    return inv;
+    const out = new Map();
+    const inv = f => 1 / Math.max(1e-6, W.get(f.id) || 0);
+    if (state?.fair === false) {
+      const sum = list.reduce((a, f) => a + inv(f), 0) || 1;
+      for (const f of list) out.set(f.id, (inv(f) / sum) * 100);
+      return out;
+    }
+    const groups = new Map();
+    for (const f of list) { const p = personOf(f); if (!groups.has(p)) groups.set(p, []); groups.get(p).push(f); }
+    const share = new Map([...groups.keys()].map(p => [p, 1 / (state?.modifiers?.[p]?.factor || 1)]));
+    const tot = [...share.values()].reduce((a, b) => a + b, 0) || 1;
+    for (const [p, fs] of groups) {
+      const s = fs.reduce((a, f) => a + inv(f), 0) || 1;
+      for (const f of fs) out.set(f.id, (100 * share.get(p) / tot) * (inv(f) / s));
+    }
+    return out;
   }
   const viewWeights = list => (elimView() ? elimWeights(chanceWeights(list), list) : chanceWeights(list));
+  const ratingFactor = avg => (avg < 5 ? 0.5 : avg < 8 ? 1 : avg < 10 ? 1.25 : 1.5);
   function syncWheel() {
     const list = activeFilms();
     const W = viewWeights(list);
@@ -554,12 +566,10 @@ function initRoom(roomId) {
     const used = myVotesUsed(), R = rules();
     $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: R.votes }, (_, i) => `<i class="${i < R.votes - used ? 'on' : ''}"></i>`).join('')}</span><span class="m">${used < R.votes ? `осталось ${R.votes - used}, каждый даёт фильму около ${R.points ?? 4}% колеса` : 'все отданы, голос можно снять'}</span>`;
 
-    const mod = state.modifier;
-    $('#modBanner').hidden = !mod || mod.factor === 1;
-    if (mod && mod.factor !== 1) {
-      $('#modBanner').className = 'mod-banner ' + (mod.factor < 1 ? 'down' : 'up');
-      $('#modBanner').innerHTML = `<b>${fmtFactor(mod.factor)}</b><span>фильмам автора <button class="person" data-person="${esc(mod.pid)}" data-name="${esc(mod.name)}">${esc(mod.name)}</button> на этот выбор: «${esc(mod.title)}» получил среднюю ${String(mod.avg).replace('.', ',')}</span>`;
-    }
+    const mods = Object.values(state.modifiers || {}).filter(m => m.factor !== 1);
+    $('#modBanner').hidden = !mods.length;
+    $('#modBanner').className = 'mod-banner mod-list';
+    $('#modBanner').innerHTML = mods.map(m => `<div class="mod-row ${m.factor < 1 ? 'down' : 'up'}" title="«${esc(m.title)}» получил среднюю ${String(m.avg).replace('.', ',')}. Действует, пока снова не выпадет фильм этого автора."><b>${fmtFactor(m.factor)}</b><span>фильмам <button class="person" data-person="${esc(m.pid)}" data-name="${esc(m.name)}">${nick(m.pid, m.name)}</button> за «${esc(m.title)}», до выпадения их фильма</span></div>`).join('');
     $('#fairOn').checked = state.fair !== false;
     $('#fairOn').disabled = spinning || Boolean(state.duel);
     renderRate();
@@ -1384,18 +1394,19 @@ function initRoom(roomId) {
   function renderRate() {
     const h = state.history[0];
     const box = $('#rateBox');
-    if (!h || h.consumed) { box.hidden = true; return; }
+    if (!h) { box.hidden = true; return; }
     box.hidden = false;
     const author = personOf(h.film);
     const isAuthor = author === myPid();
     const mine = h.ratings?.[myPid()]?.score || 0;
     const list = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author);
-    const mod = state.modifier;
     const who = `<button class="person" data-person="${esc(author)}" data-name="${esc(h.film.addedBy || '')}">${esc(h.film.addedBy || 'автора')}</button>`;
-    const effect = !mod
-      ? `Средняя оценка изменит шанс фильмов ${who} на следующий выбор.`
-      : mod.factor === 1 ? `Средняя ${String(mod.avg).replace('.', ',')}: шанс фильмов ${who} не меняется.`
-      : `Средняя ${String(mod.avg).replace('.', ',')}: фильмы ${who} получат ${fmtFactor(mod.factor)} на следующий выбор.`;
+    const a = avgRating(h);
+    const fct = a === null ? null : ratingFactor(a);
+    const effect = !h.src ? `Бонус ${who} уже задаёт его более новый фильм.`
+      : a === null ? `Средняя оценка даст фильмам ${who} бонус или штраф, который продержится, пока снова не выпадет его фильм.`
+      : fct === 1 ? `Средняя ${a.toFixed(1).replace('.', ',')}: шанс фильмов ${who} не меняется.`
+      : `Средняя ${a.toFixed(1).replace('.', ',')}: фильмы ${who} получают ${fmtFactor(fct)}, пока снова не выпадет его фильм.`;
     box.innerHTML = `
       <h3>Оцените после просмотра</h3>
       <div class="rate-film" data-h="0"><i style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><div><b>${esc(h.film.title)}</b><span>добавил(а) ${who}</span></div></div>
@@ -1465,7 +1476,7 @@ function initRoom(roomId) {
     const genres = [...freq.keys()].sort((a, b) => freq.get(b) - freq.get(a)).slice(0, 4);
     const rated = state.history.filter(h => isBy(h.film, pid, name)).map(avgRating).filter(a => a !== null);
     const avgOfHis = rated.length ? rated.reduce((a, b) => a + b, 0) / rated.length : null;
-    const modNow = state.modifier && state.modifier.pid === pid && state.modifier.factor !== 1 ? state.modifier : null;
+    const modNow = state.modifiers?.[pid]?.factor && state.modifiers[pid].factor !== 1 ? state.modifiers[pid] : null;
     const myPerfs = (state.perfs || []).filter(x => (x.singerPid ? x.singerPid === pid : x.singer === name));
     const perfScores = myPerfs.map(x => Object.values(x.ratings || {}).map(r => r.score)).filter(a => a.length).map(a => a.reduce((s, v) => s + v, 0) / a.length);
     const stats = {
@@ -1500,7 +1511,7 @@ function initRoom(roomId) {
         <div class="profile-id">
           <h2>${nick(pid, name, p)}</h2>
           ${p.status ? `<p class="profile-status">${esc(p.status)}</p>` : ''}
-          <div class="profile-tags"><span>${pid.startsWith('d') ? 'Discord' : 'Гость'}</span>${online ? '<span class="online">в комнате</span>' : ''}${mine ? '<span>это вы</span>' : ''}${modNow ? `<span class="${modNow.factor < 1 ? 'down' : 'up'}">${fmtFactor(modNow.factor)} на этот выбор</span>` : ''}</div>
+          <div class="profile-tags"><span>${pid.startsWith('d') ? 'Discord' : 'Гость'}</span>${online ? '<span class="online">в комнате</span>' : ''}${mine ? '<span>это вы</span>' : ''}${modNow ? `<span class="${modNow.factor < 1 ? 'down' : 'up'}">${fmtFactor(modNow.factor)} до выпадения его фильма</span>` : ''}</div>
         </div>
         ${mine && !profEditing ? '<button type="button" class="btn btn-ghost pe-open" data-pedit>Оформить</button>' : ''}
       </div>
@@ -1895,7 +1906,7 @@ function initRoom(roomId) {
     if (state && !spinningSid && !state.spin) syncWheel();
     $('#modeHint').dataset.hint = m === 'normal'
       ? 'Один прокрут выбирает один фильм. Шанс фильма равен его доле в колесе.'
-      : m === 'elimination' ? 'Каждый прокрут выбивает один фильм, последний оставшийся побеждает. Колесо показывает шанс вылететь: чем меньше у фильма шанс победить, тем больше его сектор.'
+      : m === 'elimination' ? 'Каждый прокрут выбивает один фильм, последний оставшийся побеждает. Шанс победить тот же, что в обычном режиме, а колесо показывает шанс вылететь следующим: при равных шансах доли вылета у людей поровну.'
       : 'Фильмы выходят парами, все голосуют. Проигравший вылетает, пока не останется один. При ничьей победителя выбирает жребий с учётом веса.';
     $('#autoWrap').hidden = m !== 'elimination';
     $('#durField').hidden = m === 'duel';

@@ -117,7 +117,7 @@ function publicState(r) {
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
     rules: { votes: VOTES_PER_PERSON, points: VOTE_POINTS, cap: VOTE_CAP },
-    fair: r.fair !== false, modifier: activeModifier(r),
+    fair: r.fair !== false, modifiers: r.mods || {},
     // во время раунда «Угадай мелодию» название трека не отдаём
     music: r.music?.quiz && r.quiz?.state === 'playing' ? { ...r.music, title: 'Угадай мелодию', author: '' } : r.music || null,
     quiz: publicQuiz(r), quizWins: r.quizWins || {}, chat: r.chat || [], queue: r.queue || [], lastTrack: r.music ? null : r.lastTrack || null,
@@ -152,22 +152,36 @@ function ratingFactor(avg) {
   if (avg < 10) return 1.25;
   return 1.5;
 }
-function activeModifier(r) {
-  const h = r.history?.[0];
-  if (!h || h.consumed) return null;
+// Бонус или штраф автору считается по оценкам его последнего выпавшего фильма (без оценки самого автора)
+// и действует, пока снова не выпадет его фильм — тогда сгорает, а новый фильм оценивают заново.
+function modFromEntry(h) {
   const author = personOf(h.film);
   const scores = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author).map(([, v]) => v.score);
   if (!scores.length) return null;
   const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
   return { pid: author, name: h.film.addedBy || '', title: h.film.title, avg: Math.round(avg * 10) / 10, count: scores.length, factor: ratingFactor(avg) };
 }
+// старые комнаты: бонусы по последнему выпавшему фильму каждого автора
+for (const r of Object.values(rooms)) {
+  if (!r.mods) {
+    r.mods = {};
+    const seen = new Set();
+    for (const h of r.history || []) {
+      const a = personOf(h.film);
+      if (seen.has(a)) continue;
+      seen.add(a);
+      h.src = true; // последний выпавший фильм автора задаёт его бонус
+      const m = modFromEntry(h);
+      if (m && m.factor !== 1) r.mods[a] = m;
+    }
+  }
+}
 
 // Шансы на колесе. Основа — 100 пунктов: с «равными шансами» поровну между авторами,
 // внутри доли автора между его фильмами по весу. Каждый голос добавляет фильму VOTE_POINTS пунктов.
 // Бонус или штраф за оценку умножает всё, что приходится на фильмы автора.
 function chanceWeights(r, list) {
-  const mod = activeModifier(r);
-  const modOf = pid => (mod && mod.pid === pid ? mod.factor : 1);
+  const modOf = pid => r.mods?.[pid]?.factor || 1;
   const w = new Map();
   if (r.fair !== false) {
     const groups = new Map();
@@ -236,12 +250,25 @@ function activeFilms(r) {
   return r.films.filter(f => !r.eliminated.includes(f.id) && f.weight > 0 && matchesFilters(r, f));
 }
 // Шанс вылететь: обратный шансу на победу, в сумме 100. Фавориты получают маленькие секторы.
-function elimWeights(W, list) {
-  const inv = new Map();
-  let sum = 0;
-  for (const f of list) { const v = 1 / Math.max(1e-6, W.get(f.id) || 0); inv.set(f.id, v); sum += v; }
-  for (const [k, v] of inv) inv.set(k, (v / sum) * 100);
-  return inv;
+// Шанс вылететь на выбывании. С «равными шансами» доля вылета делится между людьми так же поровну
+// (бонус за оценку её уменьшает, штраф увеличивает), а внутри доли человека его слабые фильмы вылетают чаще.
+function elimWeights(r, list, W) {
+  const out = new Map();
+  const inv = f => 1 / Math.max(1e-6, W.get(f.id) || 0);
+  if (r.fair === false) {
+    const sum = list.reduce((a, f) => a + inv(f), 0) || 1;
+    for (const f of list) out.set(f.id, (inv(f) / sum) * 100);
+    return out;
+  }
+  const groups = new Map();
+  for (const f of list) { const p = personOf(f); if (!groups.has(p)) groups.set(p, []); groups.get(p).push(f); }
+  const share = new Map([...groups.keys()].map(p => [p, 1 / (r.mods?.[p]?.factor || 1)]));
+  const tot = [...share.values()].reduce((a, b) => a + b, 0) || 1;
+  for (const [p, fs] of groups) {
+    const s = fs.reduce((a, f) => a + inv(f), 0) || 1;
+    for (const f of fs) out.set(f.id, (100 * share.get(p) / tot) * (inv(f) / s));
+  }
+  return out;
 }
 function pickWeighted(list, weights) {
   const wOf = f => (weights ? weights.get(f.id) || 0 : effWeight(f));
@@ -259,9 +286,18 @@ function startSpin(r, { mode, duration, auto, by, delay }) {
   delay = Math.min(15, Math.max(0, Math.round(num(delay, 0))));
   const rt = runtime(r);
   // обычный режим: сектор = шанс победить; выбывание: сектор = шанс вылететь, стрелка выбивает именно по нему
-  const W = mode === 'elimination' ? elimWeights(chanceWeights(r, list), list) : chanceWeights(r, list);
-  const landed = pickWeighted(list, W);
-  r.plan = null;
+  let W = chanceWeights(r, list);
+  let landed;
+  if (mode === 'normal') {
+    landed = pickWeighted(list, W);
+  } else {
+    // победитель серии — заранее и по тем же шансам, что в обычном режиме, поэтому равные шансы сохраняются;
+    // колесо показывает шанс вылететь, и выбиваются остальные именно по нему
+    if (!r.plan || !list.some(f => f.id === r.plan.winner)) r.plan = { winner: pickWeighted(list, W).id };
+    const E = elimWeights(r, list, W);
+    landed = pickWeighted(list.filter(f => f.id !== r.plan.winner), E);
+    W = E;
+  }
 
   r.spin = {
     sid: id(6), mode, duration, auto: Boolean(auto) && mode === 'elimination', by: str(by, 32),
@@ -412,9 +448,12 @@ function endAngle(s) {
 
 function recordWin(r, film, mode) {
   if (!film) return;
-  // прошлый бонус или штраф отработал на этом выборе
-  for (const h of r.history) h.consumed = true;
-  r.history.unshift({ hid: crypto.randomBytes(4).toString('hex'), at: Date.now(), mode, film: { ...film }, ratings: {} });
+  // фильм автора снова выпал: его прошлый бонус или штраф сгорает, новый фильм теперь задаёт бонус
+  const author = personOf(film);
+  r.mods ||= {};
+  delete r.mods[author];
+  for (const h of r.history) if (personOf(h.film) === author) h.src = false;
+  r.history.unshift({ hid: crypto.randomBytes(4).toString('hex'), at: Date.now(), mode, film: { ...film }, ratings: {}, src: true });
   // фильм выбран: голоса за него возвращаются людям (в истории остаётся, кто его хотел)
   const live = r.films.find(x => x.id === film.id);
   if (live) live.votes = [];
@@ -1230,6 +1269,13 @@ async function api(req, res, url) {
     h.ratings ||= {};
     if (score >= 1 && score <= 10) h.ratings[pid] = { score, name: who, avatar: me?.avatar || '' };
     else delete h.ratings[pid];
+    // оценка последнего выпавшего фильма автора обновляет его бонус
+    if (h.src) {
+      const a = personOf(h.film);
+      const mm = modFromEntry(h);
+      r.mods ||= {};
+      if (mm && mm.factor !== 1) r.mods[a] = mm; else delete r.mods[a];
+    }
     pushState(r); return json(res, 200, { ok: true });
   }
 

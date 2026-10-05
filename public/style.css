@@ -1185,3 +1185,12 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 .crow-n { margin-top: -4px; font-size: 11.5px; font-weight: 800; padding: 2px 7px; border-radius: 7px; background: rgba(0,0,0,.5); white-space: nowrap; }
 .crow-feather { position: absolute; width: 10px; height: 26px; border-radius: 50% 50% 50% 50% / 80% 80% 20% 20%; background: linear-gradient(90deg, #1a1a22 48%, #3a3a46 50%, #1a1a22 52%); pointer-events: none; animation: featherFall 3.2s ease-in forwards; }
 @keyframes featherFall { 0% { transform: translate(0, 0) rotate(20deg); opacity: 1; } 25% { transform: translate(28px, 60px) rotate(-30deg); } 50% { transform: translate(-18px, 130px) rotate(25deg); } 75% { transform: translate(22px, 200px) rotate(-20deg); opacity: 1; } 100% { transform: translate(-6px, 270px) rotate(10deg); opacity: 0; } }
+
+/* несколько бонусов и штрафов сразу */
+.mod-banner.mod-list { flex-direction: column; align-items: stretch; gap: 6px; border: 0; padding: 0; background: none; }
+.mod-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; border: 1px solid; font-size: 12.5px; color: var(--tx2); }
+.mod-row b { font: 800 19px/1 var(--f-ui); flex: none; }
+.mod-row.up { background: color-mix(in srgb, var(--ok) 10%, transparent); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.mod-row.up b { color: var(--ok); }
+.mod-row.down { background: color-mix(in srgb, var(--bad) 10%, transparent); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+.mod-row.down b { color: var(--bad); }
