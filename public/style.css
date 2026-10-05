@@ -1089,3 +1089,38 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
   .qz-ans { animation: riseIn .55s var(--spring) both; }
   .qz-cover.open { transform: scale(1.04); filter: blur(10px); transition: opacity .7s var(--ease), transform .7s var(--ease), filter .7s var(--ease); }
 }
+
+/* ---------- переходы полегче: только сдвиг, масштаб и прозрачность (их видеокарта анимирует сама) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-group(*) { animation-duration: .55s; }
+  html[data-vt]::view-transition-old(stage), html[data-vt]::view-transition-new(stage) { will-change: transform, opacity; }
+  html[data-vt="enter"]::view-transition-new(stage) { animation: vtCurtainLite .6s cubic-bezier(.2, .8, .2, 1) .05s both; }
+  html[data-vt="enter"]::view-transition-old(stage) { animation: vtFadeLite .3s ease both; }
+  html[data-vt="exit"]::view-transition-old(stage) { animation: vtShrinkLite .35s ease both; }
+  html[data-vt="exit"]::view-transition-new(stage) { animation: vtRiseLite .5s cubic-bezier(.2, .8, .2, 1) .08s both; }
+  html[data-vt="exit"]::view-transition-new(films-panel) { animation: vtInLeftLite .5s cubic-bezier(.2, .8, .2, 1) .12s both; }
+  html[data-vt="exit"]::view-transition-new(controls) { animation: vtInRightLite .5s cubic-bezier(.2, .8, .2, 1) .12s both; }
+  html[data-vt="enter"]::view-transition-old(films-panel) { animation: vtOutLeftLite .35s cubic-bezier(.7, 0, .3, 1) both; }
+  html[data-vt="enter"]::view-transition-old(controls) { animation: vtOutRightLite .35s cubic-bezier(.7, 0, .3, 1) both; }
+  html[data-vt="swap"]::view-transition-old(stage) { animation: vtSwapOutLite .3s ease both; }
+  html[data-vt="swap"]::view-transition-new(stage) { animation: vtSwapInLite .45s cubic-bezier(.2, .8, .2, 1) .06s both; }
+
+  /* появление элементов без размытия */
+  .karaoke:not([hidden]) .k-video, .karaoke:not([hidden]) .k-bar, .karaoke:not([hidden]) .k-lyrics, .karaoke:not([hidden]) .k-side,
+  .quiz:not([hidden]) .qz-top, .quiz:not([hidden]) .qz-video, .quiz:not([hidden]) .qz-guess, .quiz:not([hidden]) .qz-side,
+  .nav-karaoke:not([hidden]) > *, #duelBox:not([hidden]) .duel-progress, #duelBox:not([hidden]) .duel-card,
+  .stage:not(.karaoke-on) .wheel-box, .qz-hint, .qz-ans { animation-name: riseLite; animation-duration: .5s; }
+  .qz-cover.open { filter: none; }
+}
+/* «занавес» — растяжение от центра по горизонтали */
+@keyframes vtCurtainLite { from { opacity: 0; transform: scaleX(.6) scaleY(.94); } 60% { opacity: 1; } to { transform: none; } }
+@keyframes vtFadeLite { to { opacity: 0; transform: scale(.97); } }
+@keyframes vtShrinkLite { to { opacity: 0; transform: scale(.95); } }
+@keyframes vtRiseLite { from { opacity: 0; transform: translateY(18px) scale(.98); } }
+@keyframes vtOutLeftLite { to { opacity: 0; transform: translateX(-50px); } }
+@keyframes vtOutRightLite { to { opacity: 0; transform: translateX(50px); } }
+@keyframes vtInLeftLite { from { opacity: 0; transform: translateX(-50px); } }
+@keyframes vtInRightLite { from { opacity: 0; transform: translateX(50px); } }
+@keyframes vtSwapOutLite { to { opacity: 0; transform: translateX(-30px); } }
+@keyframes vtSwapInLite { from { opacity: 0; transform: translateX(30px); } }
+@keyframes riseLite { from { opacity: 0; transform: translateY(14px); } }

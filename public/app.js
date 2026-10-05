@@ -510,6 +510,7 @@ function initRoom(roomId) {
   // ---- отрисовка ----
   // Смена режима (колесо, караоке, игра) — с анимированным переходом, если браузер умеет View Transitions.
   let lastMode = null;
+  let vtBusy = false;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function render() {
     if (!state) return;
@@ -518,8 +519,10 @@ function initRoom(roomId) {
     lastMode = mode;
     if (prev && prev !== mode && document.startViewTransition && !reduceMotion) {
       document.documentElement.dataset.vt = prev === 'wheel' ? 'enter' : mode === 'wheel' ? 'exit' : 'swap';
-      const t = document.startViewTransition(() => { renderNow(); syncMusic(); });
-      t.finished.finally(() => { delete document.documentElement.dataset.vt; });
+      // плеер YouTube создаём уже после перехода: его загрузка посреди анимации даёт рывки
+      vtBusy = true;
+      const t = document.startViewTransition(() => renderNow());
+      t.finished.finally(() => { delete document.documentElement.dataset.vt; vtBusy = false; syncMusic(); });
       return;
     }
     renderNow();
@@ -714,6 +717,7 @@ function initRoom(roomId) {
   function ytDuck(on) { ytDucked = on; ytVolume(); }
   let ytHostCur = '#ytHost';
   function syncMusic() {
+    if (vtBusy) return; // догоним после перехода
     const m = state?.music;
     const hostSel = state?.quiz ? '#qHost' : state?.karaoke ? '#kHost' : '#ytHost';
     if (yt && ytHostCur !== hostSel) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $(ytHostCur).innerHTML = ''; }

@@ -132,6 +132,7 @@
     requestAnimationFrame(loop);
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    if (document.documentElement.dataset.vt) return; // во время перехода между режимами фон не рисуем
     for (const s of scenes) if (s.vis) draw(s, reduce ? 10 : now / 1000, reduce ? 0 : dt);
   })(last);
 })();
