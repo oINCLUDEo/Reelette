@@ -121,6 +121,7 @@ function publicState(r) {
     // во время раунда «Угадай мелодию» название трека не отдаём
     music: r.music?.quiz && r.quiz?.state === 'playing' ? { ...r.music, title: 'Угадай мелодию', author: '' } : r.music || null,
     quiz: publicQuiz(r), quizWins: r.quizWins || {}, chat: r.chat || [], queue: r.queue || [], lastTrack: r.music ? null : r.lastTrack || null,
+    spinLock: Boolean(r.spinLock),
     karaoke: Boolean(r.karaoke), perfs: (r.perfs || []).slice(0, 40),
     hits: r.hits || [], reacts: r.reacts || {}, profiles,
   };
@@ -909,6 +910,10 @@ async function api(req, res, url) {
   b.by = who;
 
   if (!sub && m === 'PATCH') {
+    if (b.spinLock !== undefined) {
+      if (!isOwner(r, me, b)) return json(res, 403, { error: 'Закрыть прокруты может только создатель комнаты' });
+      r.spinLock = Boolean(b.spinLock);
+    }
     if (b.karaoke !== undefined) {
       if (r.spin || r.duel) return json(res, 409, { error: 'Дождитесь конца прокрута или дуэли' });
       r.karaoke = Boolean(b.karaoke);
@@ -951,6 +956,7 @@ async function api(req, res, url) {
 
   // Отменяет отсчёт перед прокрутом или останавливает серию после текущего прокрута.
   if (sub === 'stop' && m === 'POST') {
+    if (r.spinLock && !isOwner(r, me, b)) return json(res, 403, { error: 'Крутить сейчас может только создатель комнаты' });
     const rt = runtime(r);
     rt.series = false;
     clearTimeout(rt.next); rt.next = null;
@@ -1220,6 +1226,7 @@ async function api(req, res, url) {
 
   if (sub === 'duel' && m === 'POST') {
     const action = parts[3];
+    if (r.spinLock && !isOwner(r, me, b) && ['start', 'next', 'stop'].includes(action)) return json(res, 403, { error: 'Крутить сейчас может только создатель комнаты' });
     if (action === 'start') {
       if (r.spin || r.duel) return json(res, 409, { error: 'Сначала дождитесь конца прокрута или дуэли' });
       const err = startDuel(r, who);
@@ -1300,6 +1307,7 @@ async function api(req, res, url) {
   }
 
   if (sub === 'spin' && m === 'POST') {
+    if (r.spinLock && !isOwner(r, me, b)) return json(res, 403, { error: 'Крутить сейчас может только создатель комнаты' });
     if (r.spin) return json(res, 409, { error: 'Колесо уже крутится' });
     const err = startSpin(r, b);
     return err ? json(res, 400, { error: err }) : json(res, 200, { ok: true });

@@ -618,12 +618,17 @@ function initRoom(roomId) {
     const btn = $('#spinBtn');
     const counting = countdown !== null;
     const duel = state.duel;
-    btn.disabled = spinning || Boolean(duel) || active.length < 2;
+    const locked = Boolean(state.spinLock) && !isRoomOwner();
+    btn.disabled = spinning || Boolean(duel) || active.length < 2 || locked;
+    btn.classList.toggle('locked', locked && !spinning);
+    $('#lockWrap').hidden = !isRoomOwner();
+    $('#spinLockOn').checked = Boolean(state.spinLock);
     btn.classList.toggle('busy', spinning && !counting);
     btn.classList.toggle('count', counting);
-    $('#spinBtn .hub-label').textContent = counting ? String(countdown) : spinning ? 'Крутится'
+    $('#spinBtn .hub-label').innerHTML = counting ? String(countdown) : spinning ? 'Крутится'
+      : locked ? '<svg class="hub-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
       : settings.mode === 'duel' ? 'Дуэль' : settings.mode === 'elimination' && state.eliminated.length ? 'Дальше' : 'Крутить';
-    $('#hubSub').textContent = counting || spinning ? '' : active.length < 2 ? 'нужно 2 фильма' : `${active.length} ${plural(active.length, 'фильм', 'фильма', 'фильмов')}`;
+    $('#hubSub').textContent = counting || spinning ? '' : locked ? 'крутит создатель' : active.length < 2 ? 'нужно 2 фильма' : `${active.length} ${plural(active.length, 'фильм', 'фильма', 'фильмов')}`;
 
     $('#stopBtn').hidden = !counting && !state.series;
     $('#stopBtn').textContent = counting ? 'Отменить прокрут' : 'Остановить серию';
@@ -658,6 +663,7 @@ function initRoom(roomId) {
         ? (state.eliminated.length && active.length === 1 ? 'Остался один фильм. Чтобы начать заново, верните выбывших.'
           : state.films.length ? 'Для прокрута нужно хотя бы два фильма' : '')
         : settings.mode === 'elimination' && state.eliminated.length ? `В колесе осталось ${active.length}`
+        : locked ? 'Прокруты закрыты: крутить может только создатель комнаты'
         : settings.mode === 'duel' ? 'Нажмите на центр колеса, чтобы начать дуэль' : 'Нажмите на центр колеса или пробел';
     }
   }
@@ -1873,11 +1879,16 @@ function initRoom(roomId) {
   $('#stopBtn').addEventListener('click', async () => {
     const counting = countdown !== null;
     try {
-      await api(`/rooms/${roomId}/stop`, { method: 'POST', body: { by: me.name } });
+      await api(`/rooms/${roomId}/stop`, { method: 'POST', body: { by: me.name, cid: me.cid } });
       if (!counting) toast('Серия остановится после текущего прокрута');
     } catch (e) { toast(e.message, true); }
   });
 
+  $('#spinLockOn').addEventListener('change', e => {
+    api(`/rooms/${roomId}`, { method: 'PATCH', body: { spinLock: e.target.checked, cid: me.cid } })
+      .then(() => toast(e.target.checked ? 'Теперь крутить можете только вы' : 'Крутить снова могут все'))
+      .catch(err => { e.target.checked = !e.target.checked; toast(err.message, true); });
+  });
   $('#autoSpin').checked = settings.auto;
   $('#autoSpin').addEventListener('change', e => { settings.auto = e.target.checked; ls.set('auto', settings.auto); });
   $('#musicOn').checked = settings.music;
@@ -1893,12 +1904,12 @@ function initRoom(roomId) {
     if ($('#spinBtn').disabled || state?.karaoke || state?.quiz) return;
     Sfx.unlock(); // браузер разрешает звук только после клика
     if (settings.mode === 'duel') {
-      try { await api(`/rooms/${roomId}/duel/start`, { method: 'POST', body: { by: me.name } }); }
+      try { await api(`/rooms/${roomId}/duel/start`, { method: 'POST', body: { by: me.name, cid: me.cid } }); }
       catch (e) { toast(e.message, true); }
       return;
     }
     try {
-      await api(`/rooms/${roomId}/spin`, { method: 'POST', body: { mode: settings.mode, duration: settings.duration, auto: settings.auto, delay: settings.delay, by: me.name } });
+      await api(`/rooms/${roomId}/spin`, { method: 'POST', body: { mode: settings.mode, duration: settings.duration, auto: settings.auto, delay: settings.delay, by: me.name, cid: me.cid } });
     } catch (e) { toast(e.message, true); }
   }
   $('#spinBtn').addEventListener('click', spin);

@@ -1155,3 +1155,8 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 .react-bar button { position: relative; }
 @keyframes cooldownShake { 20%, 60% { transform: translateX(-3px) rotate(-6deg); } 40%, 80% { transform: translateX(3px) rotate(6deg); } }
 @keyframes cooldownBar { from { transform: scaleX(1); } to { transform: scaleX(0); opacity: .3; } }
+
+/* замок прокрутов */
+.hub-btn.locked { background: radial-gradient(circle at 50% 30%, var(--s3), var(--sheetA) 80%); color: var(--tx2); }
+.hub-btn.locked::before { display: none; }
+.hub-lock { width: 6cqw; height: 6cqw; stroke-width: 2.2; }

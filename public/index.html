@@ -247,6 +247,7 @@
           <button data-mode="elimination">Выбывание</button>
           <button data-mode="duel">Дуэль</button>
         </div>
+        <label class="check" id="lockWrap" hidden><input type="checkbox" id="spinLockOn"><span class="box"></span><span class="check-text">Крутит только создатель <button type="button" class="hint" data-hint="Пока включено, запускать прокрут, серию и дуэль, отменять отсчёт и останавливать серию можете только вы. Остальные голосуют, добавляют фильмы и смотрят." aria-label="Подсказка">?</button></span></label>
         <label class="check" id="autoWrap"><input type="checkbox" id="autoSpin"><span class="box"></span><span class="check-text">Крутить до победителя <button type="button" class="hint" data-hint="Прокруты идут подряд без остановок, пока не останется один фильм. Серию можно остановить кнопкой под колесом." aria-label="Подсказка">?</button></span></label>
         <button id="resetBtn" class="btn btn-ghost btn-block" hidden>Вернуть выбывших в колесо</button>
       </section>
