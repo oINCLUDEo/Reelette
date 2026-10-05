@@ -205,7 +205,7 @@ function initRoom(roomId) {
   let serverOffset = 0;
   let es = null;
   let provider = 'none';
-  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', false), sound: ls.get('sound', true), music: ls.get('music', false), delay: 0 };
+  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', false), sound: ls.get('sound', true), showOut: ls.get('showOut', true), music: ls.get('music', false), delay: 0 };
   let people = [];
   let countdown = null; // секунд до старта, пока идёт отсчёт
   let countdownTimer = null;
@@ -459,6 +459,7 @@ function initRoom(roomId) {
     if (msg.mode !== 'elimination' && settings.music) setTimeout(() => Sfx.win(), msg.mode === 'final' ? 1700 : msg.mode === 'duel' ? 600 : 0);
     if (msg.mode === 'elimination') {
       if (settings.sound) Sfx.out();
+      if (!settings.showOut) { toast(`Выбывает: ${f.title}${msg.left > 1 ? `, осталось ${msg.left}` : ''}`); return; }
       showWin(f, 'out', msg.left);
       if (msg.left > 1) setTimeout(() => { if ($('#winDetail').dataset.id === f.id) closeModal('#winModal'); }, 2300);
     } else if (msg.mode === 'final') {
@@ -638,7 +639,12 @@ function initRoom(roomId) {
         : state.series ? `Серия до победителя, осталось ${active.length}` : by ? `Крутит ${by}` : 'Колесо крутится';
     }
     $('#resetBtn').hidden = !state.eliminated.length || spinning;
-    $('#addBtn').disabled = spinning || Boolean(duel);
+    const addClosed = (state.addLock && !isRoomOwner()) || state.elimActive;
+    $('#addBtn').disabled = spinning || Boolean(duel) || addClosed;
+    $('#addBtn').title = state.elimActive ? 'Идёт выбывание: добавлять фильмы можно после него' : state.addLock && !isRoomOwner() ? 'Создатель комнаты закрыл добавление фильмов' : '';
+    $('#addLockWrap').hidden = !isRoomOwner();
+    $('#addLockOn').checked = Boolean(state.addLock);
+    $('#showOutWrap').hidden = settings.mode !== 'elimination';
 
     $('.stage').classList.toggle('dueling', Boolean(duel));
     $('#duelBox').hidden = !duel;
@@ -1884,6 +1890,20 @@ function initRoom(roomId) {
     } catch (e) { toast(e.message, true); }
   });
 
+  $('#addLockOn').addEventListener('change', e => {
+    api(`/rooms/${roomId}`, { method: 'PATCH', body: { addLock: e.target.checked, cid: me.cid } })
+      .then(() => toast(e.target.checked ? 'Добавлять фильмы теперь можете только вы' : 'Добавлять фильмы снова могут все'))
+      .catch(err => { e.target.checked = !e.target.checked; toast(err.message, true); });
+  });
+  $('#showOutOn').checked = settings.showOut;
+  $('#showOutOn').addEventListener('change', e => { settings.showOut = e.target.checked; ls.set('showOut', settings.showOut); });
+  // ворона: наш трек, включается у всех сразу
+  $('#crowBtn').addEventListener('click', async () => {
+    if (state?.music?.vid === 'RnMVb0lJ8LI') return toast('Ворона уже летит');
+    Sfx.unlock();
+    try { await api(`/rooms/${roomId}/music`, { method: 'POST', body: { url: 'RnMVb0lJ8LI', now: true, by: me.name, cid: me.cid } }); toast('Включаю ворону'); }
+    catch (err) { toast(err.message, true); }
+  });
   $('#spinLockOn').addEventListener('change', e => {
     api(`/rooms/${roomId}`, { method: 'PATCH', body: { spinLock: e.target.checked, cid: me.cid } })
       .then(() => toast(e.target.checked ? 'Теперь крутить можете только вы' : 'Крутить снова могут все'))

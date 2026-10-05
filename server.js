@@ -121,7 +121,9 @@ function publicState(r) {
     // во время раунда «Угадай мелодию» название трека не отдаём
     music: r.music?.quiz && r.quiz?.state === 'playing' ? { ...r.music, title: 'Угадай мелодию', author: '' } : r.music || null,
     quiz: publicQuiz(r), quizWins: r.quizWins || {}, chat: r.chat || [], queue: r.queue || [], lastTrack: r.music ? null : r.lastTrack || null,
-    spinLock: Boolean(r.spinLock),
+    spinLock: Boolean(r.spinLock), addLock: Boolean(r.addLock),
+    // идёт выбывание: есть выбывшие или серия — новые фильмы сломали бы колесо посреди серии
+    elimActive: r.eliminated.length > 0 || runtime(r).series,
     karaoke: Boolean(r.karaoke), perfs: (r.perfs || []).slice(0, 40),
     hits: r.hits || [], reacts: r.reacts || {}, profiles,
   };
@@ -910,6 +912,10 @@ async function api(req, res, url) {
   b.by = who;
 
   if (!sub && m === 'PATCH') {
+    if (b.addLock !== undefined) {
+      if (!isOwner(r, me, b)) return json(res, 403, { error: 'Закрыть добавление может только создатель комнаты' });
+      r.addLock = Boolean(b.addLock);
+    }
     if (b.spinLock !== undefined) {
       if (!isOwner(r, me, b)) return json(res, 403, { error: 'Закрыть прокруты может только создатель комнаты' });
       r.spinLock = Boolean(b.spinLock);
@@ -1115,6 +1121,7 @@ async function api(req, res, url) {
     r.queue ||= [];
     if (r.quiz && r.music?.quiz && ['next', 'restart', 'toggle'].includes(action)) return json(res, 409, { error: 'Идёт «Угадай мелодию»' });
     if (!action) {
+      if (b.now && r.quiz && r.music?.quiz) return json(res, 409, { error: 'Идёт «Угадай мелодию»' });
       const t = await fetchTrack(b.url);
       if (t.error) return json(res, 400, { error: t.error });
       // кто поёт (для караоке): по умолчанию тот, кто добавил
@@ -1251,6 +1258,8 @@ async function api(req, res, url) {
   if (r.spin && sub !== 'spin') return json(res, 409, { error: 'Колесо крутится, подождите' });
 
   if (sub === 'films' && !parts[3] && m === 'POST') {
+    if (r.addLock && !isOwner(r, me, b)) return json(res, 403, { error: 'Создатель комнаты закрыл добавление фильмов' });
+    if (r.eliminated.length || runtime(r).series) return json(res, 409, { error: 'Идёт выбывание: добавлять фильмы можно после него или после «Вернуть выбывших»' });
     const list = Array.isArray(b.films) ? b.films : [b];
     const added = [], merged = [], voted = [];
     for (const raw of list.slice(0, 100)) {

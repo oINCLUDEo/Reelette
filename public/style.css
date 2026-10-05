@@ -1160,3 +1160,8 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 .hub-btn.locked { background: radial-gradient(circle at 50% 30%, var(--s3), var(--sheetA) 80%); color: var(--tx2); }
 .hub-btn.locked::before { display: none; }
 .hub-lock { width: 6cqw; height: 6cqw; stroke-width: 2.2; }
+
+/* ворона */
+.react-bar .crow-btn { width: auto; padding: 0 12px; gap: 6px; display: inline-flex; align-items: center; font: 800 13px var(--f-ui); color: var(--tx); }
+.react-bar .crow-btn svg { width: 20px; height: 20px; }
+.react-bar .crow-btn:hover { background: var(--s2); }
