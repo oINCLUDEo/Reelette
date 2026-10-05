@@ -1144,3 +1144,14 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 @keyframes petalsOut { to { opacity: 0; transform: translate(-50%, -20%) rotate(calc(var(--rot) + 40deg)) scale(1.2); } }
 .k-items { display: flex; gap: 6px; flex-wrap: wrap; }
 .k-items-i { padding: 3px 9px; border-radius: 8px; background: var(--s2); font-weight: 800; font-size: 13px; }
+
+/* ---------- броски: легче для видеокарты, перезарядка на кнопке ---------- */
+.projectile { filter: none; text-shadow: 0 8px 16px rgba(0,0,0,.45); }
+.splat svg { filter: none; }
+.splat { will-change: transform, opacity; contain: layout style; }
+.react-bar { z-index: 9; }
+.react-bar button.cooldown { animation: cooldownShake .45s ease; }
+.react-bar button.cooldown::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: 3px; height: 3px; border-radius: 3px; background: var(--acc-hi); transform-origin: left; animation: cooldownBar 1.2s linear forwards; }
+.react-bar button { position: relative; }
+@keyframes cooldownShake { 20%, 60% { transform: translateX(-3px) rotate(-6deg); } 40%, 80% { transform: translateX(3px) rotate(6deg); } }
+@keyframes cooldownBar { from { transform: scaleX(1); } to { transform: scaleX(0); opacity: .3; } }

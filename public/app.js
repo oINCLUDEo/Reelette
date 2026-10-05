@@ -998,15 +998,27 @@ function initRoom(roomId) {
     Sfx.unlock();
     armThrow(b.dataset.throw);
   });
+  // лимит проверяем сами: при перезарядке кнопка дёргается, а не сыплются уведомления
+  const throwTimes = [];
+  function canThrow() {
+    const now = Date.now();
+    while (throwTimes.length && now - throwTimes[0] > 3000) throwTimes.shift();
+    if (throwTimes.length >= 5) {
+      const b = $(`#reactBar [data-throw="${armed}"]`);
+      b?.classList.remove('cooldown'); void b?.offsetWidth; b?.classList.add('cooldown');
+      return false;
+    }
+    throwTimes.push(now);
+    return true;
+  }
   $('#throwLayer').addEventListener('click', e => {
-    if (!armed) return;
+    if (!armed || !canThrow()) return;
     const st = $('.layout > .stage').getBoundingClientRect();
     const x = (e.clientX - st.left) / st.width, y = (e.clientY - st.top) / st.height;
     // попадание в видео караоке засчитывается певцу
     const kv = $('#karaokeBox:not([hidden]) .k-video')?.getBoundingClientRect();
     const onStage = Boolean(kv && e.clientX >= kv.left && e.clientX <= kv.right && e.clientY >= kv.top && e.clientY <= kv.bottom);
-    api(`/rooms/${roomId}/throw`, { method: 'POST', body: { item: armed, x, y, onStage, cid: me.cid, by: me.name } })
-      .catch(err => toast(err.message, true));
+    api(`/rooms/${roomId}/throw`, { method: 'POST', body: { item: armed, x, y, onStage, cid: me.cid, by: me.name } }).catch(() => {});
   });
   $('#throwLayer').addEventListener('mousemove', e => {
     const l = $('#throwLayer');
@@ -1047,7 +1059,10 @@ function initRoom(roomId) {
   function throwItem(msg) {
     const layer = $('#reactLayer');
     const T = THROW[msg.item];
-    if (!layer || !T || layer.childElementCount > 70) return;
+    if (!layer || !T) return;
+    // на экране не больше 24 клякс: старые убираем
+    const old = layer.querySelectorAll('.splat');
+    for (let i = 0; i < old.length - 23; i++) old[i].remove();
     const W = layer.clientWidth, H = layer.clientHeight;
     const tx = msg.x * W, ty = msg.y * H;
     // летит снизу, со стороны, зависящей от того, кто бросил
@@ -1090,10 +1105,15 @@ function initRoom(roomId) {
     layer.append(el);
     el.addEventListener('animationend', () => el.remove());
   }
+  const rxTimes = [];
   $('#reactBar').addEventListener('click', e => {
     const b = e.target.closest('[data-rx]');
     if (!b) return;
     b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+    const now = Date.now();
+    while (rxTimes.length && now - rxTimes[0] > 2500) rxTimes.shift();
+    if (rxTimes.length >= 10) { b.classList.remove('cooldown'); void b.offsetWidth; b.classList.add('cooldown'); return; }
+    rxTimes.push(now);
     api(`/rooms/${roomId}/react`, { method: 'POST', body: { kind: b.dataset.rx, cid: me.cid, by: me.name } }).catch(() => {});
   });
 
