@@ -407,7 +407,7 @@ function initRoom(roomId) {
     }
     const groups = new Map();
     for (const f of list) { const p = personOf(f); if (!groups.has(p)) groups.set(p, []); groups.get(p).push(f); }
-    const share = new Map([...groups.keys()].map(p => [p, 1 / (state?.modifiers?.[p]?.factor || 1)]));
+    const share = new Map([...groups].map(([p, fs]) => [p, 1 / Math.max(1e-6, fs.reduce((a, f) => a + (W.get(f.id) || 0), 0))]));
     const tot = [...share.values()].reduce((a, b) => a + b, 0) || 1;
     for (const [p, fs] of groups) {
       const s = fs.reduce((a, f) => a + inv(f), 0) || 1;
@@ -1906,7 +1906,7 @@ function initRoom(roomId) {
     if (state && !spinningSid && !state.spin) syncWheel();
     $('#modeHint').dataset.hint = m === 'normal'
       ? 'Один прокрут выбирает один фильм. Шанс фильма равен его доле в колесе.'
-      : m === 'elimination' ? 'Каждый прокрут выбивает один фильм, последний оставшийся побеждает. Шанс победить тот же, что в обычном режиме, а колесо показывает шанс вылететь следующим: при равных шансах доли вылета у людей поровну.'
+      : m === 'elimination' ? 'Каждый прокрут выбивает один фильм, последний оставшийся побеждает. Шанс победить тот же, что в обычном режиме, а колесо показывает шанс вылететь следующим: у кого больше голосов и бонусов, тот вылетает реже.'
       : 'Фильмы выходят парами, все голосуют. Проигравший вылетает, пока не останется один. При ничьей победителя выбирает жребий с учётом веса.';
     $('#autoWrap').hidden = m !== 'elimination';
     $('#durField').hidden = m === 'duel';

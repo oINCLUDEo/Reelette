@@ -250,8 +250,8 @@ function activeFilms(r) {
   return r.films.filter(f => !r.eliminated.includes(f.id) && f.weight > 0 && matchesFilters(r, f));
 }
 // Шанс вылететь: обратный шансу на победу, в сумме 100. Фавориты получают маленькие секторы.
-// Шанс вылететь на выбывании. С «равными шансами» доля вылета делится между людьми так же поровну
-// (бонус за оценку её уменьшает, штраф увеличивает), а внутри доли человека его слабые фильмы вылетают чаще.
+// Шанс вылететь на выбывании. С «равными шансами» доля вылета человека обратна его общей доле на победу
+// (голоса за его фильмы и бонус её уменьшают, штраф увеличивает), а внутри доли его слабые фильмы вылетают чаще.
 function elimWeights(r, list, W) {
   const out = new Map();
   const inv = f => 1 / Math.max(1e-6, W.get(f.id) || 0);
@@ -262,7 +262,7 @@ function elimWeights(r, list, W) {
   }
   const groups = new Map();
   for (const f of list) { const p = personOf(f); if (!groups.has(p)) groups.set(p, []); groups.get(p).push(f); }
-  const share = new Map([...groups.keys()].map(p => [p, 1 / (r.mods?.[p]?.factor || 1)]));
+  const share = new Map([...groups].map(([p, fs]) => [p, 1 / Math.max(1e-6, fs.reduce((a, f) => a + (W.get(f.id) || 0), 0))]));
   const tot = [...share.values()].reduce((a, b) => a + b, 0) || 1;
   for (const [p, fs] of groups) {
     const s = fs.reduce((a, f) => a + inv(f), 0) || 1;
