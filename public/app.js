@@ -1,6 +1,8 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
+// меняем разметку только если она правда изменилась: так не перезапускаются CSS-анимации
+const setHTML = (el, html) => { if (el && el.__html !== html) { el.innerHTML = html; el.__html = html; } };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const ls = {
   get(k, d) { try { const v = localStorage.getItem('kk_' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
@@ -506,7 +508,25 @@ function initRoom(roomId) {
   }
 
   // ---- отрисовка ----
+  // Смена режима (колесо, караоке, игра) — с анимированным переходом, если браузер умеет View Transitions.
+  let lastMode = null;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function render() {
+    if (!state) return;
+    const mode = state.quiz ? 'quiz' : state.karaoke ? 'karaoke' : 'wheel';
+    const prev = lastMode;
+    lastMode = mode;
+    if (prev && prev !== mode && document.startViewTransition && !reduceMotion) {
+      document.documentElement.dataset.vt = prev === 'wheel' ? 'enter' : mode === 'wheel' ? 'exit' : 'swap';
+      const t = document.startViewTransition(() => { renderNow(); syncMusic(); });
+      t.finished.finally(() => { delete document.documentElement.dataset.vt; });
+      return;
+    }
+    renderNow();
+  }
+  // новые фильмы в списке появляются с подскоком; при первой отрисовке — без анимации
+  let seenFilms = null;
+  function renderNow() {
     if (!state) return;
     $('#roomTitle').textContent = state.name;
     const spinning = Boolean(spinningSid || state.spin);
@@ -548,7 +568,8 @@ function initRoom(roomId) {
       const pct = out.has(f.id) || filtered || !total ? '—' : `${(share * 100).toFixed(share < 0.1 ? 1 : 0)}%`;
       const nv = (f.votes || []).length, mine = iVoted(f);
       const meta = filtered ? ['не подходит под фильтры'] : [f.year, f.runtime && fmtRuntime(f.runtime)].filter(Boolean);
-      return `<div class="film${out.has(f.id) ? ' out' : ''}${filtered ? ' filtered' : ''}${wheel.curId === f.id ? ' hot' : ''}" data-id="${esc(f.id)}">
+      const fresh = seenFilms && !seenFilms.has(f.id);
+      return `<div class="film${fresh ? ' fresh' : ''}${out.has(f.id) ? ' out' : ''}${filtered ? ' filtered' : ''}${wheel.curId === f.id ? ' hot' : ''}" data-id="${esc(f.id)}">
         <div class="film-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</div>
         <div class="film-main">
           <div class="film-title">${esc(f.title)}</div>
@@ -564,6 +585,7 @@ function initRoom(roomId) {
         ${canDelete(f) ? `<button class="film-del" data-del title="Удалить">${ICON.x}</button>` : ''}
       </div>`;
     };
+    queueMicrotask(() => { seenFilms = new Set(state.films.map(f => f.id)); });
     $('#filmList').innerHTML = ordered.map(g => {
       const gShare = total ? g.films.reduce((a, f) => a + (W.get(f.id) || 0), 0) / total : 0;
       const ava = avatarOf(g.pid);
@@ -928,14 +950,14 @@ function initRoom(roomId) {
     cover.classList.toggle('open', reveal);
     if (final) {
       const w = z.winner && z.scores[z.winner];
-      cover.innerHTML = `<span class="eq big" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="qz-k">Игра окончена</span><b class="qz-title">${w ? nick(z.winner, w.name) : 'Никто не угадал'}</b>${w ? `<span class="qz-sub">победитель, ${w.pts} ${plural(w.pts, 'очко', 'очка', 'очков')}</span>` : ''}<div class="qz-actions"><button class="btn btn-primary" data-qagain>Ещё игра</button><button class="btn btn-ghost" data-qexit>Выйти</button></div>`;
+      setHTML(cover, `<span class="eq big" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="qz-k">Игра окончена</span><b class="qz-title">${w ? nick(z.winner, w.name) : 'Никто не угадал'}</b>${w ? `<span class="qz-sub">победитель, ${w.pts} ${plural(w.pts, 'очко', 'очка', 'очков')}</span>` : ''}<div class="qz-actions"><button class="btn btn-primary" data-qagain>Ещё игра</button><button class="btn btn-ghost" data-qexit>Выйти</button></div>`);
     } else if (playing) {
-      cover.innerHTML = `<span class="eq big" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="qz-k">Что это за трек?</span><b class="qz-title">Угадай мелодию</b>${rd.hint ? `<span class="qz-hint">${esc(rd.hint)}</span>` : '<span class="qz-sub">Подсказка появится ближе к концу раунда</span>'}`;
-    } else cover.innerHTML = '';
+      setHTML(cover, `<span class="eq big" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="qz-k">Что это за трек?</span><b class="qz-title">Угадай мелодию</b>${rd.hint ? `<span class="qz-hint">${esc(rd.hint)}</span>` : '<span class="qz-sub">Подсказка появится ближе к концу раунда</span>'}`);
+    } // в момент ответа заглушка не меняется, а плавно уходит (класс open)
     const guessed = rd?.guessed || [];
-    $('#qzStatus').innerHTML = reveal && rd.reveal
+    setHTML($('#qzStatus'), reveal && rd.reveal
       ? `<span class="qz-ans">Это было: <b>${esc(rd.reveal.title)}</b></span>${rd.reveal.note ? `<em>${esc(rd.reveal.note)}</em>` : ''}${guessed.length ? `<span>Угадали: ${guessed.map(g => `${nick(g.pid, g.name)} +${g.pts}`).join(', ')}</span>` : '<span>Никто не угадал</span>'}`
-      : playing && guessed.length ? `<span>Угадали: ${guessed.map(g => `${nick(g.pid, g.name)} +${g.pts}`).join(', ')}</span>` : '';
+      : playing && guessed.length ? `<span>Угадали: ${guessed.map(g => `${nick(g.pid, g.name)} +${g.pts}`).join(', ')}</span>` : '');
   }
   (function quizFrame() {
     requestAnimationFrame(quizFrame);
