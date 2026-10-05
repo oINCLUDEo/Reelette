@@ -122,6 +122,20 @@
     tone(t + 0.4, { freq: hz(48), type: 'sine', peak: 0.2, attack: 0.02, decay: 1.4 });
     noiseHit(t + 0.4, { freq: 6000, type: 'highpass', q: 0.5, peak: 0.06, decay: 0.8 });
   }
+  // шлепок: низкий удар и мокрый шум; роза — мягкий шелест
+  function splat(kind) {
+    ac();
+    const t = ctx.currentTime;
+    if (kind === 'rose') {
+      noiseHit(t, { freq: 5000, type: 'highpass', q: 0.6, peak: 0.08, decay: 0.25 });
+      tone(t, { freq: hz(88), type: 'sine', peak: 0.05, decay: 0.3 });
+      return;
+    }
+    tone(t, { freq: kind === 'egg' ? 260 : 180, type: 'sine', peak: 0.22, attack: 0.003, decay: 0.12, glide: 70 });
+    noiseHit(t, { freq: kind === 'pie' ? 900 : 1400, q: 0.8, peak: 0.25, decay: 0.16 });
+    noiseHit(t + 0.03, { freq: 600, type: 'lowpass', q: 0.5, peak: 0.12, decay: 0.22 });
+    if (kind === 'egg') tone(t + 0.01, { freq: 2600, type: 'triangle', peak: 0.05, decay: 0.04 });
+  }
   function out() {
     ac();
     const t = ctx.currentTime;
@@ -130,7 +144,7 @@
   }
 
   window.Sfx = {
-    unlock: ac, tick, beep, win, out,
+    unlock: ac, tick, beep, win, out, splat,
     analyser: () => analyser,
     spinStart, spinStop: () => spinStop(false),
   };

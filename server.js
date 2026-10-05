@@ -1045,6 +1045,33 @@ async function api(req, res, url) {
     }
   }
 
+  // броски: помидор, яйцо, торт, роза — летят в точку на сцене у всех.
+  // В караоке попадание в видео засчитывается певцу текущего выступления.
+  if (sub === 'throw' && m === 'POST') {
+    const item = str(b.item, 10);
+    if (!['tomato', 'egg', 'pie', 'rose'].includes(item)) return json(res, 400, { error: 'Этим не бросить' });
+    const x = Math.min(1, Math.max(0, num(b.x, 0.5))), y = Math.min(1, Math.max(0, num(b.y, 0.5)));
+    const pid = personKey(me, b) || 'anon';
+    const rt = runtime(r);
+    rt.throwRx ||= new Map();
+    const now = Date.now();
+    const recent = (rt.throwRx.get(pid) || []).filter(t => now - t < 3000);
+    if (recent.length >= 5) return json(res, 429, { error: 'Перезаряжаемся' });
+    recent.push(now); rt.throwRx.set(pid, recent);
+    let scored = false;
+    if (b.onStage && r.karaoke && r.music?.perfId) {
+      const perf = (r.perfs || []).find(p => p.perfId === r.music.perfId);
+      if (perf && !(perf.singerPid && perf.singerPid === pid)) {
+        perf.items ||= {};
+        perf.items[item] = (perf.items[item] || 0) + 1;
+        scored = true;
+      }
+    }
+    broadcast(r.id, { type: 'throw', item, x, y, pid, name: who, seed: crypto.randomInt(0, 1e6) });
+    if (scored) pushState(r);
+    return json(res, 200, { ok: true });
+  }
+
   // реакции: летят у всех, не хранятся; у каждого лимит, считаем для бейджа
   if (sub === 'react' && m === 'POST') {
     const kind = str(b.kind, 12);

@@ -256,6 +256,7 @@ function initRoom(roomId) {
     if (msg.now) serverOffset = msg.now - Date.now();
     if (msg.type === 'profiles') { profilesMap = msg.profiles || {}; render(); return; }
     if (msg.type === 'react') { spawnReaction(msg.kind, msg.pid, msg.name); return; }
+    if (msg.type === 'throw') { throwItem(msg); return; }
     if (msg.type === 'chat') {
       flyMessage(msg.msg);
       if (!msg.msg.guess && state) { state.chat = [...(state.chat || []), msg.msg].slice(-50); if (!$('#chatLog').hidden) renderChatLog(); }
@@ -823,7 +824,9 @@ function initRoom(roomId) {
       const list = Object.values(perf.ratings || {});
       const avg = list.length ? list.reduce((a, r) => a + r.score, 0) / list.length : null;
       const mine = perf.ratings?.[myPid()]?.score || 0;
-      $('#kRate').innerHTML = `<span class="label">Оценка выступления ${avg !== null ? `<b>${avg.toFixed(1).replace('.', ',')}</b>` : ''}</span>
+      const it = perf.items || {};
+      const thrown = ['rose', 'tomato', 'egg', 'pie'].filter(k => it[k]).map(k => `<span class="k-items-i">${THROW[k].e} ${it[k]}</span>`).join('');
+      $('#kRate').innerHTML = `<span class="label">Оценка выступления ${avg !== null ? `<b>${avg.toFixed(1).replace('.', ',')}</b>` : ''}</span>${thrown ? `<div class="k-items">${thrown}</div>` : ''}
         ${perf.singerPid && perf.singerPid === myPid() ? '<p class="note">Это ваше выступление, оценивают остальные.</p>'
           : `<div class="rate-scale">${Array.from({ length: 10 }, (_, i) => `<button class="${i + 1 === mine ? 'on' : ''} ${i + 1 < 5 ? 'low' : i + 1 < 8 ? 'mid' : 'high'}" data-kscore="${i + 1}">${i + 1}</button>`).join('')}</div>`}`;
     }
@@ -973,6 +976,104 @@ function initRoom(roomId) {
     $('#qzBar').style.width = `${left / total * 100}%`;
     $('#qzSecs').textContent = `${Math.ceil(left / 1000)} с`;
   })();
+
+  // ---- броски: летят по дуге в точку на сцене и шлёпаются ----
+  const THROW = {
+    tomato: { e: '🍅', main: '#D7261E', dark: '#8E1210', spots: '#F4C542', drips: true },
+    egg: { e: '🥚', main: '#F6F1E2', dark: '#E2D9BF', yolk: '#FFB21C', drips: true },
+    pie: { e: '🥧', main: '#FFF3DC', dark: '#E9D2A6', spots: '#B8742E', drips: true },
+    rose: { e: '🌹', main: '#E11D48', dark: '#9F1239', petals: true },
+  };
+  let armed = null;
+  function armThrow(item) {
+    armed = armed === item ? null : item;
+    $$('#reactBar [data-throw]').forEach(b => b.classList.toggle('armed', b.dataset.throw === armed));
+    $('#throwLayer').hidden = !armed;
+    if (armed) $('#throwLayer').dataset.item = THROW[armed].e;
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && armed) armThrow(armed); });
+  $('#reactBar').addEventListener('click', e => {
+    const b = e.target.closest('[data-throw]');
+    if (!b) return;
+    Sfx.unlock();
+    armThrow(b.dataset.throw);
+  });
+  $('#throwLayer').addEventListener('click', e => {
+    if (!armed) return;
+    const st = $('.layout > .stage').getBoundingClientRect();
+    const x = (e.clientX - st.left) / st.width, y = (e.clientY - st.top) / st.height;
+    // попадание в видео караоке засчитывается певцу
+    const kv = $('#karaokeBox:not([hidden]) .k-video')?.getBoundingClientRect();
+    const onStage = Boolean(kv && e.clientX >= kv.left && e.clientX <= kv.right && e.clientY >= kv.top && e.clientY <= kv.bottom);
+    api(`/rooms/${roomId}/throw`, { method: 'POST', body: { item: armed, x, y, onStage, cid: me.cid, by: me.name } })
+      .catch(err => toast(err.message, true));
+  });
+  $('#throwLayer').addEventListener('mousemove', e => {
+    const l = $('#throwLayer');
+    l.style.setProperty('--cx', `${e.offsetX}px`);
+    l.style.setProperty('--cy', `${e.offsetY}px`);
+  });
+
+  // детерминированный «случай» по seed с сервера: у всех одинаковые брызги
+  function rng(seed) { let s = seed || 1; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+  function splatSVG(item, seed) {
+    const T = THROW[item], R = rng(seed);
+    let out = '';
+    if (T.petals) {
+      for (let i = 0; i < 14; i++) {
+        const a = R() * 6.283, d = 10 + R() * 60, w = 6 + R() * 7;
+        out += `<ellipse cx="${(Math.cos(a) * d).toFixed(1)}" cy="${(Math.sin(a) * d).toFixed(1)}" rx="${w.toFixed(1)}" ry="${(w * .6).toFixed(1)}" fill="${i % 3 ? T.main : T.dark}" transform="rotate(${Math.round(R() * 180)} ${(Math.cos(a) * d).toFixed(1)} ${(Math.sin(a) * d).toFixed(1)})" opacity=".95"/>`;
+      }
+      return `<svg viewBox="-90 -90 180 180">${out}</svg>`;
+    }
+    // основное пятно — неровный многоугольник с капельками по краю
+    const pts = [];
+    for (let i = 0; i < 18; i++) { const a = i / 18 * 6.283, r = 26 + R() * 18; pts.push(`${(Math.cos(a) * r).toFixed(1)},${(Math.sin(a) * r).toFixed(1)}`); }
+    out += `<polygon points="${pts.join(' ')}" fill="${T.main}" stroke="${T.dark}" stroke-width="2" stroke-linejoin="round"/>`;
+    for (let i = 0; i < 12; i++) {
+      const a = R() * 6.283, d = 40 + R() * 38, r = 2 + R() * 6;
+      out += `<circle cx="${(Math.cos(a) * d).toFixed(1)}" cy="${(Math.sin(a) * d).toFixed(1)}" r="${r.toFixed(1)}" fill="${T.main}"/>`;
+    }
+    if (T.yolk) out += `<circle cx="${(R() * 8 - 4).toFixed(1)}" cy="${(R() * 8 - 4).toFixed(1)}" r="13" fill="${T.yolk}"/><circle cx="-4" cy="-5" r="4" fill="#fff" opacity=".55"/>`;
+    if (T.spots) for (let i = 0; i < 7; i++) out += `<ellipse cx="${(R() * 40 - 20).toFixed(1)}" cy="${(R() * 40 - 20).toFixed(1)}" rx="${(1.5 + R() * 2).toFixed(1)}" ry="${(1 + R() * 1.5).toFixed(1)}" fill="${T.spots}" opacity=".9"/>`;
+    // потёки вниз
+    let drips = '';
+    if (T.drips) for (let i = 0; i < 3; i++) {
+      const x = (R() * 50 - 25).toFixed(1), w = (4 + R() * 5).toFixed(1);
+      drips += `<rect class="drip" x="${x}" y="10" width="${w}" height="${(30 + R() * 40).toFixed(1)}" rx="${(w / 2).toFixed(1)}" fill="${T.main}" style="animation-delay:${(0.4 + R() * 0.8).toFixed(2)}s"/>`;
+    }
+    return `<svg viewBox="-90 -90 180 180">${drips}${out}</svg>`;
+  }
+  function throwItem(msg) {
+    const layer = $('#reactLayer');
+    const T = THROW[msg.item];
+    if (!layer || !T || layer.childElementCount > 70) return;
+    const W = layer.clientWidth, H = layer.clientHeight;
+    const tx = msg.x * W, ty = msg.y * H;
+    // летит снизу, со стороны, зависящей от того, кто бросил
+    const sx = (hue(msg.name || '') % 2 ? 0.15 : 0.85) * W, sy = H + 60;
+    const p = document.createElement('div');
+    p.className = 'projectile';
+    p.textContent = T.e;
+    layer.append(p);
+    const peak = Math.min(sy, ty) - 120;
+    const anim = p.animate([
+      { transform: `translate(${sx}px, ${sy}px) translate(-50%, -50%) rotate(0deg) scale(.7)` },
+      { transform: `translate(${(sx + tx) / 2}px, ${peak}px) translate(-50%, -50%) rotate(${msg.item === 'rose' ? 200 : 360}deg) scale(1.1)`, offset: 0.55 },
+      { transform: `translate(${tx}px, ${ty}px) translate(-50%, -50%) rotate(${msg.item === 'rose' ? 320 : 620}deg) scale(1.6)` },
+    ], { duration: 620, easing: 'cubic-bezier(.3,.1,.5,1)', fill: 'forwards' });
+    anim.onfinish = () => {
+      p.remove();
+      if (settings.sound) Sfx.splat(msg.item);
+      const s = document.createElement('div');
+      s.className = `splat splat-${msg.item}`;
+      s.style.left = `${tx}px`; s.style.top = `${ty}px`;
+      s.style.setProperty('--rot', `${(msg.seed % 360)}deg`);
+      s.innerHTML = splatSVG(msg.item, msg.seed + 1) + `<span class="splat-n">${nick(msg.pid || '', msg.name || '')}</span>`;
+      layer.append(s);
+      setTimeout(() => s.remove(), 6000);
+    };
+  }
 
   // ---- реакции: всплывают у всех над сценой ----
   const RX = { clap: '👏', fire: '🔥', laugh: '😂', love: '😍', wow: '😮', skull: '💀', party: '🎉' };
