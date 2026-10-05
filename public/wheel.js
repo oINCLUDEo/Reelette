@@ -64,7 +64,7 @@ class Wheel {
         if (seen.has(it.id)) return;
         const prevId = this.items[idx - 1]?.id;
         const at = prevId ? next.findIndex(n => n.id === prevId) + 1 : 0;
-        next.splice(at, 0, { ...it, target: 0 });
+        next.splice(at, 0, { ...it, target: 0, dying: true });
       });
     } else next.forEach(i => (i.w = i.target));
     this.items = next;
@@ -129,7 +129,8 @@ class Wheel {
     let tweening = false;
     for (const it of this.items) {
       const d = it.target - it.w;
-      if (Math.abs(d) > 0.001) { it.w += d * Math.min(1, dt * 7); tweening = true; }
+      // выбывший сектор схлопывается медленнее, остальные перетекают в новые размеры
+      if (Math.abs(d) > 0.001) { it.w += d * Math.min(1, dt * (it.dying ? 2.6 : 4.5)); tweening = true; }
       else it.w = it.target;
     }
     if (tweening) this.dirty = true;
@@ -210,6 +211,7 @@ class Wheel {
         grd.addColorStop(1, 'rgba(255,255,255,.04)');
         g.fillStyle = grd; g.fillRect(0, 0, S, S);
       }
+      if (it.dying) { g.fillStyle = 'rgba(255, 60, 90, .5)'; g.fillRect(0, 0, S, S); }
       g.restore();
 
       // разделитель

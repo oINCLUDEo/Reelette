@@ -1165,3 +1165,23 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 .react-bar .crow-btn { width: auto; padding: 0 12px; gap: 6px; display: inline-flex; align-items: center; font: 800 13px var(--f-ui); color: var(--tx); }
 .react-bar .crow-btn svg { width: 20px; height: 20px; }
 .react-bar .crow-btn:hover { background: var(--s2); }
+
+/* шанс вылететь на выбывании */
+.film-pct.elim { color: #FF7A90; }
+
+/* ворона: кнопка-трек в шапке и реакция */
+#crowBtn svg, .rx-crow svg { width: 20px; height: 20px; }
+.react-bar .rx-crow { color: var(--tx); }
+.crow-fly { position: absolute; left: 0; top: 0; pointer-events: none; display: flex; flex-direction: column; align-items: center; will-change: transform; }
+.crow-bird svg { width: 110px; height: 66px; fill: #0d0d12; filter: drop-shadow(0 0 1px rgba(255,255,255,.55)); animation: crowBob .32s ease-in-out infinite alternate; }
+.crow-fly.rtl .crow-bird { transform: scaleX(-1); }
+.cw-wing { transform-box: fill-box; transform-origin: 20% 100%; animation: crowFlap .22s ease-in-out infinite alternate; fill: #1a1a22; }
+.cw-wing.back { fill: #08080c; animation-delay: -.11s; }
+@keyframes crowFlap { from { transform: scaleY(1); } to { transform: scaleY(-.6); } }
+@keyframes crowBob { to { translate: 0 -4px; } }
+.crow-say { position: absolute; top: -26px; left: 60%; padding: 4px 10px; border-radius: 12px 12px 12px 3px; background: #fff; color: #0d0d12; font: 900 18px var(--f-head); letter-spacing: .02em; opacity: 0; animation: crowSay 1.6s ease .55s both; }
+.crow-fly.rtl .crow-say { left: auto; right: 60%; border-radius: 12px 12px 3px 12px; }
+@keyframes crowSay { 0% { opacity: 0; transform: scale(.4) rotate(-10deg); } 15% { opacity: 1; transform: scale(1.15) rotate(4deg); } 30%, 80% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.9); } }
+.crow-n { margin-top: -4px; font-size: 11.5px; font-weight: 800; padding: 2px 7px; border-radius: 7px; background: rgba(0,0,0,.5); white-space: nowrap; }
+.crow-feather { position: absolute; width: 10px; height: 26px; border-radius: 50% 50% 50% 50% / 80% 80% 20% 20%; background: linear-gradient(90deg, #1a1a22 48%, #3a3a46 50%, #1a1a22 52%); pointer-events: none; animation: featherFall 3.2s ease-in forwards; }
+@keyframes featherFall { 0% { transform: translate(0, 0) rotate(20deg); opacity: 1; } 25% { transform: translate(28px, 60px) rotate(-30deg); } 50% { transform: translate(-18px, 130px) rotate(25deg); } 75% { transform: translate(22px, 200px) rotate(-20deg); opacity: 1; } 100% { transform: translate(-6px, 270px) rotate(10deg); opacity: 0; } }

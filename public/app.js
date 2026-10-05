@@ -395,9 +395,19 @@ function initRoom(roomId) {
   const frameCls = (pid, p = prof(pid)) => (p.frame && p.frame !== 'none' ? ` frame-${p.frame}` : '');
   const frameVars = (pid, p = prof(pid)) => nickVars(p).style;
 
+  // на выбывании колесо показывает шанс вылететь (как на сервере)
+  const elimView = () => settings.mode === 'elimination' || Boolean(state?.eliminated?.length);
+  function elimWeights(W, list) {
+    const inv = new Map();
+    let sum = 0;
+    for (const f of list) { const v = 1 / Math.max(1e-6, W.get(f.id) || 0); inv.set(f.id, v); sum += v; }
+    for (const [k, v] of inv) inv.set(k, (v / sum) * 100);
+    return inv;
+  }
+  const viewWeights = list => (elimView() ? elimWeights(chanceWeights(list), list) : chanceWeights(list));
   function syncWheel() {
     const list = activeFilms();
-    const W = chanceWeights(list);
+    const W = viewWeights(list);
     wheel.setItems(list.map(f => ({ ...f, weight: W.get(f.id) })));
   }
 
@@ -536,7 +546,7 @@ function initRoom(roomId) {
     $('#roomTitle').textContent = state.name;
     const spinning = Boolean(spinningSid || state.spin);
     const active = activeFilms();
-    const W = chanceWeights(active);
+    const W = viewWeights(active);
     const total = active.reduce((s, f) => s + W.get(f.id), 0);
     const amOwner = Boolean(state.owner) && state.owner === myPid();
     const out = new Set(state.eliminated);
@@ -581,7 +591,7 @@ function initRoom(roomId) {
           <div class="film-meta">${meta.map(esc).join(', ')}</div>
         </div>
         <div class="film-side">
-          <span class="film-pct">${pct}</span>
+          <span class="film-pct${elimView() ? ' elim' : ''}" title="${elimView() ? 'Шанс вылететь на следующем прокруте' : 'Шанс выпасть'}">${pct}</span>
           <div class="film-actions">
             <button class="vote-btn${mine ? ' on' : ''}${nv ? ' has' : ''}" data-vote-film title="${mine ? 'Снять свой голос' : `Хочу посмотреть: около +${rules().points ?? 4}% колеса этому фильму`}">${ICON.heart}<b>${nv || ''}</b></button>
             ${amOwner ? `<div class="stepper"><button data-w="-1" title="Меньше">${ICON.minus}</button><b>${f.weight}</b><button data-w="1" title="Больше">${ICON.plus}</button></div>` : ''}
@@ -1104,7 +1114,37 @@ function initRoom(roomId) {
 
   // ---- реакции: всплывают у всех над сценой ----
   const RX = { clap: '👏', fire: '🔥', laugh: '😂', love: '😍', wow: '😮', skull: '💀', party: '🎉' };
+  function crowFly(pid, name) {
+    const layer = $('#reactLayer');
+    if (!layer) return;
+    const W = layer.clientWidth, H = layer.clientHeight;
+    const ltr = Math.random() < 0.5;
+    const y0 = H * (0.12 + Math.random() * 0.3);
+    const el = document.createElement('div');
+    el.className = 'crow-fly' + (ltr ? '' : ' rtl');
+    el.innerHTML = `<div class="crow-bird"><svg viewBox="0 0 80 48"><path class="cw-wing back" d="M34 22c-2-9-9-17-19-20 4 7 6 15 9 21z"/><path d="M8 26c7-2 14 0 19 3l10-2c7-1 13 0 18-3l9-6-5 7 11 1-12 4c-5 5-14 8-22 7l-7 7h-5l4-7c-8-1-14-4-20-11z"/><circle cx="62" cy="21" r="1.7" fill="#fff"/><path class="cw-wing" d="M30 24c3-11 12-19 24-22-4 8-9 15-15 23z"/></svg></div><span class="crow-say">КАР!</span><span class="crow-n">${nick(pid || '', name || '')}</span>`;
+    layer.append(el);
+    const x0 = ltr ? -120 : W + 120, x1 = ltr ? W + 120 : -120;
+    el.animate([
+      { transform: `translate(${x0}px, ${y0}px)` },
+      { transform: `translate(${x0 + (x1 - x0) * 0.25}px, ${y0 - 40}px)` },
+      { transform: `translate(${x0 + (x1 - x0) * 0.5}px, ${y0 + 10}px)` },
+      { transform: `translate(${x0 + (x1 - x0) * 0.75}px, ${y0 - 30}px)` },
+      { transform: `translate(${x1}px, ${y0 - 10}px)` },
+    ], { duration: 3400, easing: 'linear', fill: 'forwards' }).onfinish = () => el.remove();
+    if (settings.sound) setTimeout(() => Sfx.caw(), 700);
+    // перо падает с середины пути
+    setTimeout(() => {
+      const f = document.createElement('div');
+      f.className = 'crow-feather';
+      f.style.left = `${W * (0.35 + Math.random() * 0.3)}px`;
+      f.style.top = `${y0 + 20}px`;
+      layer.append(f);
+      f.addEventListener('animationend', () => f.remove());
+    }, 1500);
+  }
   function spawnReaction(kind, pid, name) {
+    if (kind === 'crow') return crowFly(pid, name);
     const layer = $('#reactLayer');
     if (!layer || !RX[kind] || layer.childElementCount > 40) return;
     const el = document.createElement('div');
@@ -1852,9 +1892,10 @@ function initRoom(roomId) {
     settings.mode = m; ls.set('mode', m);
     $$('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
     placeSeg($('#modeSeg'));
+    if (state && !spinningSid && !state.spin) syncWheel();
     $('#modeHint').dataset.hint = m === 'normal'
       ? 'Один прокрут выбирает один фильм. Шанс фильма равен его доле в колесе.'
-      : m === 'elimination' ? 'Каждый прокрут убирает один фильм, последний оставшийся побеждает. Шансы на победу такие же, как в обычном режиме.'
+      : m === 'elimination' ? 'Каждый прокрут выбивает один фильм, последний оставшийся побеждает. Колесо показывает шанс вылететь: чем меньше у фильма шанс победить, тем больше его сектор.'
       : 'Фильмы выходят парами, все голосуют. Проигравший вылетает, пока не останется один. При ничьей победителя выбирает жребий с учётом веса.';
     $('#autoWrap').hidden = m !== 'elimination';
     $('#durField').hidden = m === 'duel';

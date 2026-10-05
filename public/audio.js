@@ -136,6 +136,24 @@
     noiseHit(t + 0.03, { freq: 600, type: 'lowpass', q: 0.5, peak: 0.12, decay: 0.22 });
     if (kind === 'egg') tone(t + 0.01, { freq: 2600, type: 'triangle', peak: 0.05, decay: 0.04 });
   }
+  // «КАР!» дважды: пила через полосовой фильтр с падающим тоном и немного шума
+  function caw() {
+    ac();
+    const t = ctx.currentTime;
+    for (const [d, f0] of [[0, 640], [0.34, 580]]) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f0, t + d);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.6, t + d + 0.24);
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 1350; bp.Q.value = 2.4;
+      const g = ctx.createGain();
+      env(g, t + d, 0.24, 0.012, 0.24);
+      o.connect(bp).connect(g).connect(master);
+      o.start(t + d); o.stop(t + d + 0.3);
+      noiseHit(t + d, { freq: 1900, q: 1.3, peak: 0.08, decay: 0.2 });
+    }
+  }
   function out() {
     ac();
     const t = ctx.currentTime;
@@ -144,7 +162,7 @@
   }
 
   window.Sfx = {
-    unlock: ac, tick, beep, win, out, splat,
+    unlock: ac, tick, beep, win, out, splat, caw,
     analyser: () => analyser,
     spinStart, spinStop: () => spinStop(false),
   };

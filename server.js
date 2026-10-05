@@ -52,7 +52,7 @@ function cleanProfile(b) {
     status: typeof b.status === 'string' ? b.status.trim().slice(0, 60) : '',
   };
 }
-const REACTIONS = ['clap', 'fire', 'laugh', 'love', 'wow', 'skull', 'party'];
+const REACTIONS = ['clap', 'fire', 'laugh', 'love', 'wow', 'skull', 'party', 'crow'];
 
 const auth = require('./auth')({
   dataDir: DATA_DIR,
@@ -235,6 +235,14 @@ setInterval(() => {
 function activeFilms(r) {
   return r.films.filter(f => !r.eliminated.includes(f.id) && f.weight > 0 && matchesFilters(r, f));
 }
+// Шанс вылететь: обратный шансу на победу, в сумме 100. Фавориты получают маленькие секторы.
+function elimWeights(W, list) {
+  const inv = new Map();
+  let sum = 0;
+  for (const f of list) { const v = 1 / Math.max(1e-6, W.get(f.id) || 0); inv.set(f.id, v); sum += v; }
+  for (const [k, v] of inv) inv.set(k, (v / sum) * 100);
+  return inv;
+}
 function pickWeighted(list, weights) {
   const wOf = f => (weights ? weights.get(f.id) || 0 : effWeight(f));
   const total = list.reduce((s, f) => s + wOf(f), 0);
@@ -250,17 +258,10 @@ function startSpin(r, { mode, duration, auto, by, delay }) {
   duration = Math.min(60, Math.max(0, num(duration, 12))); // 0 — сразу результат, без вращения
   delay = Math.min(15, Math.max(0, Math.round(num(delay, 0))));
   const rt = runtime(r);
-  const W = chanceWeights(r, list);
-
-  let landed;
-  if (mode === 'normal') {
-    landed = pickWeighted(list, W);
-  } else {
-    // Победитель выбирается сразу пропорционально весу, порядок выбывания — случайный.
-    if (!r.plan || !list.some(f => f.id === r.plan.winner)) r.plan = { winner: pickWeighted(list, W).id };
-    const losers = list.filter(f => f.id !== r.plan.winner);
-    landed = losers[crypto.randomInt(0, losers.length)];
-  }
+  // обычный режим: сектор = шанс победить; выбывание: сектор = шанс вылететь, стрелка выбивает именно по нему
+  const W = mode === 'elimination' ? elimWeights(chanceWeights(r, list), list) : chanceWeights(r, list);
+  const landed = pickWeighted(list, W);
+  r.plan = null;
 
   r.spin = {
     sid: id(6), mode, duration, auto: Boolean(auto) && mode === 'elimination', by: str(by, 32),
@@ -1124,6 +1125,7 @@ async function api(req, res, url) {
       if (b.now && r.quiz && r.music?.quiz) return json(res, 409, { error: 'Идёт «Угадай мелодию»' });
       const t = await fetchTrack(b.url);
       if (t.error) return json(res, 400, { error: t.error });
+      if (t.vid === 'RnMVb0lJ8LI') broadcast(r.id, { type: 'react', kind: 'crow', name: who, pid: personKey(me, b) });
       // кто поёт (для караоке): по умолчанию тот, кто добавил
       const singer = str(b.singer, 32);
       const track = { ...t, by: who, singer: singer || who, singerPid: !singer || singer === who ? personKey(me, b) : '' };
