@@ -407,19 +407,8 @@ function initRoom(roomId) {
   function elimWeights(W, list) {
     const out = new Map();
     const inv = f => 1 / Math.max(1e-6, W.get(f.id) || 0);
-    if (state?.fair === false) {
-      const sum = list.reduce((a, f) => a + inv(f), 0) || 1;
-      for (const f of list) out.set(f.id, (inv(f) / sum) * 100);
-      return out;
-    }
-    const groups = new Map();
-    for (const f of list) { const p = personOf(f); if (!groups.has(p)) groups.set(p, []); groups.get(p).push(f); }
-    const share = new Map([...groups].map(([p, fs]) => [p, 1 / Math.max(1e-6, fs.reduce((a, f) => a + (W.get(f.id) || 0), 0))]));
-    const tot = [...share.values()].reduce((a, b) => a + b, 0) || 1;
-    for (const [p, fs] of groups) {
-      const s = fs.reduce((a, f) => a + inv(f), 0) || 1;
-      for (const f of fs) out.set(f.id, (100 * share.get(p) / tot) * (inv(f) / s));
-    }
+    const sum = list.reduce((a, f) => a + inv(f), 0) || 1;
+    for (const f of list) out.set(f.id, (inv(f) / sum) * 100);
     return out;
   }
   const viewWeights = list => (elimView() ? elimWeights(chanceWeights(list), list) : chanceWeights(list));
@@ -1956,7 +1945,7 @@ function initRoom(roomId) {
     if (state && !spinningSid && !state.spin) syncWheel();
     $('#modeHint').dataset.hint = m === 'normal'
       ? 'Один прокрут выбирает один фильм. Шанс фильма равен его доле в колесе.'
-      : m === 'elimination' ? 'Каждый прокрут выбивает один фильм, последний оставшийся побеждает. Шанс победить тот же, что в обычном режиме, а колесо показывает шанс вылететь следующим: у кого больше голосов и бонусов, тот вылетает реже.'
+      : m === 'elimination' ? 'Каждый прокрут выбивает один фильм, последний оставшийся побеждает. Шанс победить тот же, что в обычном режиме, а колесо показывает шанс вылететь следующим: чем больше у фильма шанс выиграть, тем уже его сектор.'
       : 'Фильмы выходят парами, все голосуют. Проигравший вылетает, пока не останется один. При ничьей победителя выбирает жребий с учётом веса.';
     $('#autoWrap').hidden = m !== 'elimination';
     $('#durField').hidden = m === 'duel';
