@@ -136,6 +136,7 @@ const VOTE_BONUS = 0.25;
 // Голос добавляет фильму фиксированные 4 пункта к колесу (колесо = 100 пунктов + голоса),
 // поэтому весит одинаково, сколько бы фильмов ни было у автора.
 const VOTE_POINTS = 4;
+const RATE_EDIT_MS = 60000; // сколько можно менять свою оценку
 const votePoints = f => VOTE_POINTS * Math.min(VOTE_CAP, (f.votes || []).length);
 const VOTE_CAP = 4;
 const voteMul = f => 1 + VOTE_BONUS * Math.min(VOTE_CAP, (f.votes || []).length);
@@ -246,8 +247,11 @@ setInterval(() => {
 }, 25000);
 
 // ---------- колесо ----------
+// уже выпадавшие фильмы на колесо не попадают; создатель может убрать фильм из истории, и он вернётся
+const watchedIds = r => new Set(r.history.map(h => h.film.id));
 function activeFilms(r) {
-  return r.films.filter(f => !r.eliminated.includes(f.id) && f.weight > 0 && matchesFilters(r, f));
+  const watched = watchedIds(r);
+  return r.films.filter(f => !r.eliminated.includes(f.id) && !watched.has(f.id) && f.weight > 0 && matchesFilters(r, f));
 }
 // Шанс вылететь: обратный шансу на победу, в сумме 100. Фавориты получают маленькие секторы.
 // Шанс вылететь на выбывании. С «равными шансами» доля вылета человека обратна его общей доле на победу
@@ -1258,7 +1262,28 @@ async function api(req, res, url) {
     }
   }
 
-  // оценка фильма после просмотра, можно менять
+  // создатель убирает фильм из выпавших: он возвращается на колесо
+  if (sub === 'history' && parts[3] && m === 'DELETE') {
+    if (!isOwner(r, me, b)) return json(res, 403, { error: 'Убирать фильмы из истории может только создатель комнаты' });
+    const h = r.history.find(x => x.hid === parts[3]);
+    if (!h) return json(res, 404, { error: 'Этого фильма нет в истории' });
+    r.history = r.history.filter(x => x !== h);
+    if (h.src) {
+      // бонус автора теперь задаёт его предыдущий выпавший фильм
+      const a = personOf(h.film);
+      r.mods ||= {};
+      delete r.mods[a];
+      const prev = r.history.find(x => personOf(x.film) === a);
+      if (prev) {
+        prev.src = true;
+        const mm = modFromEntry(prev);
+        if (mm && mm.factor !== 1) r.mods[a] = mm;
+      }
+    }
+    pushState(r); return json(res, 200, { ok: true });
+  }
+
+  // оценка фильма после просмотра: свою оценку можно поменять в течение минуты
   if (sub === 'rate' && m === 'POST') {
     const h = r.history.find(x => x.hid === str(b.hid, 16));
     if (!h) return json(res, 404, { error: 'Этого фильма нет в истории' });
@@ -1267,7 +1292,9 @@ async function api(req, res, url) {
     if (pid === personOf(h.film)) return json(res, 400, { error: 'Свой фильм оценивают остальные' });
     const score = Math.round(num(b.score, 0));
     h.ratings ||= {};
-    if (score >= 1 && score <= 10) h.ratings[pid] = { score, name: who, avatar: me?.avatar || '' };
+    const old = h.ratings[pid];
+    if (old && Date.now() - (old.at || 0) > RATE_EDIT_MS) return json(res, 403, { error: 'Оценку можно менять только в первую минуту' });
+    if (score >= 1 && score <= 10) h.ratings[pid] = { score, name: who, avatar: me?.avatar || '', at: old?.at || Date.now() };
     else delete h.ratings[pid];
     // оценка последнего выпавшего фильма автора обновляет его бонус
     if (h.src) {
@@ -1379,7 +1406,7 @@ async function api(req, res, url) {
 
   if (sub === 'clear' && m === 'POST') {
     if (!isOwner(r, me, b)) return json(res, 403, { error: 'Это может только создатель комнаты' });
-    if (b.what === 'history') r.history = [];
+    if (b.what === 'history') { r.history = []; r.mods = {}; }
     else { r.films = []; r.eliminated = []; r.plan = null; }
     pushState(r); return json(res, 200, { ok: true });
   }

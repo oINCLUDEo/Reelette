@@ -125,6 +125,11 @@ function placeSeg(seg) {
   ind.style.transform = `translateX(${on.offsetLeft - 4}px)`;
 }
 addEventListener('resize', () => $$('.seg, .tabs').forEach(placeSeg));
+// переключатель в скрытом блоке не измерить: ставим индикатор, когда блок показали
+if (window.ResizeObserver) {
+  const segRO = new ResizeObserver(es => es.forEach(e => placeSeg(e.target)));
+  $$('.seg, .tabs').forEach(s => segRO.observe(s));
+}
 document.fonts?.ready.then(() => $$('.seg, .tabs').forEach(placeSeg));
 
 // Аккаунт: Discord, если настроен на сервере, иначе гость.
@@ -317,8 +322,10 @@ function initRoom(roomId) {
     if (F.genres.length && !(f.genres || []).some(g => F.genres.includes(String(g).toLowerCase()))) return false;
     return true;
   }
+  const watchedIds = () => new Set((state?.history || []).map(h => h.film.id));
   function activeFilms() {
-    return state ? state.films.filter(f => !state.eliminated.includes(f.id) && matchesFilters(f)) : [];
+    const watched = watchedIds();
+    return state ? state.films.filter(f => !state.eliminated.includes(f.id) && !watched.has(f.id) && matchesFilters(f)) : [];
   }
   // ---- голоса: тот же расчёт веса, что на сервере ----
   const rules = () => state?.rules || { votes: 3, points: 4, cap: 4 };
@@ -558,10 +565,11 @@ function initRoom(roomId) {
     $('#roomTitle').textContent = state.name;
     const spinning = Boolean(spinningSid || state.spin);
     const active = activeFilms();
-    const W = viewWeights(active);
+    const W = chanceWeights(active);
     const total = active.reduce((s, f) => s + W.get(f.id), 0);
     const amOwner = Boolean(state.owner) && state.owner === myPid();
     const out = new Set(state.eliminated);
+    const watched = watchedIds();
 
     const used = myVotesUsed(), R = rules();
     $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: R.votes }, (_, i) => `<i class="${i < R.votes - used ? 'on' : ''}"></i>`).join('')}</span><span class="m">${used < R.votes ? `осталось ${R.votes - used}, каждый даёт фильму около ${R.points ?? 4}% колеса` : 'все отданы, голос можно снять'}</span>`;
@@ -588,20 +596,21 @@ function initRoom(roomId) {
       || state.films.flatMap(f => f.votes || []).find(v => v.id === pid && v.avatar)?.avatar
       || (account.user && pid === myPid() ? account.user.avatar : '');
     const filmRow = f => {
-      const filtered = !out.has(f.id) && !matchesFilters(f);
+      const seen = watched.has(f.id);
+      const filtered = !seen && !out.has(f.id) && !matchesFilters(f);
       const share = (W.get(f.id) || 0) / total;
-      const pct = out.has(f.id) || filtered || !total ? '—' : `${(share * 100).toFixed(share < 0.1 ? 1 : 0)}%`;
+      const pct = seen || out.has(f.id) || filtered || !total ? '—' : `${(share * 100).toFixed(share < 0.1 ? 1 : 0)}%`;
       const nv = (f.votes || []).length, mine = iVoted(f);
-      const meta = filtered ? ['не подходит под фильтры'] : [f.year, f.runtime && fmtRuntime(f.runtime)].filter(Boolean);
+      const meta = seen ? ['уже смотрели'] : filtered ? ['не подходит под фильтры'] : [f.year, f.runtime && fmtRuntime(f.runtime)].filter(Boolean);
       const fresh = seenFilms && !seenFilms.has(f.id);
-      return `<div class="film${fresh ? ' fresh' : ''}${out.has(f.id) ? ' out' : ''}${filtered ? ' filtered' : ''}${wheel.curId === f.id ? ' hot' : ''}" data-id="${esc(f.id)}">
+      return `<div class="film${fresh ? ' fresh' : ''}${out.has(f.id) || seen ? ' out' : ''}${seen ? ' watched' : ''}${filtered ? ' filtered' : ''}${wheel.curId === f.id ? ' hot' : ''}" data-id="${esc(f.id)}">
         <div class="film-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</div>
         <div class="film-main">
           <div class="film-title">${esc(f.title)}</div>
           <div class="film-meta">${meta.map(esc).join(', ')}</div>
         </div>
         <div class="film-side">
-          <span class="film-pct${elimView() ? ' elim' : ''}" title="${elimView() ? 'Шанс вылететь на следующем прокруте' : 'Шанс выпасть'}">${pct}</span>
+          <span class="film-pct" title="${seen ? 'Уже выпадал, на колесе его нет' : 'Шанс выиграть'}">${pct}</span>
           <div class="film-actions">
             <button class="vote-btn${mine ? ' on' : ''}${nv ? ' has' : ''}" data-vote-film title="${mine ? 'Снять свой голос' : `Хочу посмотреть: около +${rules().points ?? 4}% колеса этому фильму`}">${ICON.heart}<b>${nv || ''}</b></button>
             ${amOwner ? `<div class="stepper"><button data-w="-1" title="Меньше">${ICON.minus}</button><b>${f.weight}</b><button data-w="1" title="Больше">${ICON.plus}</button></div>` : ''}
@@ -632,7 +641,8 @@ function initRoom(roomId) {
     $('#historyList').innerHTML = state.history.length
       ? state.history.slice(0, 20).map((h, i) => {
         const a = avgRating(h);
-        return `<div class="hist" data-h="${i}"><i style="${posterStyle(h.film)}"></i><div><b>${esc(h.film.title)}</b><span>${timeAgo(h.at)}</span></div>${a !== null ? `<em class="score">${a.toFixed(1).replace('.', ',')}</em>` : ''}</div>`;
+        const canRate = personOf(h.film) !== myPid() && !h.ratings?.[myPid()];
+        return `<div class="hist" data-h="${i}"><i style="${posterStyle(h.film)}"></i><div><b>${esc(h.film.title)}</b><span>${timeAgo(h.at)}</span></div>${canRate ? '<em class="rate-me">Оценить</em>' : ''}${a !== null ? `<em class="score">${a.toFixed(1).replace('.', ',')}</em>` : ''}</div>`;
       }).join('')
       : '<p class="note">Пока ничего. Победители будут появляться здесь.</p>';
 
@@ -1410,18 +1420,46 @@ function initRoom(roomId) {
     box.innerHTML = `
       <h3>Оцените после просмотра</h3>
       <div class="rate-film" data-h="0"><i style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><div><b>${esc(h.film.title)}</b><span>добавил(а) ${who}</span></div></div>
-      ${isAuthor ? '<p class="note">Это ваш фильм, его оценивают остальные.</p>'
-        : `<div class="rate-scale">${Array.from({ length: 10 }, (_, i) => `<button class="${i + 1 === mine ? 'on' : ''} ${i + 1 < 5 ? 'low' : i + 1 < 8 ? 'mid' : 'high'}" data-score="${i + 1}">${i + 1}</button>`).join('')}</div>`}
+      ${isAuthor ? '<p class="note">Это ваш фильм, его оценивают остальные.</p>' : rateScale(h)}
       ${list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>` : ''}
       <p class="rate-effect">${effect}</p>`;
   }
-  $('#rateBox').addEventListener('click', async e => {
-    const b = e.target.closest('[data-score]');
+  // своя оценка меняется только первую минуту, потом шкала закрывается
+  const RATE_EDIT_MS = 60000;
+  let detailHid = null, rateTimer = null;
+  const rateLeft = h => { const r = h.ratings?.[myPid()]; return r ? RATE_EDIT_MS - (Date.now() + serverOffset - (r.at || 0)) : Infinity; };
+  function rateScale(h) {
+    const mine = h.ratings?.[myPid()]?.score || 0;
+    const left = rateLeft(h);
+    if (left <= 0) return `<p class="note rate-locked">Ваша оценка <b>${mine}</b>, изменить её уже нельзя.</p>`;
+    if (left !== Infinity) {
+      // когда минута кончится, перерисуем шкалу закрытой
+      clearTimeout(rateTimer);
+      rateTimer = setTimeout(() => { renderRate(); if (detailHid && $('#filmModal').classList.contains('open')) showHist(detailHid); }, left + 300);
+    }
+    return `<div class="rate-scale" data-hid="${esc(h.hid)}">${Array.from({ length: 10 }, (_, i) => `<button class="${i + 1 === mine ? 'on' : ''} ${i + 1 < 5 ? 'low' : i + 1 < 8 ? 'mid' : 'high'}" data-score="${i + 1}">${i + 1}</button>`).join('')}</div>
+      ${mine ? '<p class="note">Оценку можно поменять в течение минуты.</p>' : ''}`;
+  }
+  // оценка в карточке выпавшего фильма
+  function histRateHtml(h) {
+    const author = personOf(h.film);
+    const list = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author);
+    const a = avgRating(h);
+    return `<div class="hist-rate">
+      <div class="hr-head">Оценки${a !== null ? ` <b>${a.toFixed(1).replace('.', ',')}</b>` : ''}</div>
+      ${author === myPid() ? '<p class="note">Это ваш фильм, его оценивают остальные.</p>' : rateScale(h)}
+      ${list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>` : ''}
+    </div>`;
+  }
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('.rate-scale [data-score]');
     if (!b) return;
-    const h = state.history[0];
+    const hid = b.closest('[data-hid]').dataset.hid;
     const score = b.classList.contains('on') ? 0 : Number(b.dataset.score); // повторный клик снимает оценку
-    try { await api(`/rooms/${roomId}/rate`, { method: 'POST', body: { hid: h.hid, score, cid: me.cid, by: me.name } }); }
-    catch (err) { toast(err.message, true); }
+    try {
+      await api(`/rooms/${roomId}/rate`, { method: 'POST', body: { hid, score, cid: me.cid, by: me.name } });
+      if (detailHid === hid) setTimeout(() => showHist(hid), 250);
+    } catch (err) { toast(err.message, true); }
   });
   $('#fairOn').addEventListener('change', e => {
     state.fair = e.target.checked;
@@ -1686,11 +1724,16 @@ function initRoom(roomId) {
 
   $('#historyList').addEventListener('click', e => {
     const h = e.target.closest('[data-h]');
-    if (h) showDetail(state.history[h.dataset.h].film, true);
+    if (h) showHist(state.history[h.dataset.h]?.hid);
   });
+  function showHist(hid) {
+    const h = state.history.find(x => x.hid === hid);
+    if (h) showDetail(h.film, true, h);
+  }
 
-  function showDetail(f, fromHistory = false) {
+  function showDetail(f, fromHistory = false, h = null) {
     if (!f) return;
+    detailHid = h?.hid || null;
     const active = activeFilms();
     const W = chanceWeights(active);
     const total = active.reduce((s, x) => s + W.get(x.id), 0);
@@ -1705,6 +1748,7 @@ function initRoom(roomId) {
         ${facts(f)}
         ${inWheel ? `<div class="facts"><span>Вес <b>${f.weight}</b></span><span>Голосов <b>${votes.length}</b></span><span>Шанс <b>${(W.get(f.id) / total * 100).toFixed(1)}%</b></span></div>` : ''}
         ${votersLine}
+        ${h ? histRateHtml(h) : ''}
         <p>${f.overview ? esc(f.overview) : '<span class="muted">Описания нет.</span>'}</p>
         <div class="detail-actions">
           ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Страница фильма</a>` : ''}
@@ -1712,8 +1756,14 @@ function initRoom(roomId) {
           ${kpBtn(f)}
           ${!fromHistory ? `<button class="btn btn-ghost${iVoted(f) ? ' on' : ''}" data-vote-detail>${ICON.heart}${iVoted(f) ? 'Снять голос' : 'Хочу посмотреть'}</button>` : ''}
           ${!fromHistory && canDelete(f) ? `<button class="btn btn-ghost" data-rm>Удалить из колеса</button>` : ''}
+          ${h && isRoomOwner() ? `<button class="btn btn-ghost" data-hdel title="Фильм вернётся на колесо, его оценки удалятся">Убрать из выпавших</button>` : ''}
         </div>
       </div></div>`;
+    $('#filmDetail [data-hdel]')?.addEventListener('click', async () => {
+      if (!confirm(`Убрать «${f.title}» из выпавших? Фильм вернётся на колесо, его оценки удалятся.`)) return;
+      try { await api(`/rooms/${roomId}/history/${h.hid}?cid=${encodeURIComponent(me.cid)}`, { method: 'DELETE' }); closeModal('#filmModal'); toast('Фильм вернулся на колесо'); }
+      catch (err) { toast(err.message, true); }
+    });
     $('#filmDetail [data-rm]')?.addEventListener('click', async () => { await removeFilm(f.id); closeModal('#filmModal'); });
     $('#filmDetail [data-vote-detail]')?.addEventListener('click', async () => {
       await voteFilm(f.id);

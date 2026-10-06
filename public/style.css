@@ -1194,3 +1194,12 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 .mod-row.up b { color: var(--ok); }
 .mod-row.down { background: color-mix(in srgb, var(--bad) 10%, transparent); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
 .mod-row.down b { color: var(--bad); }
+
+/* выпавшие фильмы и оценки в истории */
+.film.watched .film-meta { color: var(--tx3); }
+.hist .rate-me { margin-left: auto; flex: none; font: 700 11.5px var(--f-ui); font-style: normal; color: var(--btn-tx); background: var(--btn); padding: 4px 8px; border-radius: 8px; }
+.hist .rate-me + .score { margin-left: 6px; }
+.hist-rate { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border-radius: 14px; background: var(--s1); border: 1px solid var(--bd); }
+.hist-rate .hr-head { font: 800 14px var(--f-ui); color: var(--tx2); }
+.hist-rate .hr-head b { color: var(--tx); margin-left: 4px; }
+.rate-locked b { color: var(--tx); }
