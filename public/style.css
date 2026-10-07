@@ -1233,10 +1233,7 @@ html { overflow-x: clip; }
   .chat-log { right: 0; left: 0; width: auto; }
 }
 /* на узком экране вместо аватаров — счётчик людей со списком */
-.people-wrap { display: none; }
 @media (max-width: 520px) {
-  .people { display: none; }
-  .people-wrap { display: block; }
   /* название комнаты важнее логотипа; кнопки чуть компактнее */
   #room .brand { display: none; }
   #room .room-title { margin-left: 0; padding: 9px 10px; }
@@ -1346,15 +1343,15 @@ html { overflow-x: clip; }
 .stage.dueling .stage-top { display: flex; }
 
 /* правая колонка */
-.side { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow: hidden; }
+.side { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
 .side > .rate-box, .side > .mod-banner { flex: none; }
 .side .mod-banner { margin: 0; }
 .side-sec { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .side-head { font: 800 15px var(--f-head); letter-spacing: -.02em; display: flex; gap: 6px; align-items: baseline; }
-.side-people { flex: none; max-height: 34%; }
+.side-people { flex: none; max-height: 200px; }
 .people-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; margin: 0 -8px; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
 .people-list .menu-item { padding: 6px 8px; }
-.side-chat { flex: 1; }
+.side-chat { flex: 1 0 260px; }
 .chat-feed { flex: 1; min-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
 .chat-feed .note { font-size: 13px; }
 .chat-slot .chat-form { margin: 0; }
