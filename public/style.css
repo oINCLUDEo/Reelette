@@ -1452,4 +1452,5 @@ html { overflow-x: clip; }
   .nav-music .yt-ctrl > :not(#ytToggle):not(#ytChange), .nav-music #ytVol { display: none; }
   /* браузер ждёт клика, чтобы включить звук: кнопку «Слушать» показываем */
   .nav-music .yt-frame:has(.yt-unmute:not([hidden])) { position: relative; width: 64px; height: 36px; opacity: 1; pointer-events: auto; }
+  .nav-music .yt-card:has(.yt-unmute:not([hidden])) .yt-ctrl { display: none; }
 }
