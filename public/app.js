@@ -797,6 +797,7 @@ function initRoom(roomId) {
     $('#ytPanel').hidden = !ytChanging && !playerHere;
     $('#ytPanel').classList.toggle('open', ytChanging);
     $('#ytPanel').classList.toggle('docked', !ytChanging && playerHere);
+    document.body.classList.toggle('yt-docked', !ytChanging && playerHere);
     $('#ytPlayer').hidden = !playerHere;
     renderQueue();
     $('#musicBtn').hidden = Boolean(m);

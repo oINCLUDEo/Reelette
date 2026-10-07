@@ -1311,7 +1311,8 @@ html { overflow-x: clip; }
 }
 /* планшет: фильмы + колесо, правая колонка под ними */
 @media (min-width: 768px) and (max-width: 1099px) {
-  #room .layout { grid-template-columns: minmax(270px, 320px) minmax(0, 1fr); align-items: start; }
+  #room { --col-l: 300px; }
+  #room .layout { grid-template-columns: var(--col-l) minmax(0, 1fr); align-items: start; }
   #room .layout > .stage { order: 0; }
   #room .films-panel { position: sticky; top: 78px; max-height: calc(100dvh - 86px); }
   #room .side { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
@@ -1505,3 +1506,20 @@ html { overflow-x: clip; }
 }
 @media (max-width: 520px) { .yt-thumb { width: 40px; } }
 .yt-panel .yt-add { display: flex; flex-direction: column; gap: 10px; }
+
+/* свёрнутый плеер — внизу колонки фильмов: видимый, высотой 200px, колесо не закрывает */
+@media (min-width: 768px) {
+  .yt-panel.docked { left: calc(var(--gap) + 12px); right: auto; bottom: calc(var(--gap) + 12px); width: calc(var(--col-l) - 24px); }
+  .yt-panel.docked .yt-player { aspect-ratio: auto; height: 200px; }
+  body.yt-docked #room .films-panel { padding-bottom: 222px; }
+}
+/* средние ширины: громкость прячется, чтобы название трека не сжималось */
+@media (max-width: 1500px) { .nav-music #ytVol { display: none; } }
+/* невысокий экран: меньше воздуха вокруг колеса, само колесо крупнее */
+@media (min-width: 1100px) and (max-height: 860px) {
+  #room .stage-in { padding-top: 12px; padding-bottom: 66px; }
+  .stage-top { margin-bottom: 6px; }
+  #room .current { font-size: clamp(22px, 2.2vw, 32px); margin-bottom: 4px; }
+  #room .wheel-area { padding-top: 12px; }
+  #room .stage-status { margin-top: 6px; }
+}
