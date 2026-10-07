@@ -1523,3 +1523,12 @@ html { overflow-x: clip; }
   #room .wheel-area { padding-top: 12px; }
   #room .stage-status { margin-top: 6px; }
 }
+
+/* шапка: аватарки как раньше, без подложки; счётчик со списком — только на узком экране */
+.people-wrap { display: none; }
+#room .people { display: flex; align-items: center; }
+#room .people .ava-more { background: var(--s3); font-size: 12px; cursor: pointer; }
+#room .people-wrap .people-menu { right: 0; }
+.people + .people-wrap .pop-menu { top: calc(100% + 10px); }
+@media (min-width: 521px) { .people-wrap { display: block; width: 0; } .people-wrap > .people-count { display: none; } }
+@media (max-width: 520px) { #room .people { display: none; } .people-wrap { display: block; } }

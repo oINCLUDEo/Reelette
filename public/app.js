@@ -1726,8 +1726,9 @@ function initRoom(roomId) {
     if (state?.duel) renderDuel(state.duel);
     const people_ = list;
     const row = p => `<button class="menu-item person-item" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}"><span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span><span>${nick(p.pid, p.name)}${p.pid === myPid() ? ' <small>это вы</small>' : p.pid?.startsWith('d') ? ' <small>Discord</small>' : ''}</span></button>`;
-    $('#people').innerHTML = list.slice(0, 6).map(p => `<span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
-      + (list.length > 6 ? `<span class="ava ava-more">+${list.length - 6}</span>` : '');
+    // аватарки в шапке, как раньше: клик — профиль, при наведении имя; лишние — «+N» со списком
+    $('#people').innerHTML = list.slice(0, 6).map(p => `<span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}" data-tip="${esc(p.name)}" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
+      + (list.length > 6 ? `<button type="button" class="ava ava-more" data-people-more title="Все в комнате">+${list.length - 6}</button>` : '');
     $('#peopleNum').textContent = String(list.length);
     $('#peopleBtn').setAttribute('aria-label', `В комнате ${list.length} ${plural(list.length, 'человек', 'человека', 'человек')}`);
     $('#peopleMenu').innerHTML = `<div class="menu-label">В комнате</div>` + list.map(row).join('');
@@ -1864,6 +1865,12 @@ function initRoom(roomId) {
     btn.setAttribute('aria-expanded', String(open));
     if (open) menu.querySelector('button')?.focus({ preventScroll: true });
   }
+  // «+N» у аватарок открывает тот же список, что и счётчик на узком экране
+  document.addEventListener('click', e => {
+    if (!e.target.closest('[data-people-more]')) return;
+    e.stopImmediatePropagation();
+    $('#peopleMenu').hidden = !$('#peopleMenu').hidden;
+  });
   [['#funBtn', '#funMenu'], ['#peopleBtn', '#peopleMenu']].forEach(([b, m]) => {
     $(b).addEventListener('click', e => {
       e.stopPropagation();
