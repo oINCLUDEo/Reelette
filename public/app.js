@@ -1591,7 +1591,7 @@ function initRoom(roomId) {
     const num = m ? Number(m[1]) : Number(prog.replace(',', '.')) || 0;
     const goal = m ? Number(m[2]) : 8;
     const pct = Math.max(0, Math.min(100, (num / goal) * 100));
-    const label = m ? `${m[1]} из ${m[2]}` : `${prog} из 8`;
+    const label = m ? `${m[1]} из ${m[2]}` : num ? `средняя ${prog} из 8` : 'пока нет оценок';
     const tip = on ? `${b.name}: получен` : `Как получить: ${b.need}. Сейчас ${label}.`;
     return `<div class="bdg${on ? ' on' : ''}" data-tt="${esc(tip)}" tabindex="0"><span class="bdg-ico"><svg viewBox="0 0 24 24">${b.icon}</svg></span><span class="bdg-txt"><b>${b.name}</b>${on ? '<small>получен</small>' : `<small>${label}</small><i class="bdg-bar"><i style="width:${pct}%"></i></i>`}</span></div>`;
   }

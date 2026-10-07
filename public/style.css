@@ -1582,7 +1582,7 @@ html { overflow-x: clip; }
 .pe-preview h3 { font-size: 22px; margin: 0; }
 .pe-preview .profile-status { margin: 4px 0 0; font-size: 13px; }
 .pe-tabs { width: 100%; }
-.pe-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 24px 24px; display: flex; flex-direction: column; gap: 24px; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
+.pe-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 24px 24px; display: flex; flex-direction: column; gap: 24px; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
 .pe-group { display: flex; flex-direction: column; gap: 12px; }
 .pe-group h5 { margin: 4px 0 0; font: 700 13px var(--f-ui); color: var(--tx2); }
 .pe-foot { flex: none; display: flex; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--bd); background: var(--sheetB); }
@@ -1619,3 +1619,7 @@ html { overflow-x: clip; }
   .opt-grid.wide { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .opt-grid.wide .opt { height: 88px; }
 }
+
+/* «Волна» с градиентом: у каждой буквы свой градиент, иначе прыгающие буквы прозрачные */
+.nick.c-grad.fx-wave > span { background: var(--ng); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.pe-body > .pe-group:first-child { padding-top: 8px; }
