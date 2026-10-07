@@ -1516,7 +1516,7 @@ html { overflow-x: clip; }
 /* средние ширины: громкость прячется, чтобы название трека не сжималось */
 @media (max-width: 1500px) { .nav-music #ytVol { display: none; } }
 /* невысокий экран: меньше воздуха вокруг колеса, само колесо крупнее */
-@media (min-width: 1100px) and (max-height: 860px) {
+@media (min-width: 1100px) and (max-height: 960px) {
   #room .stage-in { padding-top: 12px; padding-bottom: 66px; }
   .stage-top { margin-bottom: 6px; }
   #room .current { font-size: clamp(22px, 2.2vw, 32px); margin-bottom: 4px; }
