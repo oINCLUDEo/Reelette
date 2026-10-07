@@ -297,6 +297,9 @@ function initRoom(roomId) {
       if (!state.spin && !spinningSid) { syncWheel(); wheel.setAngle(state.angle); }
       render();
       syncMusic();
+      // лента чата: только если что-то изменилось, чтобы не сбивать прокрутку
+      const lastChat = state.chat?.at(-1)?.at || 0;
+      if (lastChat !== renderChatLog.last) { renderChatLog.last = lastChat; renderChatLog(); }
     } else if (msg.type === 'spin') {
       runSpin(msg.spin);
     } else if (msg.type === 'presence') {
