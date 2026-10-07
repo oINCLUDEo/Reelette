@@ -89,6 +89,7 @@ function openModal(m) {
 function closeModal(m) {
   const el = modalEl(m);
   if (!el || el.hidden) return;
+  if (el._beforeClose && el._beforeClose() === false) return;
   el.classList.remove('open');
   const k = modalStack.indexOf(el);
   if (k >= 0) modalStack.splice(k, 1);
@@ -1531,20 +1532,27 @@ function initRoom(roomId) {
   const PROFILE_ICONS = ['', '👑', '🔥', '⭐', '🎤', '🎬', '💀', '👾', '🐸', '🌙', '⚡', '🍿', '🦄', '🎧'];
   const PROFILE_FRAMES = [['none', 'Без рамки'], ['accent', 'Акцент'], ['neon', 'Неон'], ['gold', 'Золото'], ['rainbow', 'Радуга'], ['fire', 'Огонь'], ['ice', 'Лёд'], ['toxic', 'Токсик'], ['holo', 'Голограмма']];
   const PROFILE_BANNERS = [['none', 'Без фона'], ['aurora', 'Сияние'], ['sunset', 'Закат'], ['ocean', 'Океан'], ['ember', 'Угли'], ['night', 'Ночь'], ['live', 'Живое сияние'], ['stars', 'Звёзды']];
-  let profDraft = null, profEditing = false;
+  const PROFILE_DEFAULTS = { color: '', effect: 'none', frame: 'none', banner: 'none', font: 'default', icon: '', badge: '', status: '' };
+  let profDraft = null, profEditing = false, profTab = 'nick';
+  const profBase = pid => ({ ...PROFILE_DEFAULTS, ...prof(pid) });
+  const profDirty = pid => profEditing && JSON.stringify({ ...PROFILE_DEFAULTS, ...profDraft }) !== JSON.stringify(profBase(pid));
+  // закрыть редактор с несохранёнными изменениями — только после подтверждения
+  const confirmDiscard = () => confirm('Изменения оформления не сохранены. Выйти без сохранения?');
+  $('#profileModal')._beforeClose = () => !profDirty($('#profileBody').dataset.pid) || confirmDiscard();
 
   function openProfile(pid, name) {
     if (!state) return;
     profEditing = false;
-    profDraft = { ...{ color: '', effect: 'none', frame: 'none', banner: 'none', font: 'default', icon: '', badge: '', status: '' }, ...prof(pid) };
+    profTab = 'nick';
+    profDraft = profBase(pid);
     renderProfile(pid, name);
     openModal('#profileModal');
   }
 
-  function renderProfile(pid, name) {
-    const mine = pid === myPid();
-    const p = mine && profEditing ? profDraft : prof(pid);
+  // данные профиля считаются из комнаты (как раньше)
+  function profileData(pid, name) {
     const online = people.find(x => x.pid === pid);
+    const mine = pid === myPid();
     const avatar = online?.avatar || state.films.flatMap(f => f.votes || []).find(v => v.id === pid && v.avatar)?.avatar || (account.user && mine ? account.user.avatar : '');
     const added = state.films.filter(f => isBy(f, pid, name));
     const wins = state.history.filter(h => isBy(h.film, pid, name)).map(h => h.film);
@@ -1569,59 +1577,117 @@ function initRoom(roomId) {
     };
     const earned = BADGES.filter(b => b.test(stats));
     const locked = BADGES.filter(b => !b.test(stats));
-    const badge = (b, on) => `<span class="badge${on ? ' on' : ''}" title="${on ? b.name : `Ещё не получен: нужно ${b.need}. Сейчас ${b.prog(stats)}`}"><svg viewBox="0 0 24 24">${b.icon}</svg><b>${b.name}</b>${on ? '' : `<em>${b.prog(stats)}</em>`}</span>`;
-    const row = list => `<div class="poster-row">${list.slice(0, 8).map(f => `<i title="${esc(f.title)}" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</i>`).join('')}${list.length > 8 ? `<span>+${list.length - 8}</span>` : ''}</div>`;
-    const sec = (title, list) => (list.length ? `<div class="profile-sec"><h3>${title}</h3>${row(list)}</div>` : '');
+    return { mine, online, avatar, added, wins, voted, genres, avgOfHis, modNow, stats, earned, locked };
+  }
+
+  const avaHtml = (pid, name, p, avatar, cls = 'profile-ava') => (avatar
+    ? `<img class="${cls}${frameCls(pid, p)}" style="${frameVars(pid, p)}" src="${esc(avatar)}" alt="">`
+    : `<span class="${cls}${frameCls(pid, p)}" style="background:hsl(${hue(name)} 55% 42%);${frameVars(pid, p)}">${initial(name)}</span>`);
+
+  // бейдж: полученный цветной; неполученный приглушённый, с прогрессом и подсказкой, как получить
+  function badgeHtml(b, on, stats) {
+    const prog = String(b.prog(stats));
+    const m = prog.match(/^(\d+)\/(\d+)$/);
+    const num = m ? Number(m[1]) : Number(prog.replace(',', '.')) || 0;
+    const goal = m ? Number(m[2]) : 8;
+    const pct = Math.max(0, Math.min(100, (num / goal) * 100));
+    const label = m ? `${m[1]} из ${m[2]}` : `${prog} из 8`;
+    const tip = on ? `${b.name}: получен` : `Как получить: ${b.need}. Сейчас ${label}.`;
+    return `<div class="bdg${on ? ' on' : ''}" data-tt="${esc(tip)}" tabindex="0"><span class="bdg-ico"><svg viewBox="0 0 24 24">${b.icon}</svg></span><span class="bdg-txt"><b>${b.name}</b>${on ? '<small>получен</small>' : `<small>${label}</small><i class="bdg-bar"><i style="width:${pct}%"></i></i>`}</span></div>`;
+  }
+
+  function renderProfile(pid, name) {
+    const body = $('#profileBody');
+    body.dataset.pid = pid;
+    body.dataset.name = name;
+    const d = profileData(pid, name);
     const card = $('#profileModal .profile-card');
+    if (d.mine && profEditing) return renderProfileEditor(pid, name, d, card);
+    const p = prof(pid);
     card.className = 'modal-card profile-card' + (p.banner && p.banner !== 'none' ? ` bn-${p.banner}` : '');
-
-    const editor = mine && profEditing ? `
-      <div class="pe">
-        <div class="pe-row"><span class="label">Цвет ника</span><div class="pe-swatches">${PROFILE_COLORS.map(c => `<button type="button" class="sw${(p.color || '') === c ? ' on' : ''}" data-pc="${c}" title="${c ? (c.startsWith('grad:') ? 'Градиент' : c) : 'Обычный'}" style="background:${c ? (c.startsWith('grad:') ? GRADS[c.slice(5)][0] : c) : 'var(--s3)'}">${c ? '' : '×'}</button>`).join('')}</div></div>
-        <div class="pe-row"><span class="label">Эффект ника</span><div class="chips">${PROFILE_EFFECTS.map(([k, t]) => `<button type="button" class="chip${p.effect === k ? ' on' : ''}" data-pe="${k}">${t}</button>`).join('')}</div></div>
-        <div class="pe-row"><span class="label">Рамка аватара</span><div class="chips">${PROFILE_FRAMES.map(([k, t]) => `<button type="button" class="chip${p.frame === k ? ' on' : ''}" data-pf="${k}">${t}</button>`).join('')}</div></div>
-        <div class="pe-row"><span class="label">Шрифт ника</span><div class="chips">${PROFILE_FONTS.map(([k, t]) => `<button type="button" class="chip nf-prev nf-${k}${(p.font || 'default') === k ? ' on' : ''}" data-pn="${k}">${t}</button>`).join('')}</div></div>
-        <div class="pe-row"><span class="label">Значок у ника</span><div class="pe-swatches">${PROFILE_ICONS.map(ic => `<button type="button" class="sw ico${(p.icon || '') === ic ? ' on' : ''}" data-pi="${ic}">${ic || '×'}</button>`).join('')}</div></div>
-        <div class="pe-row"><span class="label">Бейдж у ника <span class="m">из полученных в этой комнате</span></span><div class="chips"><button type="button" class="chip${!p.badge ? ' on' : ''}" data-pbadge="">Не показывать</button>${earned.map(b => `<button type="button" class="chip${p.badge === b.id ? ' on' : ''}" data-pbadge="${b.id}">${b.name}</button>`).join('') || '<span class="note">Пока нет бейджей</span>'}</div></div>
-        <div class="pe-row"><span class="label">Фон профиля</span><div class="chips">${PROFILE_BANNERS.map(([k, t]) => `<button type="button" class="chip${p.banner === k ? ' on' : ''}" data-pb="${k}">${t}</button>`).join('')}</div></div>
-        <label class="field"><span class="label">Статус</span><input id="peStatus" maxlength="60" placeholder="Например: сегодня пою Земфиру" value="${esc(p.status || '')}"></label>
-        <div class="pe-actions"><button type="button" class="btn btn-primary" data-psave>Сохранить</button><button type="button" class="btn btn-ghost" data-pcancel>Отмена</button></div>
-      </div>` : '';
-
-    $('#profileBody').innerHTML = `
+    const you = d.mine;
+    const row = list => `<div class="poster-row">${list.slice(0, 8).map(f => `<i title="${esc(f.title)}" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</i>`).join('')}${list.length > 8 ? `<span>+${list.length - 8}</span>` : ''}</div>`;
+    const sec = (title, list) => (list.length ? `<section class="profile-sec"><h3>${title}</h3>${row(list)}</section>` : '');
+    const n = d.added.length, w = d.wins.length;
+    body.innerHTML = `
       <div class="profile-head">
-        ${avatar ? `<img class="${frameCls(pid, p)}" style="${frameVars(pid, p)}" src="${esc(avatar)}" alt="">` : `<span class="profile-ava${frameCls(pid, p)}" style="background:hsl(${hue(name)} 55% 42%);${frameVars(pid, p)}">${initial(name)}</span>`}
+        ${avaHtml(pid, name, p, d.avatar)}
         <div class="profile-id">
           <h2>${nick(pid, name, p)}</h2>
           ${p.status ? `<p class="profile-status">${esc(p.status)}</p>` : ''}
-          <div class="profile-tags"><span>${pid.startsWith('d') ? 'Discord' : 'Гость'}</span>${online ? '<span class="online">в комнате</span>' : ''}${mine ? '<span>это вы</span>' : ''}${modNow ? `<span class="${modNow.factor < 1 ? 'down' : 'up'}">${fmtFactor(modNow.factor)} до выпадения его фильма</span>` : ''}</div>
+          <div class="profile-tags"><span>${pid.startsWith('d') ? 'Discord' : 'Гость'}</span>${d.online ? '<span class="online">в комнате</span>' : ''}${you ? '<span>это вы</span>' : ''}${d.modNow ? `<span class="${d.modNow.factor < 1 ? 'down' : 'up'}">${fmtFactor(d.modNow.factor)} до выпадения ${you ? 'вашего' : 'его'} фильма</span>` : ''}</div>
         </div>
-        ${mine && !profEditing ? '<button type="button" class="btn btn-ghost pe-open" data-pedit>Оформить</button>' : ''}
       </div>
-      ${editor}
+      ${you ? '<button type="button" class="btn btn-ghost pe-open" data-pedit><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Изменить оформление</button>' : ''}
       <div class="profile-stats">
-        <div><b>${added.length}</b><span>${plural(added.length, 'фильм', 'фильма', 'фильмов')} в колесе</span></div>
-        <div><b>${wins.length}</b><span>${plural(wins.length, 'раз выбрали', 'раза выбрали', 'раз выбрали')} его фильм</span></div>
-        <div><b>${avgOfHis !== null ? avgOfHis.toFixed(1).replace('.', ',') : '—'}</b><span>средняя оценка его фильмов</span></div>
+        <div><b>${n}</b><span>${you ? plural(n, 'ваш фильм', 'ваших фильма', 'ваших фильмов') : plural(n, 'фильм', 'фильма', 'фильмов')} в колесе</span></div>
+        <div><b>${w}</b><span>${plural(w, 'раз выбрали', 'раза выбрали', 'раз выбрали')} ${you ? 'ваш' : 'его'} фильм</span></div>
+        <div><b>${d.avgOfHis !== null ? d.avgOfHis.toFixed(1).replace('.', ',') : '—'}</b><span>средняя оценка ${you ? 'ваших' : 'его'} фильмов</span></div>
       </div>
-      <div class="profile-sec"><h3>Бейджи <span class="m">${earned.length} из ${BADGES.length}</span></h3><div class="badges">${earned.map(b => badge(b, true)).join('')}${locked.map(b => badge(b, false)).join('')}</div></div>
-      ${genres.length ? `<div class="profile-sec"><h3>Любимые жанры</h3><div class="chips">${genres.map(g => `<span class="chip on-static">${esc(g)}</span>`).join('')}</div></div>` : ''}
-      ${sec(`Хочет посмотреть (${voted.length} из ${rules().votes} голосов)`, voted)}
-      ${sec('Выбирали его фильмы', wins)}
-      ${sec('Добавил(а) в колесо', added)}`;
-    $('#profileBody').dataset.pid = pid;
-    $('#profileBody').dataset.name = name;
+      <section class="profile-sec"><h3>Бейджи <span class="m">${d.earned.length} из ${BADGES.length}</span></h3><div class="bdgs">${d.earned.map(b => badgeHtml(b, true, d.stats)).join('')}${d.locked.map(b => badgeHtml(b, false, d.stats)).join('')}</div></section>
+      ${d.genres.length ? `<section class="profile-sec"><h3>Любимые жанры</h3><div class="chips">${d.genres.map(g => `<span class="chip on-static">${esc(g)}</span>`).join('')}</div></section>` : ''}
+      ${sec(`${you ? 'Хочу посмотреть' : 'Хочет посмотреть'} <span class="m">${d.voted.length} из ${rules().votes} голосов</span>`, d.voted)}
+      ${sec(you ? 'Выбирали ваши фильмы' : 'Выбирали его фильмы', d.wins)}
+      ${sec(you ? 'Вы добавили в колесо' : 'Добавил(а) в колесо', d.added)}`;
   }
 
+  // редактор оформления: закреплённое превью сверху, вкладки, закреплённые «Сохранить / Отмена» снизу
+  function renderProfileEditor(pid, name, d, card) {
+    const p = { ...PROFILE_DEFAULTS, ...profDraft };
+    card.className = 'modal-card profile-card editing';
+    const opt = (attr, val, on, inner, label, extra = '') => `<button type="button" class="opt${on ? ' on' : ''}${extra}" ${attr}="${esc(val)}" aria-pressed="${on}" title="${esc(label)}">${inner}${label ? `<small>${esc(label)}</small>` : ''}</button>`;
+    const sample = over => nick(pid, 'Ник', { ...p, icon: '', badge: '', ...over });
+    const solids = PROFILE_COLORS.filter(c => !c.startsWith('grad:'));
+    const grads = PROFILE_COLORS.filter(c => c.startsWith('grad:'));
+    const colorOpt = c => opt('data-pc', c, (p.color || '') === c, `<i class="opt-sw" style="background:${c ? (c.startsWith('grad:') ? GRADS[c.slice(5)][0] : c) : 'var(--s3)'}">${c ? '' : '<svg viewBox="0 0 24 24"><path d="M6 6l12 12"/></svg>'}</i>`, '', ' opt-color');
+    const tabs = { nick: 'Ник', avatar: 'Аватар', profile: 'Профиль' };
+    const panes = {
+      nick: `
+        <section class="pe-group"><h4>Цвет</h4>
+          <div class="opt-grid colors">${solids.map(colorOpt).join('')}</div>
+          <h5>Градиенты</h5>
+          <div class="opt-grid colors">${grads.map(colorOpt).join('')}</div></section>
+        <section class="pe-group"><h4>Эффект</h4><div class="opt-grid wide">${PROFILE_EFFECTS.map(([k, t]) => opt('data-pe', k, p.effect === k, `<span class="opt-sample">${sample({ effect: k })}</span>`, t)).join('')}</div></section>
+        <section class="pe-group"><h4>Шрифт</h4><div class="opt-grid wide">${PROFILE_FONTS.map(([k, t]) => opt('data-pn', k, (p.font || 'default') === k, `<span class="opt-sample">${sample({ font: k })}</span>`, t)).join('')}</div></section>
+        <section class="pe-group"><h4>Значок у ника</h4><div class="opt-grid icons">${PROFILE_ICONS.map(ic => opt('data-pi', ic, (p.icon || '') === ic, `<span class="opt-ico">${ic || '<svg viewBox="0 0 24 24"><path d="M6 6l12 12"/></svg>'}</span>`, '')).join('')}</div></section>`,
+      avatar: `
+        <section class="pe-group"><h4>Рамка</h4><div class="opt-grid wide">${PROFILE_FRAMES.map(([k, t]) => opt('data-pf', k, p.frame === k, `<span class="opt-ava-wrap">${avaHtml(pid, name, { ...p, frame: k }, d.avatar, 'opt-ava')}</span>`, t)).join('')}</div></section>`,
+      profile: `
+        <section class="pe-group"><h4>Фон</h4><div class="opt-grid wide">${PROFILE_BANNERS.map(([k, t]) => opt('data-pb', k, p.banner === k, `<span class="opt-bn bn-box bn-${k}"></span>`, t)).join('')}</div></section>
+        <section class="pe-group"><h4>Бейдж у ника <span class="m">из полученных</span></h4>
+          ${d.earned.length ? `<div class="opt-grid wide">${opt('data-pbadge', '', !p.badge, '<span class="opt-ico"><svg viewBox="0 0 24 24"><path d="M6 6l12 12"/></svg></span>', 'Не показывать')}${d.earned.map(b => opt('data-pbadge', b.id, p.badge === b.id, `<span class="opt-ico badge-ico"><svg viewBox="0 0 24 24">${b.icon}</svg></span>`, b.name)).join('')}</div>` : '<p class="note">Пока нет полученных бейджей. Как их получить — в профиле, по наведению на бейдж.</p>'}</section>
+        <section class="pe-group"><h4>Статус</h4><input id="peStatus" maxlength="60" placeholder="Например: сегодня пою Земфиру" value="${esc(p.status || '')}"></section>`,
+    };
+    $('#profileBody').innerHTML = `
+      <div class="pe-top">
+        <div class="pe-bar"><button type="button" class="pe-back" data-pback><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>Назад</button><h2>Оформление</h2></div>
+        <div class="pe-preview bn-box${p.banner && p.banner !== 'none' ? ` bn-${p.banner}` : ''}">
+          ${avaHtml(pid, name, p, d.avatar)}
+          <div class="profile-id"><h3>${nick(pid, name, p)}</h3>${p.status ? `<p class="profile-status">${esc(p.status)}</p>` : '<p class="profile-status m">Без статуса</p>'}</div>
+        </div>
+        <div class="tabs pe-tabs" id="peTabs" role="tablist"><span class="tabs-ind"></span>${Object.entries(tabs).map(([k, t]) => `<button type="button" role="tab" data-ptab="${k}" class="${profTab === k ? 'on' : ''}" aria-selected="${profTab === k}">${t}</button>`).join('')}</div>
+      </div>
+      <div class="pe-body">${panes[profTab]}</div>
+      <div class="pe-foot"><button type="button" class="btn btn-ghost" data-pcancel>Отмена</button><button type="button" class="btn btn-primary" data-psave>Сохранить</button></div>`;
+    requestAnimationFrame(() => placeSeg($('#peTabs')));
+  }
+
+  $('#profileBody').addEventListener('input', e => {
+    if (e.target.id !== 'peStatus') return;
+    profDraft.status = e.target.value;
+    // превью статуса — без перерисовки всего редактора, чтобы не терять фокус
+    const st = $('#profileBody .pe-preview .profile-status');
+    if (st) { st.textContent = e.target.value || 'Без статуса'; st.classList.toggle('m', !e.target.value); }
+  });
   $('#profileBody').addEventListener('click', async e => {
     const body = $('#profileBody');
     const pid = body.dataset.pid, name = body.dataset.name;
     const t = e.target.closest('button');
     if (!t) return;
-    if (t.matches('[data-pedit]')) { profEditing = true; return renderProfile(pid, name); }
-    if (t.matches('[data-pcancel]')) { profEditing = false; profDraft = { ...prof(pid) }; return renderProfile(pid, name); }
-    const st = $('#peStatus');
-    if (st) profDraft.status = st.value;
+    if (t.matches('[data-pedit]')) { profEditing = true; profTab = 'nick'; profDraft = profBase(pid); return renderProfile(pid, name); }
+    if (t.matches('[data-pback]')) { if (profDirty(pid) && !confirmDiscard()) return; profEditing = false; profDraft = profBase(pid); return renderProfile(pid, name); }
+    if (t.matches('[data-pcancel]')) { profEditing = false; profDraft = profBase(pid); return renderProfile(pid, name); }
+    if (t.dataset.ptab) { profTab = t.dataset.ptab; renderProfile(pid, name); $('#profileBody .pe-body').scrollTop = 0; return; }
     if (t.dataset.pc !== undefined) profDraft.color = t.dataset.pc;
     else if (t.dataset.pe) profDraft.effect = t.dataset.pe;
     else if (t.dataset.pf) profDraft.frame = t.dataset.pf;
@@ -1638,7 +1704,11 @@ function initRoom(roomId) {
         render();
       } catch (err) { return toast(err.message, true); }
     } else return;
+    // выбор варианта: перерисовываем, сохраняя прокрутку списка
+    const sc = $('#profileBody .pe-body')?.scrollTop || 0;
     renderProfile(pid, name);
+    const pb = $('#profileBody .pe-body');
+    if (pb) pb.scrollTop = sc;
   });
 
   document.addEventListener('click', e => {
