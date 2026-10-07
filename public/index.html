@@ -108,7 +108,6 @@
           </div>
         </div>
       </div>
-      <div id="people" class="people"></div>
       <div class="menu-wrap people-wrap">
         <button class="ghost sm people-count" id="peopleBtn" aria-haspopup="true" aria-expanded="false" aria-controls="peopleMenu" title="Кто в комнате"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg><b id="peopleNum">0</b></button>
         <div class="pop-menu people-menu" id="peopleMenu" aria-label="Кто в комнате" hidden></div>
@@ -121,14 +120,28 @@
   <div class="layout">
     <aside class="sheet b films-panel">
       <div class="panel-head">
-        <h2>Фильмы <span class="m" id="filmCount"></span></h2>
-        <button id="addBtn" class="sweep sm"><span class="sq"></span><span class="ar"><svg><use href="#plus"/></svg></span><span class="tx">Добавить</span></button>
+        <div class="tabs lp-tabs" id="lpTabs" role="tablist">
+          <span class="tabs-ind"></span>
+          <button class="on" data-lp="films" role="tab" aria-selected="true">Фильмы <span class="m" id="filmCount"></span></button>
+          <button data-lp="history" role="tab" aria-selected="false">Уже выпадало <span class="m" id="histCount"></span></button>
+        </div>
       </div>
-      <div class="my-votes" id="myVotes"></div>
-      <div class="mod-banner" id="modBanner" hidden></div>
-      <div id="filmList" class="film-list"></div>
-      <div id="filmEmpty" class="empty" hidden>
-        <p>Колесо пустое. <span class="m">Добавьте пару фильмов, чтобы его крутить.</span></p>
+      <div class="lp-pane" data-lpp="films">
+        <div class="quick-add">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+            <input id="quickSearch" placeholder="Добавить фильм" autocomplete="off" aria-label="Найти и добавить фильм" aria-controls="quickResults" aria-expanded="false">
+          </div>
+          <button id="addBtn" class="ghost sm icon" title="Добавить списком" aria-label="Добавить списком"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg></button>
+        </div>
+        <div class="my-votes" id="myVotes"></div>
+        <div id="filmList" class="film-list"></div>
+        <div id="filmEmpty" class="empty" hidden>
+          <p>Колесо пустое. <span class="m">Найдите фильм в поле выше или добавьте списком.</span></p>
+        </div>
+      </div>
+      <div class="lp-pane" data-lpp="history" hidden>
+        <div id="historyList" class="history-list"></div>
       </div>
     </aside>
 
@@ -146,6 +159,15 @@
         <div class="chat-log" id="chatLog" hidden></div>
       </div>
       <div class="stage-in">
+        <div class="stage-top" id="stageTop">
+          <div class="seg" id="modeSeg" role="group" aria-label="Режим">
+            <span class="seg-ind"></span>
+            <button data-mode="normal">Обычный</button>
+            <button data-mode="elimination">Выбывание</button>
+            <button data-mode="duel">Дуэль</button>
+          </div>
+          <button type="button" class="hint" id="modeHint" data-hint="" aria-label="Подсказка: режим">?</button>
+        </div>
         <div class="quiz" id="quizBox" hidden>
           <div class="qz-top">
             <div class="qz-round"><span>Раунд</span><b id="qzRound"></b></div>
@@ -251,82 +273,23 @@
         </div>
         <div class="stage-status" id="stageStatus"></div>
         <button id="stopBtn" class="ghost sm stop-btn" hidden></button>
+        <button id="resetBtn" class="ghost sm stop-btn" hidden>Вернуть выбывших в колесо</button>
+
       </div>
     </section>
 
-    <aside class="sheet b controls">
-      <section class="ctl">
-        <div class="ctl-head">Режим <button type="button" class="hint" id="modeHint" data-hint="" aria-label="Подсказка: режим">?</button></div>
-        <div class="seg" id="modeSeg">
-          <span class="seg-ind"></span>
-          <button data-mode="normal">Обычный</button>
-          <button data-mode="elimination">Выбывание</button>
-          <button data-mode="duel">Дуэль</button>
-        </div>
-        <label class="check" id="addLockWrap" hidden><input type="checkbox" role="switch" id="addLockOn"><span class="box"></span><span class="check-text">Закрыть добавление фильмов <button type="button" class="hint" data-hint="Пока включено, добавлять фильмы можете только вы. Во время выбывания добавлять нельзя никому, чтобы колесо не менялось посреди серии." aria-label="Подсказка: закрыть добавление фильмов">?</button></span></label>
-        <label class="check" id="lockWrap" hidden><input type="checkbox" role="switch" id="spinLockOn"><span class="box"></span><span class="check-text">Крутит только создатель <button type="button" class="hint" data-hint="Пока включено, запускать прокрут, серию и дуэль, отменять отсчёт и останавливать серию можете только вы. Остальные голосуют, добавляют фильмы и смотрят." aria-label="Подсказка: крутит только создатель">?</button></span></label>
-        <label class="check" id="showOutWrap"><input type="checkbox" role="switch" id="showOutOn" checked><span class="box"></span><span class="check-text">Показывать выбывших <button type="button" class="hint" data-hint="Окно с выбывшим фильмом после каждого прокрута. Если выключить, выбывший фильм коротко мелькнёт внизу. Настройка только у вас." aria-label="Подсказка: показывать выбывших">?</button></span></label>
-        <label class="check" id="autoWrap"><input type="checkbox" role="switch" id="autoSpin"><span class="box"></span><span class="check-text">Крутить до победителя <button type="button" class="hint" data-hint="Прокруты идут подряд без остановок, пока не останется один фильм. Серию можно остановить кнопкой под колесом." aria-label="Подсказка: крутить до победителя">?</button></span></label>
-        <button id="resetBtn" class="btn btn-ghost btn-block" hidden>Вернуть выбывших в колесо</button>
-      </section>
-
-      <section class="ctl" id="spinCtl">
-        <div class="field" id="durField">
-          <label class="label" for="duration" id="durLabel">Длительность прокрута <b id="durVal">12 с</b></label>
-          <input type="range" id="duration" min="0" max="40" value="12" aria-describedby="durVal">
-        </div>
-        <div class="field" id="delayField">
-          <span class="label">Отсчёт перед прокрутом</span>
-          <div class="seg" id="delaySeg">
-            <span class="seg-ind"></span>
-            <button data-delay="0">Сразу</button>
-            <button data-delay="3">3 с</button>
-            <button data-delay="5">5 с</button>
-            <button data-delay="10">10 с</button>
-          </div>
-        </div>
-      </section>
-
-      <section class="ctl">
-        <label class="check"><input type="checkbox" role="switch" id="fairOn" checked><span class="box"></span><span class="check-text">Равные шансы <button type="button" class="hint" data-hint="Колесо делится поровну между участниками: два фильма одного весят столько же, сколько шестьдесят у другого. Голоса и оценки действуют поверх." aria-label="Подсказка: равные шансы">?</button></span></label>
-        <div class="filters">
-          <label class="check"><input type="checkbox" role="switch" id="filtersOn"><span class="box"></span><span class="check-text">Фильтры <button type="button" class="hint" data-hint="Крутятся только фильмы, подходящие по длине, году и жанрам. Фильтры общие для всей комнаты." aria-label="Подсказка: фильтры">?</button></span></label>
-          <div id="filtersBody" class="filters-body" hidden>
-            <span class="label">Длина</span>
-            <div class="seg" id="fRuntime">
-              <span class="seg-ind"></span>
-              <button data-v="0">Любая</button>
-              <button data-v="105">до 1:45</button>
-              <button data-v="120">до 2 ч</button>
-              <button data-v="150">до 2:30</button>
-            </div>
-            <span class="label">Год</span>
-            <div class="seg" id="fYear">
-              <span class="seg-ind"></span>
-              <button data-v="0">Любой</button>
-              <button data-v="2000">2000+</button>
-              <button data-v="2010">2010+</button>
-              <button data-v="2020">2020+</button>
-            </div>
-            <span class="label">Жанры</span>
-            <div class="chips" id="fGenres"></div>
-            <p class="note" id="filtersNote"></p>
-          </div>
-        </div>
-      </section>
-
-      <section class="ctl">
-        <div class="ctl-head">Звук</div>
-        <label class="check"><input type="checkbox" role="switch" id="soundOn" checked><span class="box"></span><span class="check-text">Щелчки и сигналы</span></label>
-        <label class="check"><input type="checkbox" role="switch" id="musicOn"><span class="box"></span><span class="check-text">Музыка при прокруте <button type="button" class="hint" data-hint="Музыка собирается прямо в браузере, её темп следует за скоростью колеса. Кольцо вокруг колеса пульсирует в такт." aria-label="Подсказка: музыка при прокруте">?</button></span></label>
-      </section>
-
+    <aside class="sheet b side" id="side">
       <div class="rate-box" id="rateBox" hidden></div>
-
-      <div class="history">
-        <h3>Уже выпадало</h3>
-        <div id="historyList" class="history-list"></div>
-      </div>
+      <div class="mod-banner" id="modBanner" hidden></div>
+      <section class="side-sec side-people">
+        <div class="side-head">В комнате <span class="m" id="sideCount"></span></div>
+        <div id="peopleList" class="people-list"></div>
+      </section>
+      <section class="side-sec side-chat">
+        <div class="side-head">Чат</div>
+        <div id="chatFeed" class="chat-feed" aria-live="polite"></div>
+        <div id="chatSlot" class="chat-slot"></div>
+      </section>
     </aside>
   </div>
 </div>
@@ -419,15 +382,79 @@
   </form>
 </div>
 
-<div class="modal" id="settingsModal" hidden>
-  <div class="modal-card small-card">
+<div class="modal drawer" id="settingsModal" hidden>
+  <div class="modal-card drawer-card">
     <button class="modal-x" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     <h2>Настройки</h2>
-    <label class="field"><span class="label">Название комнаты</span><input id="setName" maxlength="60"></label>
-    <div class="account" id="accountBox"></div>
-    <label class="field" id="nickField"><span class="label">Ваше имя</span><input id="setNick" maxlength="32"></label>
-    <label class="field"><span class="label">Вебхук Discord <span id="hookState"></span></span><input id="setHook" placeholder="https://discord.com/api/webhooks/…"></label>
-    <p class="note">Победитель будет приходить в канал Discord с постером и описанием. Бот не нужен: в Discord откройте настройки канала → Интеграция → Вебхуки → Новый вебхук → Копировать URL вебхука.</p>
+    <section class="ctl">
+      <div class="ctl-head">Прокрут</div>
+      <label class="check" id="showOutWrap"><input type="checkbox" role="switch" id="showOutOn" checked><span class="box"></span><span class="check-text">Показывать выбывших <button type="button" class="hint" data-hint="Окно с выбывшим фильмом после каждого прокрута. Если выключить, выбывший фильм коротко мелькнёт внизу. Настройка только у вас." aria-label="Подсказка: показывать выбывших">?</button></span></label>
+      <label class="check" id="autoWrap"><input type="checkbox" role="switch" id="autoSpin"><span class="box"></span><span class="check-text">Крутить до победителя <button type="button" class="hint" data-hint="Прокруты идут подряд без остановок, пока не останется один фильм. Серию можно остановить кнопкой под колесом." aria-label="Подсказка: крутить до победителя">?</button></span></label>
+      <div class="ctl-sub" id="spinCtl">
+      <div class="field" id="durField">
+        <label class="label" for="duration" id="durLabel">Длительность прокрута <b id="durVal">12 с</b></label>
+        <input type="range" id="duration" min="0" max="40" value="12" aria-describedby="durVal">
+      </div>
+      <div class="field" id="delayField">
+        <span class="label">Отсчёт перед прокрутом</span>
+        <div class="seg" id="delaySeg">
+          <span class="seg-ind"></span>
+          <button data-delay="0">Сразу</button>
+          <button data-delay="3">3 с</button>
+          <button data-delay="5">5 с</button>
+          <button data-delay="10">10 с</button>
+        </div>
+      </div>
+    </div>
+    </section>
+    <section class="ctl">
+      <div class="ctl-head">Шансы</div>
+      <label class="check"><input type="checkbox" role="switch" id="fairOn" checked><span class="box"></span><span class="check-text">Равные шансы <button type="button" class="hint" data-hint="Колесо делится поровну между участниками: два фильма одного весят столько же, сколько шестьдесят у другого. Голоса и оценки действуют поверх." aria-label="Подсказка: равные шансы">?</button></span></label>
+      <div class="filters">
+        <label class="check"><input type="checkbox" role="switch" id="filtersOn"><span class="box"></span><span class="check-text">Фильтры <button type="button" class="hint" data-hint="Крутятся только фильмы, подходящие по длине, году и жанрам. Фильтры общие для всей комнаты." aria-label="Подсказка: фильтры">?</button></span></label>
+        <div id="filtersBody" class="filters-body" hidden>
+          <span class="label">Длина</span>
+          <div class="seg" id="fRuntime">
+            <span class="seg-ind"></span>
+            <button data-v="0">Любая</button>
+            <button data-v="105">до 1:45</button>
+            <button data-v="120">до 2 ч</button>
+            <button data-v="150">до 2:30</button>
+          </div>
+          <span class="label">Год</span>
+          <div class="seg" id="fYear">
+            <span class="seg-ind"></span>
+            <button data-v="0">Любой</button>
+            <button data-v="2000">2000+</button>
+            <button data-v="2010">2010+</button>
+            <button data-v="2020">2020+</button>
+          </div>
+          <span class="label">Жанры</span>
+          <div class="chips" id="fGenres"></div>
+          <p class="note" id="filtersNote"></p>
+        </div>
+      </div>
+    </section>
+    <section class="ctl" id="ownerCtl">
+      <div class="ctl-head">Создатель комнаты</div>
+      <label class="check" id="addLockWrap" hidden><input type="checkbox" role="switch" id="addLockOn"><span class="box"></span><span class="check-text">Закрыть добавление фильмов <button type="button" class="hint" data-hint="Пока включено, добавлять фильмы можете только вы. Во время выбывания добавлять нельзя никому, чтобы колесо не менялось посреди серии." aria-label="Подсказка: закрыть добавление фильмов">?</button></span></label>
+      <label class="check" id="lockWrap" hidden><input type="checkbox" role="switch" id="spinLockOn"><span class="box"></span><span class="check-text">Крутит только создатель <button type="button" class="hint" data-hint="Пока включено, запускать прокрут, серию и дуэль, отменять отсчёт и останавливать серию можете только вы. Остальные голосуют, добавляют фильмы и смотрят." aria-label="Подсказка: крутит только создатель">?</button></span></label>
+    </section>
+    <section class="ctl">
+      <div class="ctl-head">Звук и экран</div>
+      <label class="check"><input type="checkbox" role="switch" id="soundOn" checked><span class="box"></span><span class="check-text">Щелчки и сигналы</span></label>
+      <label class="check"><input type="checkbox" role="switch" id="musicOn"><span class="box"></span><span class="check-text">Музыка при прокруте <button type="button" class="hint" data-hint="Музыка собирается прямо в браузере, её темп следует за скоростью колеса. Кольцо вокруг колеса пульсирует в такт." aria-label="Подсказка: музыка при прокруте">?</button></span></label>
+      <label class="check"><input type="checkbox" role="switch" id="flyChatOn" checked><span class="box"></span><span class="check-text">Сообщения поверх колеса <button type="button" class="hint" data-hint="Сообщения чата пролетают по сцене. Если мешают во время прокрута, выключите: они останутся в чате. Настройка только у вас." aria-label="Подсказка: сообщения поверх колеса">?</button></span></label>
+    </section>
+    <section class="ctl">
+      <div class="ctl-head">Комната и вы</div>
+      <label class="field"><span class="label">Название комнаты</span><input id="setName" maxlength="60"></label>
+      <div class="account" id="accountBox"></div>
+      <label class="field" id="nickField"><span class="label">Ваше имя</span><input id="setNick" maxlength="32"></label>
+      <label class="field"><span class="label">Вебхук Discord <span id="hookState"></span></span><input id="setHook" placeholder="https://discord.com/api/webhooks/…"></label>
+      <p class="note">Победитель будет приходить в канал Discord с постером и описанием. Бот не нужен: в Discord откройте настройки канала → Интеграция → Вебхуки → Новый вебхук → Копировать URL вебхука.</p>
+      <button id="saveSettings" class="btn btn-primary btn-block">Сохранить</button>
+    </section>
     <div class="field"><span class="label">Палитра</span>
       <div class="pals" id="pals">
         <button data-p="night"><i style="background:#7C6BFF"></i>Ночь</button>
@@ -435,7 +462,6 @@
         <button data-p="ember"><i style="background:linear-gradient(90deg,#111 50%,#FF4D00 50%)"></i>Ч/б с оранжевым</button>
       </div>
     </div>
-    <button id="saveSettings" class="btn btn-primary btn-block">Сохранить</button>
     <div class="danger">
       <button id="clearHistory" class="btn btn-ghost">Очистить историю</button>
       <button id="clearFilms" class="btn btn-ghost">Удалить все фильмы</button>

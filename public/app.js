@@ -226,7 +226,7 @@ function initRoom(roomId) {
   let serverOffset = 0;
   let es = null;
   let provider = 'none';
-  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', false), sound: ls.get('sound', true), showOut: ls.get('showOut', true), music: ls.get('music', false), delay: 0 };
+  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', false), sound: ls.get('sound', true), showOut: ls.get('showOut', true), flyChat: ls.get('flyChat', true), music: ls.get('music', false), delay: 0 };
   let people = [];
   let countdown = null; // секунд до старта, пока идёт отсчёт
   let countdownTimer = null;
@@ -280,7 +280,7 @@ function initRoom(roomId) {
     if (msg.type === 'throw') { throwItem(msg); return; }
     if (msg.type === 'chat') {
       flyMessage(msg.msg);
-      if (!msg.msg.guess && state) { state.chat = [...(state.chat || []), msg.msg].slice(-50); if (!$('#chatLog').hidden) renderChatLog(); }
+      if (!msg.msg.guess && state) { state.chat = [...(state.chat || []), msg.msg].slice(-50); renderChatLog(); }
       return;
     }
     if (msg.type === 'quiz-guess') {
@@ -643,8 +643,9 @@ function initRoom(roomId) {
       </div>`;
     }).join('');
 
+    $('#histCount').textContent = state.history.length ? String(state.history.length) : '';
     $('#historyList').innerHTML = state.history.length
-      ? state.history.slice(0, 20).map((h, i) => {
+      ? state.history.slice(0, 50).map((h, i) => {
         const a = avgRating(h);
         const canRate = personOf(h.film) !== myPid() && !h.ratings?.[myPid()];
         return `<div class="hist" data-h="${i}"><i style="${posterStyle(h.film)}"></i><div><b>${esc(h.film.title)}</b><span>${timeAgo(h.at)}</span></div>${canRate ? '<em class="rate-me">Оценить</em>' : ''}${a !== null ? `<em class="score">${a.toFixed(1).replace('.', ',')}</em>` : ''}</div>`;
@@ -682,8 +683,11 @@ function initRoom(roomId) {
     const addClosed = (state.addLock && !isRoomOwner()) || state.elimActive;
     $('#addBtn').disabled = spinning || Boolean(duel) || addClosed;
     $('#wheelAddBtn').disabled = $('#addBtn').disabled;
+    $('#quickSearch').disabled = $('#addBtn').disabled;
+    $('#quickSearch').placeholder = $('#addBtn').disabled && $('#addBtn').title ? $('#addBtn').title : 'Добавить фильм';
     $('#addBtn').title = state.elimActive ? 'Идёт выбывание: добавлять фильмы можно после него' : state.addLock && !isRoomOwner() ? 'Создатель комнаты закрыл добавление фильмов' : '';
     $('#addLockWrap').hidden = !isRoomOwner();
+    $('#ownerCtl').hidden = !isRoomOwner();
     $('#addLockOn').checked = Boolean(state.addLock);
     $('#showOutWrap').hidden = settings.mode !== 'elimination';
 
@@ -911,6 +915,7 @@ function initRoom(roomId) {
   // ---- летающие сообщения: чат и версии в «Угадай мелодию» ----
   const laneFree = Array(7).fill(0);
   function flyMessage(msg) {
+    if (!settings.flyChat && !msg.guess && !msg.win) return;
     const layer = $('#reactLayer');
     if (!layer || layer.childElementCount > 60) return;
     const now = performance.now();
@@ -930,11 +935,24 @@ function initRoom(roomId) {
   }
   function renderChatLog() {
     const list = (state?.chat || []).slice(-50);
-    $('#chatLog').innerHTML = list.length
+    const html = list.length
       ? list.map(m => `<div class="cl-item"><b>${nick(m.pid, m.name)}</b><span>${esc(m.text)}</span><time>${new Date(m.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('')
-      : '<p class="note">Сообщений пока нет.</p>';
-    $('#chatLog').scrollTop = 1e6;
+      : '<p class="note">Сообщений пока нет. Напишите первым: сообщение пролетит у всех по сцене.</p>';
+    for (const el of [$('#chatLog'), $('#chatFeed')]) {
+      // ленту не дёргаем вниз, если человек прокрутил её вверх почитать
+      const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      el.innerHTML = html;
+      if (atEnd || el.hidden) el.scrollTop = 1e6;
+    }
   }
+  // широкий экран: поле чата в правой колонке; узкий — под колесом рядом с реакциями
+  const wideMq = matchMedia('(min-width: 1100px)');
+  function placeChat() {
+    const slot = wideMq.matches ? $('#chatSlot') : $('#reactBar');
+    if ($('#chatForm').parentElement !== slot) slot.insertBefore($('#chatForm'), slot === $('#reactBar') ? $('#chatLogBtn') : null);
+  }
+  wideMq.addEventListener('change', placeChat);
+  placeChat();
   $('#chatForm').addEventListener('submit', async e => {
     e.preventDefault();
     const text = $('#chatInput').value.trim();
@@ -1417,6 +1435,7 @@ function initRoom(roomId) {
   setYtVol(ls.get('ytVol', 50));
 
   // ---- оценка последнего выбранного фильма ----
+  let rateOpen = null; // hid, который человек развернул вручную
   function renderRate() {
     const h = state.history[0];
     const box = $('#rateBox');
@@ -1425,6 +1444,14 @@ function initRoom(roomId) {
     const author = personOf(h.film);
     const isAuthor = author === myPid();
     const mine = h.ratings?.[myPid()]?.score || 0;
+    // свёрнуто: свой фильм или оценка уже стоит и минута на исправление прошла
+    const done = isAuthor || (mine && rateLeft(h) <= 0);
+    box.classList.toggle('compact', done && rateOpen !== h.hid);
+    if (done && rateOpen !== h.hid) {
+      const a0 = avgRating(h);
+      box.innerHTML = `<button class="rate-line" data-rate-open title="Подробнее"><i style="${posterStyle(h.film)}"></i><span><b>${esc(h.film.title)}</b><small>${isAuthor ? 'ваш фильм' : `ваша ${mine}`}${a0 !== null ? ` · средняя ${a0.toFixed(1).replace('.', ',')}` : ''}</small></span><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>`;
+      return;
+    }
     const list = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author);
     const who = `<button class="person" data-person="${esc(author)}" data-name="${esc(h.film.addedBy || '')}">${esc(h.film.addedBy || 'автора')}</button>`;
     const a = avgRating(h);
@@ -1434,12 +1461,16 @@ function initRoom(roomId) {
       : fct === 1 ? `Средняя ${a.toFixed(1).replace('.', ',')}: шанс фильмов ${who} не меняется.`
       : `Средняя ${a.toFixed(1).replace('.', ',')}: фильмы ${who} получают ${fmtFactor(fct)}, пока снова не выпадет его фильм.`;
     box.innerHTML = `
-      <h3>Оцените после просмотра</h3>
+      <h3>Оцените после просмотра${done ? ' <button class="link-btn" data-rate-close>Свернуть</button>' : ''}</h3>
       <div class="rate-film" data-h="0"><i style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><div><b>${esc(h.film.title)}</b><span>добавил(а) ${who}</span></div></div>
       ${isAuthor ? '<p class="note">Это ваш фильм, его оценивают остальные.</p>' : rateScale(h)}
       ${list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>` : ''}
       <p class="rate-effect">${effect}</p>`;
   }
+  $('#rateBox').addEventListener('click', e => {
+    if (e.target.closest('[data-rate-open]')) { rateOpen = state.history[0]?.hid; renderRate(); }
+    if (e.target.closest('[data-rate-close]')) { rateOpen = null; renderRate(); }
+  });
   // своя оценка меняется только первую минуту, потом шкала закрывается
   const RATE_EDIT_MS = 60000;
   let detailHid = null, rateTimer = null;
@@ -1696,11 +1727,12 @@ function initRoom(roomId) {
     people = list;
     if (state?.duel) renderDuel(state.duel);
     const people_ = list;
-    $('#people').innerHTML = people_.slice(0, 6).map(p => `<span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}" data-tip="${esc(p.name)}" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
-      + (people_.length > 6 ? `<span class="ava" style="background:#333">+${people_.length - 6}</span>` : '');
+    const row = p => `<button class="menu-item person-item" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}"><span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span><span>${nick(p.pid, p.name)}${p.pid === myPid() ? ' <small>это вы</small>' : p.pid?.startsWith('d') ? ' <small>Discord</small>' : ''}</span></button>`;
+    $('#peopleList').innerHTML = people_.map(row).join('');
+    $('#sideCount').textContent = String(people_.length);
     $('#peopleNum').textContent = String(list.length);
     $('#peopleBtn').setAttribute('aria-label', `В комнате ${list.length} ${plural(list.length, 'человек', 'человека', 'человек')}`);
-    $('#peopleMenu').innerHTML = `<div class="menu-label">В комнате</div>` + list.map(p => `<button class="menu-item person-item" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}"><span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span><span>${nick(p.pid, p.name)}${p.pid === myPid() ? ' <small>это вы</small>' : ''}</span></button>`).join('');
+    $('#peopleMenu').innerHTML = `<div class="menu-label">В комнате</div>` + list.map(row).join('');
   }
 
   // ---- действия с фильмами ----
@@ -1740,6 +1772,14 @@ function initRoom(roomId) {
     if (e.target.closest('[data-del]')) return removeFilm(id);
     showDetail(state.films.find(f => f.id === id));
   });
+
+  // вкладки левой колонки: фильмы и уже выпавшие
+  function setLp(tab) {
+    $$('#lpTabs button').forEach(b => { b.classList.toggle('on', b.dataset.lp === tab); b.setAttribute('aria-selected', String(b.dataset.lp === tab)); });
+    $$('.lp-pane').forEach(x => (x.hidden = x.dataset.lpp !== tab));
+    placeSeg($('#lpTabs'));
+  }
+  $('#lpTabs').addEventListener('click', e => { const b = e.target.closest('[data-lp]'); if (b) setLp(b.dataset.lp); });
 
   $('#historyList').addEventListener('click', e => {
     const h = e.target.closest('[data-h]');
@@ -1812,10 +1852,15 @@ function initRoom(roomId) {
       if (!e.target.closest(m) || e.target.closest('#funMenu button')) setMenu($(b), $(m), false);
     }
   });
-  $('#wheelAddBtn').addEventListener('click', () => $('#addBtn').click());
+  $('#wheelAddBtn').addEventListener('click', () => {
+    setLp('films');
+    $('#quickSearch').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    $('#quickSearch').focus({ preventScroll: true });
+  });
 
   // ---- добавление ----
   $('#addBtn').addEventListener('click', () => {
+    $('#addTabs [data-tab="list"]').click();
     openModal('#addModal');
     requestAnimationFrame(() => placeSeg($('#addTabs')));
     setTimeout(() => $('#searchInput').focus({ preventScroll: true }), 120);
@@ -1838,9 +1883,8 @@ function initRoom(roomId) {
     if (e.key === 'Enter') { e.preventDefault(); $('#searchResults .res')?.click(); }
   });
 
-  async function search(q) {
+  async function search(q, box = $('#searchResults')) {
     const seq = ++searchSeq;
-    const box = $('#searchResults');
     if (q.length < 2) { box.innerHTML = ''; return; }
     let results = [];
     if (provider !== 'none') {
@@ -1857,17 +1901,59 @@ function initRoom(roomId) {
       + `<button class="res res-manual" data-manual><i></i><div><b>Добавить «${esc(q)}»</b><span>Без постера и описания</span></div><span class="plus">${ICON.plus}</span></button>`;
   }
 
-  $('#searchResults').addEventListener('click', async e => {
+  const qr = document.createElement('div');
+  qr.id = 'quickResults';
+  qr.className = 'results quick-results';
+  qr.hidden = true;
+  document.body.append(qr);
+  function placeQuick() {
+    if (qr.hidden) return;
+    const r = $('#quickSearch').getBoundingClientRect();
+    qr.style.left = `${r.left}px`;
+    qr.style.top = `${r.bottom + 6}px`;
+    qr.style.width = `${Math.max(r.width, 300)}px`;
+    qr.style.maxHeight = `${Math.max(160, innerHeight - r.bottom - 20)}px`;
+  }
+  function showQuick(on) {
+    qr.hidden = !on;
+    $('#quickSearch').setAttribute('aria-expanded', String(on));
+    placeQuick();
+  }
+  let quickTimer = null;
+  $('#quickSearch').addEventListener('input', e => {
+    clearTimeout(quickTimer);
+    const q = e.target.value.trim();
+    if (q.length < 2) { showQuick(false); qr.innerHTML = ''; return; }
+    quickTimer = setTimeout(() => { showQuick(true); search(q, qr).then(placeQuick); }, 300);
+  });
+  $('#quickSearch').addEventListener('focus', () => { if (qr.innerHTML && $('#quickSearch').value.trim().length > 1) showQuick(true); });
+  $('#quickSearch').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); qr.querySelector('.res:not(.added)')?.click(); }
+    if (e.key === 'Escape') showQuick(false);
+    if (e.key === 'ArrowDown') { e.preventDefault(); qr.querySelector('.res')?.focus(); }
+  });
+  qr.addEventListener('keydown', e => {
+    const items = [...qr.querySelectorAll('.res')], i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); items[Math.min(items.length - 1, i + 1)]?.focus(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); (i <= 0 ? $('#quickSearch') : items[i - 1]).focus(); }
+    if (e.key === 'Escape') { showQuick(false); $('#quickSearch').focus(); }
+  });
+  document.addEventListener('click', e => { if (!qr.hidden && !e.target.closest('#quickResults, #quickSearch')) showQuick(false); });
+  addEventListener('resize', placeQuick);
+  document.addEventListener('scroll', placeQuick, true);
+  $('#searchResults').addEventListener('click', e => addFromResults(e, $('#searchInput')));
+  qr.addEventListener('click', e => addFromResults(e, $('#quickSearch')));
+  async function addFromResults(e, input) {
     const b = e.target.closest('.res');
     if (!b || b.classList.contains('added')) return;
-    const film = b.dataset.manual !== undefined ? { title: $('#searchInput').value.trim() } : lastResults[b.dataset.i];
+    const film = b.dataset.manual !== undefined ? { title: input.value.trim() } : lastResults[b.dataset.i];
     try {
       const r = await api(`/rooms/${roomId}/films`, { method: 'POST', body: { ...film, by: me.name, cid: me.cid } });
       b.classList.add('added');
       b.querySelector('.plus').innerHTML = ICON.check;
       toast(r.voted.length ? `«${film.title}» уже есть, ваш голос отдан ему` : r.merged.length ? `«${film.title}» уже есть в колесе` : `«${film.title}» добавлен`);
     } catch (err) { toast(err.message, true); }
-  });
+  }
 
   // ---- добавление списком: поиск по каждой строке, затем проверка ----
   // choice: индекс найденного варианта, 'raw' (как есть) или 'skip' (не добавлять)
@@ -2040,6 +2126,8 @@ function initRoom(roomId) {
       .catch(err => { e.target.checked = !e.target.checked; toast(err.message, true); });
   });
   $('#showOutOn').checked = settings.showOut;
+  $('#flyChatOn').checked = settings.flyChat;
+  $('#flyChatOn').addEventListener('change', e => { settings.flyChat = e.target.checked; ls.set('flyChat', settings.flyChat); });
   $('#showOutOn').addEventListener('change', e => { settings.showOut = e.target.checked; ls.set('showOut', settings.showOut); });
   // ворона: наш трек, включается у всех сразу
   $('#crowBtn').addEventListener('click', async () => {
