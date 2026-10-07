@@ -1292,7 +1292,7 @@ html { overflow-x: clip; }
 :root { --nav-h: 70px; --col-l: 330px; --col-r: 300px; --gap: 8px; }
 
 /* шапка: слева название, справа две группы кнопок */
-#room .nav-music { flex: 1; }
+@media (min-width: 861px) { #room .nav-music { flex: 1; } }
 #room .act { gap: 12px; }
 #inviteBtn { margin-left: 4px; }
 
