@@ -648,6 +648,11 @@ function initRoom(roomId) {
     $('#spinBtn .hub-label').innerHTML = counting ? String(countdown) : spinning ? 'Крутится'
       : locked ? '<svg class="hub-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
       : settings.mode === 'duel' ? 'Дуэль' : settings.mode === 'elimination' && state.eliminated.length ? 'Дальше' : 'Крутить';
+    // на колесе нечего крутить: вместо кнопки предлагаем добавить фильмы
+    const empty = !spinning && !duel && active.length === 0;
+    $('#wheelEmpty').hidden = !empty;
+    $('#spinBtn').hidden = empty;
+    if (empty) $('#wheelEmptyText').textContent = state.films.length ? 'Все фильмы уже выпали или не подходят под фильтры' : 'Колесо пустое';
     $('#hubSub').textContent = counting || spinning ? '' : locked ? 'крутит создатель' : active.length < 2 ? 'нужно 2 фильма' : `${active.length} ${plural(active.length, 'фильм', 'фильма', 'фильмов')}`;
 
     $('#stopBtn').hidden = !counting && !state.series;
@@ -660,6 +665,7 @@ function initRoom(roomId) {
     $('#resetBtn').hidden = !state.eliminated.length || spinning;
     const addClosed = (state.addLock && !isRoomOwner()) || state.elimActive;
     $('#addBtn').disabled = spinning || Boolean(duel) || addClosed;
+    $('#wheelAddBtn').disabled = $('#addBtn').disabled;
     $('#addBtn').title = state.elimActive ? 'Идёт выбывание: добавлять фильмы можно после него' : state.addLock && !isRoomOwner() ? 'Создатель комнаты закрыл добавление фильмов' : '';
     $('#addLockWrap').hidden = !isRoomOwner();
     $('#addLockOn').checked = Boolean(state.addLock);
@@ -1761,6 +1767,18 @@ function initRoom(roomId) {
     openModal('#filmModal');
   }
 
+  // меню «Ещё» в шапке на телефоне
+  $('#moreBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    const open = $('#navExtra').classList.toggle('open');
+    $('#moreBtn').setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#navExtra')) { $('#navExtra').classList.remove('open'); $('#moreBtn').setAttribute('aria-expanded', 'false'); }
+    else if (e.target.closest('button')) setTimeout(() => $('#navExtra').classList.remove('open'), 0);
+  });
+  $('#wheelAddBtn').addEventListener('click', () => $('#addBtn').click());
+
   // ---- добавление ----
   $('#addBtn').addEventListener('click', () => {
     openModal('#addModal');
@@ -2109,6 +2127,7 @@ function initRoom(roomId) {
     else {
       $$('.discord-login, .discord-or').forEach(el => (el.hidden = !account.discord));
       $('.discord-login').href = loginUrl();
+      $('#room').inert = true;
       openModal('#nameModal');
       setTimeout(() => $('#nameInput').focus({ preventScroll: true }), 120);
     }
@@ -2121,6 +2140,7 @@ function initRoom(roomId) {
     me.name = $('#nameInput').value.trim().slice(0, 32);
     if (!me.name) return;
     ls.set('name', me.name);
+    $('#room').inert = false;
     closeModal('#nameModal');
     connect();
   });

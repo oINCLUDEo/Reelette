@@ -95,9 +95,12 @@
       <span class="eq right" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
     </div>
     <div class="act">
+      <button class="ghost sm icon more-btn" id="moreBtn" title="Ещё" aria-label="Ещё" aria-expanded="false"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/></svg></button>
+      <div class="nav-extra" id="navExtra">
       <button class="ghost sm icon karaoke-btn" id="crowBtn" title="Включить ворону у всех" aria-label="Ворона"><svg viewBox="0 0 24 24"><path d="M2.5 13.5c2.2-.9 4.4-.8 6.3.3l1.6-3.8c.9-2.1 3.5-3.4 5.8-2.6l2 .7 2.8-.4-2.4 1.6c.1 3.2-1.4 6.3-4.4 7.9l.9 3.6h-1.7l-1-3-2.7.8.9 2.2H8.9L8 17.9c-2.6-.2-4.6-2-5.5-4.4z" fill="currentColor" stroke="none"/></svg></button>
       <button class="ghost sm icon karaoke-btn" id="quizBtn" title="Угадай мелодию: угадываем треки, которые играли в комнате" aria-label="Угадай мелодию"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v8"/><circle cx="6" cy="18" r="3"/><path d="M15.5 15.2a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.3M18 21.5v.01"/></svg></button>
       <button class="ghost sm icon karaoke-btn" id="karaokeBtn" title="Караоке: большой плеер на сцене, очередь певцов, тексты и оценки" aria-label="Караоке"><svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0"/><path d="M12 17v4M8.5 21h7"/></svg></button>
+      </div>
       <div id="people" class="people"></div>
       <button id="inviteBtn" class="ghost sm"><svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg><span>Пригласить</span></button>
       <button id="settingsBtn" class="ghost sm icon" title="Настройки"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
@@ -225,6 +228,7 @@
           <canvas id="wheel"></canvas>
           <button id="spinBtn" class="hub-btn" title="Крутить (пробел)"><span class="hub-label">Крутить</span><span class="hub-sub" id="hubSub"></span></button>
           <div class="pointer" id="pointer"><svg viewBox="0 0 40 52"><path d="M20 50 3 14A18 18 0 1 1 37 14Z"/></svg></div>
+          <div class="wheel-empty" id="wheelEmpty" hidden><b id="wheelEmptyText">Колесо пустое</b><button class="btn btn-primary" id="wheelAddBtn" type="button">Добавить фильмы</button></div>
         </div>
         <div class="duel" id="duelBox" hidden>
           <div class="duel-progress" id="duelProgress"></div>

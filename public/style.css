@@ -1203,3 +1203,45 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 .hist-rate .hr-head { font: 800 14px var(--f-ui); color: var(--tx2); }
 .hist-rate .hr-head b { color: var(--tx); margin-left: 4px; }
 .rate-locked b { color: var(--tx); }
+
+/* ---------- пустое колесо ---------- */
+.wheel-empty { position: absolute; inset: 22%; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; border-radius: 50%; }
+.wheel-empty b { font: 800 clamp(16px, 4.2cqi, 24px)/1.15 var(--f-head); letter-spacing: -.03em; text-wrap: balance; }
+
+/* ---------- меню «Ещё» (только на узком экране) ---------- */
+.more-btn { display: none !important; }
+.nav-extra { display: contents; }
+
+/* ---------- телефон ---------- */
+html { overflow-x: clip; }
+@media (max-width: 860px) {
+  /* список фильмов сразу под колесом, настройки ниже */
+  .films-panel { order: -1; }
+  .controls { order: 0; }
+
+  /* шапка: ворона, «Угадай мелодию» и караоке уходят в меню */
+  .nav .bar { gap: 8px; padding-left: 12px; }
+  .nav .act { gap: 6px; position: relative; }
+  .more-btn { display: inline-flex !important; }
+  .nav-extra { display: none; position: absolute; top: calc(100% + 10px); right: 0; z-index: 60; flex-direction: column; gap: 4px; padding: 6px; min-width: 210px; border-radius: 16px; background: var(--sheetB); border: 1px solid var(--bd); box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+  .nav-extra.open { display: flex; }
+  .nav-extra .ghost.icon { width: 100%; justify-content: flex-start; gap: 10px; padding: 0 12px; border: 0; background: none; }
+  .nav-extra .ghost.icon:hover { background: var(--s2); }
+  .nav-extra .ghost.icon::after { content: attr(aria-label); font-size: 14.5px; }
+  .nav-music { flex: none; }
+  .room-title { flex: 0 1 auto; min-width: 0; max-width: none; margin-right: auto; }
+  .nav .act { margin-left: 0; flex: none; }
+
+  /* реакции и чат: отдельной полосой под колесом, переносятся по строкам */
+  .stage { flex-direction: column; }
+  .stage-in { padding-bottom: 14px; }
+  .react-bar { position: relative; left: auto; bottom: auto; transform: none; order: 2; margin: 0 10px 12px; flex-wrap: wrap; justify-content: center; }
+  .react-bar button { width: 38px; height: 38px; font-size: 19px; }
+  .react-bar .rb-sep { display: none; }
+  .react-bar .chat-form { flex: 1 1 180px; margin: 0; }
+  .chat-form input, .chat-form input:focus { width: 100%; }
+  .chat-log { right: 0; left: 0; width: auto; }
+}
+@media (max-width: 520px) {
+  .people { display: none; }
+}
