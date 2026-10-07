@@ -68,16 +68,32 @@ function toast(text, bad = false) {
 }
 // Окна: показываем элемент, на следующем кадре включаем переход; при закрытии ждём конец перехода.
 const modalEl = m => (typeof m === 'string' ? $(m) : m);
+// Открытая модалка забирает фокус: остальная страница становится inert, после закрытия фокус возвращается.
+const modalStack = [];
+function syncInert() {
+  const top = modalStack[modalStack.length - 1];
+  for (const el of document.body.children) {
+    if (el.tagName === 'SCRIPT' || el.classList.contains('toast-wrap') || el.id === 'toasts') continue;
+    el.inert = Boolean(top) && el !== top;
+  }
+}
 function openModal(m) {
   const el = modalEl(m);
   clearTimeout(el._t);
+  if (!modalStack.includes(el)) { el._ret = document.activeElement; modalStack.push(el); }
   el.hidden = false;
+  syncInert();
+  requestAnimationFrame(() => { if (!el.contains(document.activeElement)) { const c = el.querySelector('.modal-card') || el; c.tabIndex = -1; c.focus({ preventScroll: true }); } });
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('open')));
 }
 function closeModal(m) {
   const el = modalEl(m);
   if (!el || el.hidden) return;
   el.classList.remove('open');
+  const k = modalStack.indexOf(el);
+  if (k >= 0) modalStack.splice(k, 1);
+  syncInert();
+  if (el._ret?.isConnected) el._ret.focus({ preventScroll: true });
   clearTimeout(el._t);
   el._t = setTimeout(() => {
     el.hidden = true;
@@ -684,6 +700,7 @@ function initRoom(roomId) {
     $('#quizBox').hidden = !quiz;
     $('#karaokeBtn').classList.toggle('on', Boolean(state.karaoke));
     $('#quizBtn').classList.toggle('on', Boolean(quiz));
+    $('#funBtn').classList.toggle('has-on', Boolean(state.karaoke || quiz));
     if (karaoke) renderKaraoke();
     if (quiz) renderQuiz(quiz);
     renderFilters(spinning || Boolean(duel));
@@ -1024,25 +1041,29 @@ function initRoom(roomId) {
   let armed = null;
   function armThrow(item) {
     armed = armed === item ? null : item;
-    $$('#reactBar [data-throw]').forEach(b => b.classList.toggle('armed', b.dataset.throw === armed));
+    $$('[data-throw]').forEach(b => b.classList.toggle('armed', b.dataset.throw === armed));
     $('#throwLayer').hidden = !armed;
+    $('#armedChip').hidden = !armed;
+    if (armed) $('#armedChip').innerHTML = `<span>${THROW[armed].e}</span>Кликните по сцене<i aria-hidden="true">${ICON.x}</i>`;
+    $('#armedChip').setAttribute('aria-label', armed ? 'Убрать бросок из рук' : '');
     if (armed) $('#throwLayer').dataset.item = THROW[armed].e;
   }
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && armed) armThrow(armed); });
-  $('#reactBar').addEventListener('click', e => {
+  $('#throwRow').addEventListener('click', e => {
     const b = e.target.closest('[data-throw]');
     if (!b) return;
     Sfx.unlock();
     armThrow(b.dataset.throw);
   });
+  $('#armedChip').addEventListener('click', () => { if (armed) armThrow(armed); });
   // лимит проверяем сами: при перезарядке кнопка дёргается, а не сыплются уведомления
   const throwTimes = [];
   function canThrow() {
     const now = Date.now();
     while (throwTimes.length && now - throwTimes[0] > 3000) throwTimes.shift();
     if (throwTimes.length >= 5) {
-      const b = $(`#reactBar [data-throw="${armed}"]`);
-      b?.classList.remove('cooldown'); void b?.offsetWidth; b?.classList.add('cooldown');
+      const b = $('#armedChip');
+      b.classList.remove('cooldown'); void b.offsetWidth; b.classList.add('cooldown');
       return false;
     }
     throwTimes.push(now);
@@ -1677,6 +1698,9 @@ function initRoom(roomId) {
     const people_ = list;
     $('#people').innerHTML = people_.slice(0, 6).map(p => `<span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}" data-tip="${esc(p.name)}" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
       + (people_.length > 6 ? `<span class="ava" style="background:#333">+${people_.length - 6}</span>` : '');
+    $('#peopleNum').textContent = String(list.length);
+    $('#peopleBtn').setAttribute('aria-label', `В комнате ${list.length} ${plural(list.length, 'человек', 'человека', 'человек')}`);
+    $('#peopleMenu').innerHTML = `<div class="menu-label">В комнате</div>` + list.map(p => `<button class="menu-item person-item" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}"><span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span><span>${nick(p.pid, p.name)}${p.pid === myPid() ? ' <small>это вы</small>' : ''}</span></button>`).join('');
   }
 
   // ---- действия с фильмами ----
@@ -1767,15 +1791,26 @@ function initRoom(roomId) {
     openModal('#filmModal');
   }
 
-  // меню «Ещё» в шапке на телефоне
-  $('#moreBtn').addEventListener('click', e => {
-    e.stopPropagation();
-    const open = $('#navExtra').classList.toggle('open');
-    $('#moreBtn').setAttribute('aria-expanded', String(open));
+  // выпадающие меню в шапке: «Развлечения» и «Кто в комнате»
+  function setMenu(btn, menu, open) {
+    menu.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+    if (open) menu.querySelector('button')?.focus({ preventScroll: true });
+  }
+  [['#funBtn', '#funMenu'], ['#peopleBtn', '#peopleMenu']].forEach(([b, m]) => {
+    $(b).addEventListener('click', e => {
+      e.stopPropagation();
+      $$('.pop-menu').forEach(x => { if (x !== $(m)) x.hidden = true; });
+      setMenu($(b), $(m), $(m).hidden);
+    });
+    $(m).addEventListener('keydown', e => { if (e.key === 'Escape') { setMenu($(b), $(m), false); $(b).focus(); } });
   });
   document.addEventListener('click', e => {
-    if (!e.target.closest('#navExtra')) { $('#navExtra').classList.remove('open'); $('#moreBtn').setAttribute('aria-expanded', 'false'); }
-    else if (e.target.closest('button')) setTimeout(() => $('#navExtra').classList.remove('open'), 0);
+    // клик мимо меню или по пункту меню закрывает его
+    for (const [b, m] of [['#funBtn', '#funMenu'], ['#peopleBtn', '#peopleMenu']]) {
+      if ($(m).hidden) continue;
+      if (!e.target.closest(m) || e.target.closest('#funMenu button')) setMenu($(b), $(m), false);
+    }
   });
   $('#wheelAddBtn').addEventListener('click', () => $('#addBtn').click());
 
@@ -2127,7 +2162,6 @@ function initRoom(roomId) {
     else {
       $$('.discord-login, .discord-or').forEach(el => (el.hidden = !account.discord));
       $('.discord-login').href = loginUrl();
-      $('#room').inert = true;
       openModal('#nameModal');
       setTimeout(() => $('#nameInput').focus({ preventScroll: true }), 120);
     }
@@ -2140,7 +2174,6 @@ function initRoom(roomId) {
     me.name = $('#nameInput').value.trim().slice(0, 32);
     if (!me.name) return;
     ls.set('name', me.name);
-    $('#room').inert = false;
     closeModal('#nameModal');
     connect();
   });

@@ -1208,9 +1208,6 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 .wheel-empty { position: absolute; inset: 22%; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; border-radius: 50%; }
 .wheel-empty b { font: 800 clamp(16px, 4.2cqi, 24px)/1.15 var(--f-head); letter-spacing: -.03em; text-wrap: balance; }
 
-/* ---------- меню «Ещё» (только на узком экране) ---------- */
-.more-btn { display: none !important; }
-.nav-extra { display: contents; }
 
 /* ---------- телефон ---------- */
 html { overflow-x: clip; }
@@ -1219,15 +1216,10 @@ html { overflow-x: clip; }
   .films-panel { order: -1; }
   .controls { order: 0; }
 
-  /* шапка: ворона, «Угадай мелодию» и караоке уходят в меню */
   .nav .bar { gap: 8px; padding-left: 12px; }
-  .nav .act { gap: 6px; position: relative; }
-  .more-btn { display: inline-flex !important; }
-  .nav-extra { display: none; position: absolute; top: calc(100% + 10px); right: 0; z-index: 60; flex-direction: column; gap: 4px; padding: 6px; min-width: 210px; border-radius: 16px; background: var(--sheetB); border: 1px solid var(--bd); box-shadow: 0 20px 50px rgba(0,0,0,.5); }
-  .nav-extra.open { display: flex; }
-  .nav-extra .ghost.icon { width: 100%; justify-content: flex-start; gap: 10px; padding: 0 12px; border: 0; background: none; }
-  .nav-extra .ghost.icon:hover { background: var(--s2); }
-  .nav-extra .ghost.icon::after { content: attr(aria-label); font-size: 14.5px; }
+  .nav .act { gap: 6px; }
+  .fun-btn { width: 44px; padding: 0; justify-content: center; }
+  .fun-btn span { display: none; }
   .nav-music { flex: none; }
   .room-title { flex: 0 1 auto; min-width: 0; max-width: none; margin-right: auto; }
   .nav .act { margin-left: 0; flex: none; }
@@ -1242,6 +1234,49 @@ html { overflow-x: clip; }
   .chat-form input, .chat-form input:focus { width: 100%; }
   .chat-log { right: 0; left: 0; width: auto; }
 }
+/* на узком экране вместо аватаров — счётчик людей со списком */
+.people-wrap { display: none; }
 @media (max-width: 520px) {
   .people { display: none; }
+  .people-wrap { display: block; }
 }
+
+/* ---------- выпадающие меню шапки ---------- */
+.menu-wrap { position: relative; }
+.pop-menu { position: absolute; top: calc(100% + 10px); right: 0; z-index: 60; display: flex; flex-direction: column; gap: 4px; padding: 8px; min-width: 248px; border-radius: 16px; background: var(--sheetB); border: 1px solid var(--bd); box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+.pop-menu[hidden] { display: none; }
+.menu-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 12px; border-radius: 12px; text-align: left; font-weight: 700; font-size: 14px; color: var(--tx); transition: background .2s; }
+.menu-item:hover, .menu-item:focus-visible { background: var(--s2); }
+.menu-item svg { width: 20px; height: 20px; color: var(--tx2); }
+.menu-item span { display: flex; flex-direction: column; min-width: 0; }
+.menu-item small { font-weight: 500; font-size: 12px; color: var(--tx3); }
+.menu-item.on { background: color-mix(in srgb, var(--acc) 18%, transparent); }
+.menu-item.on svg { color: var(--acc-hi); }
+.menu-sep { height: 1px; margin: 4px 8px; background: var(--bd); }
+.menu-label { padding: 4px 12px 0; font-size: 12px; font-weight: 700; color: var(--tx3); }
+.throw-row { display: flex; gap: 4px; padding: 0 4px 4px; }
+.throw-row button { flex: 1; height: 44px; border-radius: 12px; font-size: 22px; display: grid; place-items: center; transition: background .2s, transform .3s var(--spring); }
+.throw-row button:hover, .throw-row button:focus-visible { background: var(--s2); transform: translateY(-2px); }
+.throw-row button.armed { background: var(--acc); box-shadow: 0 0 14px var(--glow); }
+.fun-btn { position: relative; gap: 8px; }
+.fun-dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 8px var(--glow); display: none; }
+.fun-btn.has-on .fun-dot { display: block; }
+.people-count { gap: 6px; padding: 0 12px; }
+.people-count b { font-size: 14px; }
+.people-menu { min-width: 220px; max-height: 60vh; overflow-y: auto; }
+.person-item .ava { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; flex: none; overflow: hidden; margin: 0; }
+.person-item .ava img { width: 100%; height: 100%; object-fit: cover; }
+
+/* взведённый бросок: плашка в полосе реакций, по клику бросок убирается */
+.armed-chip { width: auto !important; display: inline-flex !important; align-items: center; gap: 8px; padding: 0 10px 0 8px; font: 700 13px var(--f-ui) !important; color: var(--on-acc); background: var(--acc) !important; box-shadow: 0 0 14px var(--glow); }
+.armed-chip[hidden] { display: none !important; }
+.armed-chip span { font-size: 19px; }
+.armed-chip i { display: grid; opacity: .8; }
+.armed-chip i svg { width: 15px; height: 15px; }
+.armed-chip.cooldown { animation: cooldownShake .45s ease; }
+
+/* переключатели: настоящий checkbox с ролью switch, доступный с клавиатуры */
+.check input { display: block; position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.check { position: relative; }
+.modal-card:focus { outline: none; }
+.check input:focus-visible + .box { outline: 2px solid var(--acc); outline-offset: 3px; }

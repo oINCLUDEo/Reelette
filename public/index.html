@@ -24,7 +24,7 @@
 <!-- ===== Главная ===== -->
 <div id="home" hidden>
   <header class="nav"><div class="bar">
-    <a class="brand" href="/"><svg><use href="#logo"/></svg>Reelette</a>
+    <a class="brand" href="/" aria-label="Reelette, на главную"><svg aria-hidden="true"><use href="#logo"/></svg>Reelette</a>
     <div class="act" id="homeAcct"></div>
   </div></header>
 
@@ -57,11 +57,11 @@
 <!-- ===== Комната ===== -->
 <div id="room" hidden>
   <header class="nav"><div class="bar">
-    <a class="brand" href="/"><svg><use href="#logo"/></svg><span class="brand-name">Reelette</span></a>
+    <a class="brand" href="/" aria-label="Reelette, на главную"><svg aria-hidden="true"><use href="#logo"/></svg><span class="brand-name">Reelette</span></a>
     <button id="roomTitle" class="room-title" title="Переименовать"></button>
     <div class="nav-music" id="navMusic">
       <button class="ghost sm icon" id="ytReplay" hidden><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
-      <button class="ghost sm music-btn" id="musicBtn" title="Общая музыка из YouTube, её слышат все в комнате"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Музыка</span></button>
+      <button class="ghost sm music-btn" id="musicBtn" aria-label="Общая музыка" title="Общая музыка из YouTube, её слышат все в комнате"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Музыка</span></button>
       <div class="yt-card" id="ytCard" hidden>
         <div class="yt-frame"><div id="ytHost"></div><button class="yt-unmute" id="ytUnmute" hidden title="Браузер ждёт клика, чтобы включить звук">Слушать</button></div>
         <div class="yt-info"><b id="ytTitle"></b><span id="ytBy"></span></div>
@@ -95,15 +95,26 @@
       <span class="eq right" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
     </div>
     <div class="act">
-      <button class="ghost sm icon more-btn" id="moreBtn" title="Ещё" aria-label="Ещё" aria-expanded="false"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/></svg></button>
-      <div class="nav-extra" id="navExtra">
-      <button class="ghost sm icon karaoke-btn" id="crowBtn" title="Включить ворону у всех" aria-label="Ворона"><svg viewBox="0 0 24 24"><path d="M2.5 13.5c2.2-.9 4.4-.8 6.3.3l1.6-3.8c.9-2.1 3.5-3.4 5.8-2.6l2 .7 2.8-.4-2.4 1.6c.1 3.2-1.4 6.3-4.4 7.9l.9 3.6h-1.7l-1-3-2.7.8.9 2.2H8.9L8 17.9c-2.6-.2-4.6-2-5.5-4.4z" fill="currentColor" stroke="none"/></svg></button>
-      <button class="ghost sm icon karaoke-btn" id="quizBtn" title="Угадай мелодию: угадываем треки, которые играли в комнате" aria-label="Угадай мелодию"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v8"/><circle cx="6" cy="18" r="3"/><path d="M15.5 15.2a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.3M18 21.5v.01"/></svg></button>
-      <button class="ghost sm icon karaoke-btn" id="karaokeBtn" title="Караоке: большой плеер на сцене, очередь певцов, тексты и оценки" aria-label="Караоке"><svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0"/><path d="M12 17v4M8.5 21h7"/></svg></button>
+      <div class="menu-wrap">
+        <button class="ghost sm fun-btn" id="funBtn" aria-haspopup="true" aria-expanded="false" aria-controls="funMenu" title="Ворона, «Угадай мелодию», караоке и броски"><svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg><span>Развлечения</span><i class="fun-dot" aria-hidden="true"></i></button>
+        <div class="pop-menu fun-menu" id="funMenu" role="menu" aria-label="Развлечения" hidden>
+          <button class="menu-item" id="crowBtn" role="menuitem" title="Включить ворону у всех"><svg viewBox="0 0 24 24"><path d="M2.5 13.5c2.2-.9 4.4-.8 6.3.3l1.6-3.8c.9-2.1 3.5-3.4 5.8-2.6l2 .7 2.8-.4-2.4 1.6c.1 3.2-1.4 6.3-4.4 7.9l.9 3.6h-1.7l-1-3-2.7.8.9 2.2H8.9L8 17.9c-2.6-.2-4.6-2-5.5-4.4z" fill="currentColor" stroke="none"/></svg><span>Ворона<small>трек у всех в комнате</small></span></button>
+          <button class="menu-item" id="quizBtn" role="menuitem" title="Угадываем треки, которые играли в комнате"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v8"/><circle cx="6" cy="18" r="3"/><path d="M15.5 15.2a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.3M18 21.5v.01"/></svg><span>Угадай мелодию<small>треки, что играли в комнате</small></span></button>
+          <button class="menu-item" id="karaokeBtn" role="menuitem" title="Большой плеер, очередь певцов, тексты и оценки"><svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0"/><path d="M12 17v4M8.5 21h7"/></svg><span>Караоке<small>сцена для всей комнаты</small></span></button>
+          <div class="menu-sep"></div>
+          <div class="menu-label">Бросить в сцену</div>
+          <div class="throw-row" id="throwRow">
+            <button data-throw="tomato" role="menuitem" aria-label="Бросить помидор" title="Помидор">🍅</button><button data-throw="egg" role="menuitem" aria-label="Бросить яйцо" title="Яйцо">🥚</button><button data-throw="pie" role="menuitem" aria-label="Бросить торт" title="Торт">🥧</button><button data-throw="rose" role="menuitem" aria-label="Бросить розу" title="Роза">🌹</button>
+          </div>
+        </div>
       </div>
       <div id="people" class="people"></div>
-      <button id="inviteBtn" class="ghost sm"><svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg><span>Пригласить</span></button>
-      <button id="settingsBtn" class="ghost sm icon" title="Настройки"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
+      <div class="menu-wrap people-wrap">
+        <button class="ghost sm people-count" id="peopleBtn" aria-haspopup="true" aria-expanded="false" aria-controls="peopleMenu" title="Кто в комнате"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg><b id="peopleNum">0</b></button>
+        <div class="pop-menu people-menu" id="peopleMenu" aria-label="Кто в комнате" hidden></div>
+      </div>
+      <button id="inviteBtn" class="ghost sm" aria-label="Пригласить: скопировать ссылку на комнату" title="Скопировать ссылку на комнату"><svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg><span>Пригласить</span></button>
+      <button id="settingsBtn" class="ghost sm icon" title="Настройки" aria-label="Настройки комнаты"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
     </div>
   </div></header>
 
@@ -128,8 +139,7 @@
       <div class="throw-layer" id="throwLayer" hidden></div>
       <div class="react-bar" id="reactBar" aria-label="Реакции">
         <button data-rx="clap" title="Аплодисменты">👏</button><button data-rx="fire" title="Огонь">🔥</button><button data-rx="laugh" title="Смешно">😂</button><button data-rx="love" title="Люблю">😍</button><button data-rx="wow" title="Вау">😮</button><button data-rx="skull" title="Это конец">💀</button><button data-rx="party" title="Праздник">🎉</button><button data-rx="crow" class="rx-crow" title="Ворона: КАР!"><svg viewBox="0 0 24 24"><path d="M2.5 13.5c2.2-.9 4.4-.8 6.3.3l1.6-3.8c.9-2.1 3.5-3.4 5.8-2.6l2 .7 2.8-.4-2.4 1.6c.1 3.2-1.4 6.3-4.4 7.9l.9 3.6h-1.7l-1-3-2.7.8.9 2.2H8.9L8 17.9c-2.6-.2-4.6-2-5.5-4.4z" fill="currentColor" stroke="none"/></svg></button>
-        <span class="rb-sep"></span>
-        <button data-throw="tomato" title="Бросить помидор: выберите и кликните по сцене">🍅</button><button data-throw="egg" title="Бросить яйцо">🥚</button><button data-throw="pie" title="Бросить торт">🥧</button><button data-throw="rose" title="Бросить розу">🌹</button>
+        <button type="button" class="armed-chip" id="armedChip" hidden></button>
 
         <form class="chat-form" id="chatForm"><input id="chatInput" maxlength="200" placeholder="Написать всем…" autocomplete="off"></form>
         <button type="button" class="chat-log-btn" id="chatLogBtn" title="История чата"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
@@ -246,24 +256,24 @@
 
     <aside class="sheet b controls">
       <section class="ctl">
-        <div class="ctl-head">Режим <button type="button" class="hint" id="modeHint" data-hint="" aria-label="Подсказка">?</button></div>
+        <div class="ctl-head">Режим <button type="button" class="hint" id="modeHint" data-hint="" aria-label="Подсказка: режим">?</button></div>
         <div class="seg" id="modeSeg">
           <span class="seg-ind"></span>
           <button data-mode="normal">Обычный</button>
           <button data-mode="elimination">Выбывание</button>
           <button data-mode="duel">Дуэль</button>
         </div>
-        <label class="check" id="addLockWrap" hidden><input type="checkbox" id="addLockOn"><span class="box"></span><span class="check-text">Закрыть добавление фильмов <button type="button" class="hint" data-hint="Пока включено, добавлять фильмы можете только вы. Во время выбывания добавлять нельзя никому, чтобы колесо не менялось посреди серии." aria-label="Подсказка">?</button></span></label>
-        <label class="check" id="lockWrap" hidden><input type="checkbox" id="spinLockOn"><span class="box"></span><span class="check-text">Крутит только создатель <button type="button" class="hint" data-hint="Пока включено, запускать прокрут, серию и дуэль, отменять отсчёт и останавливать серию можете только вы. Остальные голосуют, добавляют фильмы и смотрят." aria-label="Подсказка">?</button></span></label>
-        <label class="check" id="showOutWrap"><input type="checkbox" id="showOutOn" checked><span class="box"></span><span class="check-text">Показывать выбывших <button type="button" class="hint" data-hint="Окно с выбывшим фильмом после каждого прокрута. Если выключить, выбывший фильм коротко мелькнёт внизу. Настройка только у вас." aria-label="Подсказка">?</button></span></label>
-        <label class="check" id="autoWrap"><input type="checkbox" id="autoSpin"><span class="box"></span><span class="check-text">Крутить до победителя <button type="button" class="hint" data-hint="Прокруты идут подряд без остановок, пока не останется один фильм. Серию можно остановить кнопкой под колесом." aria-label="Подсказка">?</button></span></label>
+        <label class="check" id="addLockWrap" hidden><input type="checkbox" role="switch" id="addLockOn"><span class="box"></span><span class="check-text">Закрыть добавление фильмов <button type="button" class="hint" data-hint="Пока включено, добавлять фильмы можете только вы. Во время выбывания добавлять нельзя никому, чтобы колесо не менялось посреди серии." aria-label="Подсказка: закрыть добавление фильмов">?</button></span></label>
+        <label class="check" id="lockWrap" hidden><input type="checkbox" role="switch" id="spinLockOn"><span class="box"></span><span class="check-text">Крутит только создатель <button type="button" class="hint" data-hint="Пока включено, запускать прокрут, серию и дуэль, отменять отсчёт и останавливать серию можете только вы. Остальные голосуют, добавляют фильмы и смотрят." aria-label="Подсказка: крутит только создатель">?</button></span></label>
+        <label class="check" id="showOutWrap"><input type="checkbox" role="switch" id="showOutOn" checked><span class="box"></span><span class="check-text">Показывать выбывших <button type="button" class="hint" data-hint="Окно с выбывшим фильмом после каждого прокрута. Если выключить, выбывший фильм коротко мелькнёт внизу. Настройка только у вас." aria-label="Подсказка: показывать выбывших">?</button></span></label>
+        <label class="check" id="autoWrap"><input type="checkbox" role="switch" id="autoSpin"><span class="box"></span><span class="check-text">Крутить до победителя <button type="button" class="hint" data-hint="Прокруты идут подряд без остановок, пока не останется один фильм. Серию можно остановить кнопкой под колесом." aria-label="Подсказка: крутить до победителя">?</button></span></label>
         <button id="resetBtn" class="btn btn-ghost btn-block" hidden>Вернуть выбывших в колесо</button>
       </section>
 
       <section class="ctl" id="spinCtl">
         <div class="field" id="durField">
-          <span class="label">Длительность <b id="durVal">12 с</b></span>
-          <input type="range" id="duration" min="0" max="40" value="12">
+          <label class="label" for="duration" id="durLabel">Длительность прокрута <b id="durVal">12 с</b></label>
+          <input type="range" id="duration" min="0" max="40" value="12" aria-describedby="durVal">
         </div>
         <div class="field" id="delayField">
           <span class="label">Отсчёт перед прокрутом</span>
@@ -278,9 +288,9 @@
       </section>
 
       <section class="ctl">
-        <label class="check"><input type="checkbox" id="fairOn" checked><span class="box"></span><span class="check-text">Равные шансы <button type="button" class="hint" data-hint="Колесо делится поровну между участниками: два фильма одного весят столько же, сколько шестьдесят у другого. Голоса и оценки действуют поверх." aria-label="Подсказка">?</button></span></label>
+        <label class="check"><input type="checkbox" role="switch" id="fairOn" checked><span class="box"></span><span class="check-text">Равные шансы <button type="button" class="hint" data-hint="Колесо делится поровну между участниками: два фильма одного весят столько же, сколько шестьдесят у другого. Голоса и оценки действуют поверх." aria-label="Подсказка: равные шансы">?</button></span></label>
         <div class="filters">
-          <label class="check"><input type="checkbox" id="filtersOn"><span class="box"></span><span class="check-text">Фильтры <button type="button" class="hint" data-hint="Крутятся только фильмы, подходящие по длине, году и жанрам. Фильтры общие для всей комнаты." aria-label="Подсказка">?</button></span></label>
+          <label class="check"><input type="checkbox" role="switch" id="filtersOn"><span class="box"></span><span class="check-text">Фильтры <button type="button" class="hint" data-hint="Крутятся только фильмы, подходящие по длине, году и жанрам. Фильтры общие для всей комнаты." aria-label="Подсказка: фильтры">?</button></span></label>
           <div id="filtersBody" class="filters-body" hidden>
             <span class="label">Длина</span>
             <div class="seg" id="fRuntime">
@@ -307,8 +317,8 @@
 
       <section class="ctl">
         <div class="ctl-head">Звук</div>
-        <label class="check"><input type="checkbox" id="soundOn" checked><span class="box"></span><span class="check-text">Щелчки и сигналы</span></label>
-        <label class="check"><input type="checkbox" id="musicOn"><span class="box"></span><span class="check-text">Музыка при прокруте <button type="button" class="hint" data-hint="Музыка собирается прямо в браузере, её темп следует за скоростью колеса. Кольцо вокруг колеса пульсирует в такт." aria-label="Подсказка">?</button></span></label>
+        <label class="check"><input type="checkbox" role="switch" id="soundOn" checked><span class="box"></span><span class="check-text">Щелчки и сигналы</span></label>
+        <label class="check"><input type="checkbox" role="switch" id="musicOn"><span class="box"></span><span class="check-text">Музыка при прокруте <button type="button" class="hint" data-hint="Музыка собирается прямо в браузере, её темп следует за скоростью колеса. Кольцо вокруг колеса пульсирует в такт." aria-label="Подсказка: музыка при прокруте">?</button></span></label>
       </section>
 
       <div class="rate-box" id="rateBox" hidden></div>
