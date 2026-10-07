@@ -1239,6 +1239,14 @@ html { overflow-x: clip; }
 @media (max-width: 520px) {
   .people { display: none; }
   .people-wrap { display: block; }
+  /* название комнаты важнее логотипа; кнопки чуть компактнее */
+  #room .brand { display: none; }
+  #room .room-title { margin-left: 0; padding: 9px 10px; }
+  #room .nav .bar { gap: 6px; padding-left: 7px; }
+  #room .nav .act { gap: 4px; }
+  #room .nav .ghost.sm { height: 40px; }
+  #room .nav .ghost.icon, #room .fun-btn, #inviteBtn { width: 40px; }
+  .people-count { padding: 0 9px; gap: 4px; }
 }
 
 /* ---------- выпадающие меню шапки ---------- */
@@ -1268,7 +1276,7 @@ html { overflow-x: clip; }
 .person-item .ava img { width: 100%; height: 100%; object-fit: cover; }
 
 /* взведённый бросок: плашка в полосе реакций, по клику бросок убирается */
-.armed-chip { width: auto !important; display: inline-flex !important; align-items: center; gap: 8px; padding: 0 10px 0 8px; font: 700 13px var(--f-ui) !important; color: var(--on-acc); background: var(--acc) !important; box-shadow: 0 0 14px var(--glow); }
+.armed-chip { width: auto !important; white-space: nowrap; display: inline-flex !important; align-items: center; gap: 8px; padding: 0 10px 0 8px; font: 700 13px var(--f-ui) !important; color: var(--on-acc); background: var(--acc) !important; box-shadow: 0 0 14px var(--glow); }
 .armed-chip[hidden] { display: none !important; }
 .armed-chip span { font-size: 19px; }
 .armed-chip i { display: grid; opacity: .8; }
