@@ -1288,3 +1288,6 @@ html { overflow-x: clip; }
 .check { position: relative; }
 .modal-card:focus { outline: none; }
 .check input:focus-visible + .box { outline: 2px solid var(--acc); outline-offset: 3px; }
+
+/* длинные модалки скроллятся, а не сплющивают кнопки */
+.modal-card > * { flex-shrink: 0; }
