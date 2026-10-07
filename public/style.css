@@ -1343,15 +1343,15 @@ html { overflow-x: clip; }
 .stage.dueling .stage-top { display: flex; }
 
 /* правая колонка */
-.side { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
+.side { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow: hidden; }
 .side > .rate-box, .side > .mod-banner { flex: none; }
 .side .mod-banner { margin: 0; }
 .side-sec { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .side-head { font: 800 15px var(--f-head); letter-spacing: -.02em; display: flex; gap: 6px; align-items: baseline; }
-.side-people { flex: none; max-height: 200px; }
+.side-people { flex: 0 1 auto; min-height: 84px; max-height: 220px; }
 .people-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; margin: 0 -8px; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
 .people-list .menu-item { padding: 6px 8px; }
-.side-chat { flex: 1 0 260px; }
+.side-chat { flex: 1 0 220px; }
 .chat-feed { flex: 1; min-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
 .chat-feed .note { font-size: 13px; }
 .chat-slot .chat-form { margin: 0; }
