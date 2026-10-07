@@ -256,11 +256,13 @@
           </div>
         </div>
         <div class="current"><span id="currentTitle">&nbsp;</span></div>
+        <div class="wheel-area">
         <div class="wheel-box" id="wheelBox">
           <canvas id="wheel"></canvas>
           <button id="spinBtn" class="hub-btn" title="Крутить (пробел)"><span class="hub-label">Крутить</span><span class="hub-sub" id="hubSub"></span></button>
           <div class="pointer" id="pointer"><svg viewBox="0 0 40 52"><path d="M20 50 3 14A18 18 0 1 1 37 14Z"/></svg></div>
           <div class="wheel-empty" id="wheelEmpty" hidden><b id="wheelEmptyText">Колесо пустое</b><button class="btn btn-primary" id="wheelAddBtn" type="button">Добавить фильмы</button></div>
+        </div>
         </div>
         <div class="duel" id="duelBox" hidden>
           <div class="duel-progress" id="duelProgress"></div>
@@ -280,11 +282,6 @@
 
     <aside class="sheet b side" id="side">
       <div class="rate-box" id="rateBox" hidden></div>
-      <div class="mod-banner" id="modBanner" hidden></div>
-      <section class="side-sec side-people">
-        <div class="side-head">В комнате <span class="m" id="sideCount"></span></div>
-        <div id="peopleList" class="people-list"></div>
-      </section>
       <section class="side-sec side-chat">
         <div class="side-head">Чат</div>
         <div id="chatFeed" class="chat-feed" aria-live="polite"></div>
@@ -472,6 +469,7 @@
 </div>
 
 <div id="toasts" class="toasts"></div>
+<div id="tip" class="tip" role="tooltip" hidden></div>
 
 <script src="/audio.js"></script>
 <script src="/fx.js"></script>

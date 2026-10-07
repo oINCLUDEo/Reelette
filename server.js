@@ -1027,7 +1027,7 @@ async function api(req, res, url) {
     const recent = (rt.chatRx.get(pid) || []).filter(t => now - t < 5000);
     if (recent.length >= 5) return json(res, 429, { error: 'Не так быстро' });
     recent.push(now); rt.chatRx.set(pid, recent);
-    const msg = { id: id(6), pid, name: who, text, at: now };
+    const msg = { id: id(6), pid, name: who, avatar: me?.avatar || '', text, at: now };
     r.chat ||= [];
     r.chat.push(msg);
     r.chat = r.chat.slice(-50);

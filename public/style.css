@@ -1289,7 +1289,7 @@ html { overflow-x: clip; }
 
 /* ================= этап 1: сетка ================= */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-:root { --nav-h: 70px; --col-l: 330px; --col-r: 300px; --gap: 8px; }
+:root { --nav-h: 70px; --col-l: clamp(300px, 21vw, 420px); --col-r: clamp(300px, 22vw, 440px); --gap: 8px; }
 
 /* шапка: слева название, справа две группы кнопок */
 @media (min-width: 861px) { #room .nav-music { flex: 1; } }
@@ -1302,7 +1302,12 @@ html { overflow-x: clip; }
   #room .layout > .sheet { margin: 0 !important; min-height: 0; height: 100%; }
   #room .films-panel { position: static; max-height: none; }
   #room .stage { min-height: 0; }
-  #room .wheel-box { width: min(92%, calc(100dvh - var(--nav-h) - 290px)); min-width: 280px; }
+  /* колесо вписывается в свободное место центра, но не больше 960px */
+  #room .stage-in { justify-content: flex-start; }
+  #room .wheel-area { flex: 1; min-height: 0; container-type: size; display: grid; place-items: center; padding-top: 14px; }
+  #room .wheel-box { width: min(100cqw, 100cqh, 960px); min-width: 0; }
+  /* очень широкий экран или отдаление: раскладка не шире 2200px, по центру */
+  #room .layout, #room .nav .bar { max-width: 2200px; margin-inline: auto; }
   body.karaoke-on #room .layout { grid-template-columns: minmax(0, 1fr); height: auto; min-height: calc(100dvh - var(--nav-h)); }
   body.karaoke-on #room .layout > .stage { height: auto; }
 }
@@ -1384,3 +1389,58 @@ html { overflow-x: clip; }
 .drawer-card .check { font-size: 14px; font-weight: 600; }
 .drawer-card > .field { padding: 16px 0; }
 .drawer-card .danger { padding-top: 8px; }
+
+/* ================= правки после живой комнаты ================= */
+.wheel-area { width: 100%; display: flex; justify-content: center; }
+.stage.dueling .wheel-area, .stage.karaoke-on .wheel-area { display: none !important; }
+.stage-top { flex: none; }
+.current { flex: none; }
+
+/* правая колонка: компактная оценка и чат на всю оставшуюся высоту с одним скроллом */
+.side { gap: 12px; }
+.side-chat { flex: 1 1 auto; min-height: 0; }
+.chat-feed { flex: 1 1 auto; min-height: 0; gap: 10px; padding-right: 2px; }
+.rate-box { gap: 8px; padding: 12px; border-radius: 16px; }
+.rate-box h3 { font-size: 15px; align-items: center; }
+.rate-box h3 > span { display: inline-flex; align-items: center; }
+.rate-film { gap: 10px; }
+.rate-film i { width: 28px; height: 40px; border-radius: 6px; font-size: 12px; }
+.rate-film b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.rate-film div { min-width: 0; }
+.rate-film span { font-size: 12px; }
+.rate-box .rate-scale { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; }
+.rate-box .rate-scale button { height: 28px; border-radius: 7px; font-size: 12.5px; }
+.rate-box .rate-list { gap: 4px; }
+.rate-box .rate-list span { font-size: 12px; padding: 2px 6px; }
+.rate-hint { font-size: 11.5px; }
+
+/* сообщение: аватар, имя, время — текст ниже на всю ширину */
+.cl-item { display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; }
+.cl-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cl-ava { width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center; overflow: hidden; font: 800 10px var(--f-ui); color: #fff; }
+.cl-ava img { width: 100%; height: 100%; object-fit: cover; }
+.cl-name { flex: 1; min-width: 0; display: flex; font-size: 13px; }
+.cl-head time { flex: none; color: var(--tx3); font-size: 11.5px; }
+.cl-text { margin: 0; padding-left: 30px; color: var(--tx2); line-height: 1.4; overflow-wrap: anywhere; word-break: normal; }
+
+/* ник со значками — одной строкой, длинный обрезается многоточием */
+.nick-wrap { display: inline-flex; align-items: center; max-width: 100%; min-width: 0; white-space: nowrap; vertical-align: bottom; }
+.nick-wrap > .nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nick-wrap > .nick-ico, .nick-wrap > .nick-badge { flex: none; }
+.group-head b { display: flex; align-items: center; gap: 4px; }
+.group-head b .m { flex: none; }
+
+/* значок бонуса у процента человека */
+.mod-chip { flex: none; font: 800 11.5px/1 var(--f-ui); padding: 4px 6px; border-radius: 7px; cursor: help; }
+.mod-chip.up { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.mod-chip.down { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+
+/* плавающая подсказка */
+.hint::after { display: none !important; }
+.tip { position: fixed; z-index: 90; max-width: 280px; padding: 10px 12px; border-radius: 12px; background: var(--s2); border: 1px solid var(--bd); box-shadow: 0 14px 40px rgba(0,0,0,.5); color: var(--tx2); font: 500 13px/1.45 var(--f-ui); pointer-events: none; }
+.tip[hidden] { display: none; }
+
+/* мини-плеер в шапке: высотой с кнопки, вместо крошечного видео — обложка */
+.nav-music .yt-card { padding: 3px 8px 3px 3px; height: 44px; }
+.nav-music .yt-frame { width: 64px; height: 36px; border-radius: 8px; background: #000 center/cover no-repeat; }
+.nav-music .yt-frame iframe { opacity: 0; }

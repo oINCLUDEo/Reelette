@@ -132,6 +132,12 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') $$('.modal.open').forEach(m => { if (m.id !== 'nameModal' && !m.hasAttribute('data-fixed')) closeModal(m); });
 });
 
+// Высота шапки комнаты в CSS-переменной: от неё считается высота колонок.
+if (window.ResizeObserver) {
+  const roomNav = document.querySelector('#room .nav');
+  if (roomNav) new ResizeObserver(() => { if (roomNav.offsetHeight) document.documentElement.style.setProperty('--nav-h', roomNav.offsetHeight + 'px'); }).observe(roomNav);
+}
+
 // Индикатор в переключателях подстраивается под ширину выбранной кнопки.
 function placeSeg(seg) {
   const on = seg.querySelector('button.on');
@@ -413,9 +419,9 @@ function initRoom(roomId) {
     const font = p.font && p.font !== 'default' ? ` nf-${p.font}` : '';
     const text = p.effect === 'wave' ? [...String(name)].map((ch, i) => `<span style="--i:${i}">${esc(ch)}</span>`).join('') : esc(name);
     const b = p.badge && typeof BADGES !== 'undefined' ? BADGES.find(x => x.id === p.badge) : null;
-    return `<span class="nick ${v.cls}${fx}${font}" style="${v.style}">${text}</span>`
+    return `<span class="nick-wrap"><span class="nick ${v.cls}${fx}${font}" style="${v.style}">${text}</span>`
       + (p.icon ? `<span class="nick-ico">${esc(p.icon)}</span>` : '')
-      + (b ? `<i class="nick-badge" title="${esc(b.name)}"><svg viewBox="0 0 24 24">${b.icon}</svg></i>` : '');
+      + (b ? `<i class="nick-badge" title="${esc(b.name)}"><svg viewBox="0 0 24 24">${b.icon}</svg></i>` : '') + '</span>';
   }
   const frameCls = (pid, p = prof(pid)) => (p.frame && p.frame !== 'none' ? ` frame-${p.frame}` : '');
   const frameVars = (pid, p = prof(pid)) => nickVars(p).style;
@@ -582,10 +588,13 @@ function initRoom(roomId) {
     const used = myVotesUsed(), R = rules();
     $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: R.votes }, (_, i) => `<i class="${i < R.votes - used ? 'on' : ''}"></i>`).join('')}</span><span class="m">${used < R.votes ? `осталось ${R.votes - used}, каждый даёт фильму около ${R.points ?? 4}% колеса` : 'все отданы, голос можно снять'}</span>`;
 
-    const mods = Object.values(state.modifiers || {}).filter(m => m.factor !== 1);
-    $('#modBanner').hidden = !mods.length;
-    $('#modBanner').className = 'mod-banner mod-list';
-    $('#modBanner').innerHTML = mods.map(m => `<div class="mod-row ${m.factor < 1 ? 'down' : 'up'}" title="«${esc(m.title)}» получил среднюю ${String(m.avg).replace('.', ',')}. Действует, пока снова не выпадет фильм этого автора."><b>${fmtFactor(m.factor)}</b><span>фильмам <button class="person" data-person="${esc(m.pid)}" data-name="${esc(m.name)}">${nick(m.pid, m.name)}</button> за «${esc(m.title)}», до выпадения их фильма</span></div>`).join('');
+    // бонус или штраф человека — значком у его процента, подробности в подсказке
+    const modChip = pid => {
+      const m = state.modifiers?.[pid];
+      if (!m || m.factor === 1) return '';
+      const tip = `${m.factor > 1 ? 'Бонус' : 'Штраф'} ${fmtFactor(m.factor)} к шансам: «${m.title}» получил среднюю ${String(m.avg).replace('.', ',')}. Действует, пока снова не выпадет фильм этого человека.`;
+      return `<button type="button" class="mod-chip ${m.factor < 1 ? 'down' : 'up'}" data-tt="${esc(tip)}" aria-label="${esc(tip)}">${fmtFactor(m.factor)}</button>`;
+    };
     $('#fairOn').checked = state.fair !== false;
     $('#fairOn').disabled = spinning || Boolean(state.duel);
     renderRate();
@@ -640,6 +649,7 @@ function initRoom(roomId) {
             <b>${nick(g.pid, g.name)}${g.pid === myPid() ? ' <span class="m">(вы)</span>' : ''}</b>
           </span>
           <span class="g-count">${g.films.length}</span>
+          ${modChip(g.pid)}
           <em>${gShare ? `${(gShare * 100).toFixed(gShare < 0.1 ? 1 : 0)}%` : '—'}</em>
         </div>
         <div class="g-body"><div>${g.films.map(filmRow).join('')}</div></div>
@@ -795,6 +805,7 @@ function initRoom(roomId) {
       return;
     }
     $('#ytTitle').textContent = m.title;
+    $('#ytCard .yt-frame').style.backgroundImage = `url("https://i.ytimg.com/vi/${encodeURIComponent(m.vid)}/mqdefault.jpg")`;
     $('#ytBy').textContent = [m.author, m.pausedAt != null ? `на паузе (${m.by})` : `включил(а) ${m.by}`].filter(Boolean).join(', ');
     $('#ytToggle').innerHTML = m.pausedAt != null
       ? '<svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>'
@@ -939,7 +950,10 @@ function initRoom(roomId) {
   function renderChatLog() {
     const list = (state?.chat || []).slice(-50);
     const html = list.length
-      ? list.map(m => `<div class="cl-item"><b>${nick(m.pid, m.name)}</b><span>${esc(m.text)}</span><time>${new Date(m.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('')
+      ? list.map(m => {
+        const ava = m.avatar || people.find(x => x.pid === m.pid)?.avatar || '';
+        return `<div class="cl-item"><div class="cl-head"><span class="cl-ava${frameCls(m.pid)}" style="background:hsl(${hue(m.name)} 55% 42%)">${ava ? `<img src="${esc(ava)}" alt="">` : initial(m.name)}</span><b class="cl-name">${nick(m.pid, m.name)}</b><time>${new Date(m.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</time></div><p class="cl-text">${esc(m.text)}</p></div>`;
+      }).join('')
       : '<p class="note">Сообщений пока нет. Напишите первым: сообщение пролетит у всех по сцене.</p>';
     for (const el of [$('#chatLog'), $('#chatFeed')]) {
       // ленту не дёргаем вниз, если человек прокрутил её вверх почитать
@@ -1459,16 +1473,16 @@ function initRoom(roomId) {
     const who = `<button class="person" data-person="${esc(author)}" data-name="${esc(h.film.addedBy || '')}">${esc(h.film.addedBy || 'автора')}</button>`;
     const a = avgRating(h);
     const fct = a === null ? null : ratingFactor(a);
-    const effect = !h.src ? `Бонус ${who} уже задаёт его более новый фильм.`
-      : a === null ? `Средняя оценка даст фильмам ${who} бонус или штраф, который продержится, пока снова не выпадет его фильм.`
-      : fct === 1 ? `Средняя ${a.toFixed(1).replace('.', ',')}: шанс фильмов ${who} не меняется.`
-      : `Средняя ${a.toFixed(1).replace('.', ',')}: фильмы ${who} получают ${fmtFactor(fct)}, пока снова не выпадет его фильм.`;
+    const whoT = h.film.addedBy || 'автора';
+    const effect = !h.src ? `Бонус ${whoT} уже задаёт его более новый фильм.`
+      : a === null ? `Средняя оценка даст фильмам ${whoT} бонус или штраф до следующего выпадения его фильма: меньше 5 — ×0,5, 8–9,9 — ×1,25, 10 — ×1,5.`
+      : fct === 1 ? `Средняя ${a.toFixed(1).replace('.', ',')}: шанс фильмов ${whoT} не меняется.`
+      : `Средняя ${a.toFixed(1).replace('.', ',')}: фильмы ${whoT} получают ${fmtFactor(fct)}, пока снова не выпадет его фильм.`;
     box.innerHTML = `
-      <h3>Оцените после просмотра${done ? ' <button class="link-btn" data-rate-close>Свернуть</button>' : ''}</h3>
+      <h3><span>Оцените фильм <button type="button" class="hint" data-hint="${esc(effect)}" aria-label="Подсказка: что даёт оценка">?</button></span>${done ? ' <button class="link-btn" data-rate-close>Свернуть</button>' : ''}</h3>
       <div class="rate-film" data-h="0"><i style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><div><b>${esc(h.film.title)}</b><span>добавил(а) ${who}</span></div></div>
       ${isAuthor ? '<p class="note">Это ваш фильм, его оценивают остальные.</p>' : rateScale(h)}
-      ${list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>` : ''}
-      <p class="rate-effect">${effect}</p>`;
+      ${list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>` : ''}`;
   }
   $('#rateBox').addEventListener('click', e => {
     if (e.target.closest('[data-rate-open]')) { rateOpen = state.history[0]?.hid; renderRate(); }
@@ -1488,7 +1502,7 @@ function initRoom(roomId) {
       rateTimer = setTimeout(() => { renderRate(); if (detailHid && $('#filmModal').classList.contains('open')) showHist(detailHid); }, left + 300);
     }
     return `<div class="rate-scale" data-hid="${esc(h.hid)}">${Array.from({ length: 10 }, (_, i) => `<button class="${i + 1 === mine ? 'on' : ''} ${i + 1 < 5 ? 'low' : i + 1 < 8 ? 'mid' : 'high'}" data-score="${i + 1}">${i + 1}</button>`).join('')}</div>
-      ${mine ? '<p class="note">Оценку можно поменять в течение минуты.</p>' : ''}`;
+      ${mine ? '<p class="note rate-hint">Поменять можно в течение минуты</p>' : ''}`;
   }
   // оценка в карточке выпавшего фильма
   function histRateHtml(h) {
@@ -1731,8 +1745,6 @@ function initRoom(roomId) {
     if (state?.duel) renderDuel(state.duel);
     const people_ = list;
     const row = p => `<button class="menu-item person-item" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}"><span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span><span>${nick(p.pid, p.name)}${p.pid === myPid() ? ' <small>это вы</small>' : p.pid?.startsWith('d') ? ' <small>Discord</small>' : ''}</span></button>`;
-    $('#peopleList').innerHTML = people_.map(row).join('');
-    $('#sideCount').textContent = String(people_.length);
     $('#peopleNum').textContent = String(list.length);
     $('#peopleBtn').setAttribute('aria-label', `В комнате ${list.length} ${plural(list.length, 'человек', 'человека', 'человек')}`);
     $('#peopleMenu').innerHTML = `<div class="menu-label">В комнате</div>` + list.map(row).join('');
@@ -1761,7 +1773,7 @@ function initRoom(roomId) {
   });
   $('#filmList').addEventListener('click', async e => {
     const head = e.target.closest('[data-group]');
-    if (head) { if (!e.target.closest('[data-person]')) toggleGroup(head); return; }
+    if (head) { if (!e.target.closest('[data-person], .mod-chip')) toggleGroup(head); return; }
     const row = e.target.closest('.film');
     if (!row) return;
     const id = row.dataset.id;
@@ -1833,6 +1845,35 @@ function initRoom(roomId) {
     });
     openModal('#filmModal');
   }
+
+  // подсказки «?» и значки с data-tt: один плавающий слой поверх страницы
+  const tipEl = $('#tip');
+  let tipFor = null;
+  function showTip(el) {
+    const text = el.dataset.tt || el.dataset.hint;
+    if (!text) return hideTip();
+    tipFor = el;
+    tipEl.textContent = text;
+    tipEl.hidden = false;
+    const r = el.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+    const left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+    const below = r.bottom + 8 + h < innerHeight;
+    tipEl.style.left = `${left}px`;
+    tipEl.style.top = `${below ? r.bottom + 8 : r.top - h - 8}px`;
+  }
+  function hideTip() { tipFor = null; tipEl.hidden = true; }
+  const tipTarget = e => e.target.closest?.('.hint[data-hint], [data-tt]');
+  document.addEventListener('pointerover', e => { const t = tipTarget(e); if (t && e.pointerType === 'mouse') showTip(t); });
+  document.addEventListener('pointerout', e => { const t = tipTarget(e); if (t && t === tipFor && !t.contains(e.relatedTarget)) hideTip(); });
+  document.addEventListener('focusin', e => { const t = tipTarget(e); if (t) showTip(t); });
+  document.addEventListener('focusout', e => { if (tipTarget(e) === tipFor) hideTip(); });
+  // на телефоне подсказка открывается и закрывается тапом
+  document.addEventListener('click', e => {
+    const t = tipTarget(e);
+    if (t) { e.preventDefault(); if (tipFor === t && !tipEl.hidden && e.pointerType !== 'mouse') hideTip(); else showTip(t); return; }
+    if (!tipEl.hidden) hideTip();
+  }, true);
+  document.addEventListener('scroll', hideTip, true);
 
   // выпадающие меню в шапке: «Развлечения» и «Кто в комнате»
   function setMenu(btn, menu, open) {
