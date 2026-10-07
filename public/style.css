@@ -572,7 +572,7 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .group-head em { font-style: normal; font: 800 13px var(--f-ui); color: var(--acc-hi); min-width: 36px; text-align: right; }
 
 /* мини-профиль: отступы между блоками содержимого */
-#profileBody { display: flex; flex-direction: column; gap: 26px; }
+#profileBody { display: flex; flex-direction: column; gap: 24px; }
 #profileBody .profile-sec h3 { font-size: 17px; }
 
 /* сворачиваемые группы фильмов */
@@ -1569,7 +1569,7 @@ html { overflow-x: clip; }
 .profile-card.editing { padding: 0; gap: 0; overflow: hidden; height: min(760px, calc(100dvh - 32px)); display: flex; flex-direction: column; }
 .profile-card.editing::before { display: none; }
 .profile-card.editing > .modal-x { top: 16px; right: 16px; }
-.profile-card.editing #profileBody { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.profile-card.editing #profileBody { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 0; }
 .pe-top { flex: none; display: flex; flex-direction: column; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--bd); }
 .pe-bar { display: flex; align-items: center; gap: 12px; padding-right: 48px; }
 .pe-bar h2 { font-size: 20px; padding: 0; }
@@ -1623,3 +1623,5 @@ html { overflow-x: clip; }
 /* «Волна» с градиентом: у каждой буквы свой градиент, иначе прыгающие буквы прозрачные */
 .nick.c-grad.fx-wave > span { background: var(--ng); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .pe-body > .pe-group:first-child { padding-top: 8px; }
+/* ник со значками не залезает под крестик закрытия */
+.profile-card:not(.editing) .profile-head { padding-right: 40px; }
