@@ -346,7 +346,6 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
   .win-inner { padding: 26px; justify-items: center; text-align: center; }
   .win-inner img, .win-inner .noposter { width: 160px; }
   .detail-actions { justify-content: center; }
-  .people .ava:nth-child(n+3) { display: none; }
 }
 
 /* ---------- вход, отсчёт, остановка ---------- */
@@ -1023,7 +1022,6 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 /* ---------- переходы между колесом, караоке и игрой (View Transitions) ---------- */
 @media (prefers-reduced-motion: no-preference) {
   .films-panel { view-transition-name: films-panel; }
-  .side { view-transition-name: controls; }
   .layout > .stage { view-transition-name: stage; }
   .nav .bar { view-transition-name: navbar; }
   ::view-transition-group(*) { animation-duration: .7s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
@@ -1289,7 +1287,7 @@ html { overflow-x: clip; }
 
 /* ================= этап 1: сетка ================= */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-:root { --nav-h: 70px; --col-l: clamp(300px, 21vw, 420px); --col-r: clamp(300px, 22vw, 440px); --gap: 8px; }
+:root { --nav-h: 70px; --col-l: clamp(320px, 24vw, 460px); --gap: 8px; }
 
 /* шапка: слева название, справа две группы кнопок */
 @media (min-width: 861px) { #room .nav-music { flex: 1; } }
@@ -1298,7 +1296,7 @@ html { overflow-x: clip; }
 
 /* широкий экран: три колонки одной высоты, длинное скроллится внутри своей колонки */
 @media (min-width: 1100px) {
-  #room .layout { grid-template-columns: var(--col-l) minmax(0, 1fr) var(--col-r); gap: var(--gap); padding: var(--gap); height: calc(100dvh - var(--nav-h)); align-items: stretch; }
+  #room .layout { grid-template-columns: var(--col-l) minmax(0, 1fr); gap: var(--gap); padding: var(--gap); height: calc(100dvh - var(--nav-h)); align-items: stretch; }
   #room .layout > .sheet { margin: 0 !important; min-height: 0; height: 100%; }
   #room .films-panel { position: static; max-height: none; }
   #room .stage { min-height: 0; }
@@ -1445,12 +1443,65 @@ html { overflow-x: clip; }
 .nav-music .yt-frame { width: 64px; height: 36px; border-radius: 8px; background: #000 center/cover no-repeat; }
 .nav-music .yt-frame iframe { opacity: 0; }
 
-/* телефон: в мини-плеере только пауза и очередь, видео-слой скрыт, но продолжает играть */
+
+/* ================= две колонки, без ленты чата ================= */
+.side { display: none !important; }
+/* оценка — карточкой наверху колонки фильмов */
+.films-panel > .rate-box { margin: 16px 16px 0; flex: none; }
+.films-panel > .rate-box.compact { margin-bottom: -4px; }
+/* поле «Написать всем» снова в полосе реакций */
+.react-bar .chat-form { margin-left: 6px; }
+.react-bar .chat-form input { width: 180px; transition: width .3s var(--ease); }
+.react-bar .chat-form input:focus { width: 240px; }
 @media (max-width: 860px) {
-  .nav-music .yt-card { width: auto; padding: 3px; gap: 2px; background: var(--ghost); }
-  .nav-music .yt-frame { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
-  .nav-music .yt-ctrl > :not(#ytToggle):not(#ytChange), .nav-music #ytVol { display: none; }
-  /* браузер ждёт клика, чтобы включить звук: кнопку «Слушать» показываем */
-  .nav-music .yt-frame:has(.yt-unmute:not([hidden])) { position: relative; width: 64px; height: 36px; opacity: 1; pointer-events: auto; }
-  .nav-music .yt-card:has(.yt-unmute:not([hidden])) .yt-ctrl { display: none; }
+  .react-bar .chat-form { flex: 1 1 180px; margin: 0; }
+  .react-bar .chat-form input, .react-bar .chat-form input:focus { width: 100%; }
 }
+
+/* аватарки в шапке внахлёст; на узком экране — иконка со счётчиком */
+.people-count { gap: 0; padding: 0 10px 0 6px; }
+.people-count .people { margin: 0; }
+.people-count .ava { width: 30px; height: 30px; margin-left: -8px; border-width: 2px; border-color: var(--sheetB); font-size: 11px; }
+.people-count .ava:first-child { margin-left: 0; }
+.people-count .ava-more { background: var(--s3); font-size: 10.5px; }
+.people-count .pc-num { display: none; align-items: center; gap: 4px; }
+@media (max-width: 520px) {
+  .people-count { padding: 0 9px; }
+  .people-count .people { display: none; }
+  .people-count .pc-num { display: inline-flex; }
+}
+
+/* заголовок над колесом: одна строка, фиксированная высота, отступ до ореола */
+#room .current { height: calc(1.1em + 28px); line-height: 1.1; margin: -14px 0 12px; }
+#room .wheel-area { padding-top: 16px; }
+.stage-top { align-items: center; }
+.stage-top .hint { margin-left: 8px; }
+
+/* мини-плеер в шапке: обложка трека — кнопка, открывающая панель */
+.yt-thumb { width: 64px; height: 36px; flex: none; border-radius: 8px; background: var(--s2) center/cover no-repeat; transition: transform .2s; }
+.yt-thumb:hover { transform: scale(1.04); }
+.nav-music .yt-card { padding: 3px 8px 3px 3px; height: 44px; }
+
+/* панель плеера: открыта под шапкой или прилипла в угол; видео всегда видно и не меньше 200px */
+.yt-panel { position: fixed; z-index: 45; display: flex; flex-direction: column; gap: 12px; background: var(--sheetB); border: 1px solid var(--bd); box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+.yt-panel[hidden] { display: none; }
+.yt-panel.open { top: calc(var(--nav-h) + 4px); left: 50%; transform: translateX(-50%); width: min(420px, calc(100vw - 16px)); padding: 14px; border-radius: 18px; max-height: calc(100dvh - var(--nav-h) - 16px); overflow-y: auto; }
+.yt-panel.docked { right: 16px; bottom: 16px; width: 356px; padding: 0; border-radius: 14px; overflow: hidden; }
+.yt-player { position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 200px; border-radius: 12px; overflow: hidden; background: #000; flex: none; }
+.yt-panel.docked .yt-player { border-radius: 0; }
+.yt-player[hidden] { display: none; }
+.yt-player #ytHost, .yt-player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.yt-player iframe { pointer-events: none; }
+.yt-expand { position: absolute; top: 8px; right: 8px; z-index: 2; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #fff; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); opacity: 0; transition: opacity .2s; }
+.yt-panel.docked:hover .yt-expand, .yt-expand:focus-visible { opacity: 1; }
+.yt-panel.open .yt-expand { display: none; }
+.yt-panel .yt-add { position: static; transform: none; width: auto; padding: 0; border: 0; background: none; box-shadow: none; animation: none; }
+@media (max-width: 860px) {
+  .yt-panel.docked { left: 8px; right: 8px; bottom: 8px; width: auto; max-width: 356px; margin-left: auto; }
+  .yt-expand { opacity: 1; }
+  /* в шапке на телефоне только обложка, пауза и очередь */
+  .nav-music .yt-card { width: auto; padding: 3px; gap: 4px; }
+  .nav-music .yt-ctrl > :not(#ytToggle):not(#ytChange), .nav-music #ytVol { display: none; }
+}
+@media (max-width: 520px) { .yt-thumb { width: 40px; } }
+.yt-panel .yt-add { display: flex; flex-direction: column; gap: 10px; }

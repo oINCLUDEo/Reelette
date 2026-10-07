@@ -286,7 +286,7 @@ function initRoom(roomId) {
     if (msg.type === 'throw') { throwItem(msg); return; }
     if (msg.type === 'chat') {
       flyMessage(msg.msg);
-      if (!msg.msg.guess && state) { state.chat = [...(state.chat || []), msg.msg].slice(-50); renderChatLog(); }
+      if (!msg.msg.guess && state) state.chat = [...(state.chat || []), msg.msg].slice(-50);
       return;
     }
     if (msg.type === 'quiz-guess') {
@@ -303,9 +303,6 @@ function initRoom(roomId) {
       if (!state.spin && !spinningSid) { syncWheel(); wheel.setAngle(state.angle); }
       render();
       syncMusic();
-      // лента чата: только если что-то изменилось, чтобы не сбивать прокрутку
-      const lastChat = state.chat?.at(-1)?.at || 0;
-      if (lastChat !== renderChatLog.last) { renderChatLog.last = lastChat; renderChatLog(); }
     } else if (msg.type === 'spin') {
       runSpin(msg.spin);
     } else if (msg.type === 'presence') {
@@ -795,6 +792,12 @@ function initRoom(roomId) {
     if (yt && ytHostCur !== hostSel) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $(ytHostCur).innerHTML = ''; }
     $('#ytCard').hidden = !m;
     $('#ytAdd').hidden = !ytChanging;
+    // плеер живёт в одной панели и не переносится по странице, иначе YouTube перезагрузит видео
+    const playerHere = Boolean(m) && hostSel === '#ytHost';
+    $('#ytPanel').hidden = !ytChanging && !playerHere;
+    $('#ytPanel').classList.toggle('open', ytChanging);
+    $('#ytPanel').classList.toggle('docked', !ytChanging && playerHere);
+    $('#ytPlayer').hidden = !playerHere;
     renderQueue();
     $('#musicBtn').hidden = Boolean(m);
     const last = state?.lastTrack;
@@ -805,7 +808,7 @@ function initRoom(roomId) {
       return;
     }
     $('#ytTitle').textContent = m.title;
-    $('#ytCard .yt-frame').style.backgroundImage = `url("https://i.ytimg.com/vi/${encodeURIComponent(m.vid)}/mqdefault.jpg")`;
+    $('#ytThumb').style.backgroundImage = `url("https://i.ytimg.com/vi/${encodeURIComponent(m.vid)}/mqdefault.jpg")`;
     $('#ytBy').textContent = [m.author, m.pausedAt != null ? `на паузе (${m.by})` : `включил(а) ${m.by}`].filter(Boolean).join(', ');
     $('#ytToggle').innerHTML = m.pausedAt != null
       ? '<svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>'
@@ -947,29 +950,6 @@ function initRoom(roomId) {
     laneFree[lane] = Math.max(now, laneFree[lane]) + (el.offsetWidth + 60) / dist * dur * 1000;
     el.addEventListener('animationend', () => el.remove());
   }
-  function renderChatLog() {
-    const list = (state?.chat || []).slice(-50);
-    const html = list.length
-      ? list.map(m => {
-        const ava = m.avatar || people.find(x => x.pid === m.pid)?.avatar || '';
-        return `<div class="cl-item"><div class="cl-head"><span class="cl-ava${frameCls(m.pid)}" style="background:hsl(${hue(m.name)} 55% 42%)">${ava ? `<img src="${esc(ava)}" alt="">` : initial(m.name)}</span><b class="cl-name">${nick(m.pid, m.name)}</b><time>${new Date(m.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</time></div><p class="cl-text">${esc(m.text)}</p></div>`;
-      }).join('')
-      : '<p class="note">Сообщений пока нет. Напишите первым: сообщение пролетит у всех по сцене.</p>';
-    for (const el of [$('#chatLog'), $('#chatFeed')]) {
-      // ленту не дёргаем вниз, если человек прокрутил её вверх почитать
-      const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-      el.innerHTML = html;
-      if (atEnd || el.hidden) el.scrollTop = 1e6;
-    }
-  }
-  // широкий экран: поле чата в правой колонке; узкий — под колесом рядом с реакциями
-  const wideMq = matchMedia('(min-width: 1100px)');
-  function placeChat() {
-    const slot = wideMq.matches ? $('#chatSlot') : $('#reactBar');
-    if ($('#chatForm').parentElement !== slot) slot.insertBefore($('#chatForm'), slot === $('#reactBar') ? $('#chatLogBtn') : null);
-  }
-  wideMq.addEventListener('change', placeChat);
-  placeChat();
   $('#chatForm').addEventListener('submit', async e => {
     e.preventDefault();
     const text = $('#chatInput').value.trim();
@@ -978,8 +958,6 @@ function initRoom(roomId) {
     try { await api(`/rooms/${roomId}/chat`, { method: 'POST', body: { text, cid: me.cid, by: me.name } }); }
     catch (err) { toast(err.message, true); }
   });
-  $('#chatLogBtn').addEventListener('click', () => { $('#chatLog').hidden = !$('#chatLog').hidden; if (!$('#chatLog').hidden) renderChatLog(); });
-  document.addEventListener('click', e => { if (!$('#chatLog').hidden && !e.target.closest('#reactBar')) $('#chatLog').hidden = true; });
 
   // ---- «Угадай мелодию» ----
   const qzSettings = { rounds: 10, len: 15 };
@@ -1436,10 +1414,12 @@ function initRoom(roomId) {
   $('#ytStop').addEventListener('click', () => confirm('Выключить музыку у всех и очистить очередь?') && api(`/rooms/${roomId}/music/stop`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
   const openMusicForm = () => { ytChanging = !ytChanging; syncMusic(); if (ytChanging) setTimeout(() => $('#ytUrl').focus(), 30); };
   $('#ytChange').addEventListener('click', openMusicForm);
+  $('#ytThumb').addEventListener('click', openMusicForm);
+  $('#ytExpand').addEventListener('click', e => { e.stopPropagation(); openMusicForm(); });
   $('#musicBtn').addEventListener('click', openMusicForm);
   // форма ссылки — всплывающая: закрывается кликом мимо и по Esc
   document.addEventListener('click', e => {
-    if (ytChanging && !e.target.closest('#navMusic')) { ytChanging = false; syncMusic(); }
+    if (ytChanging && !e.target.closest('#navMusic, #ytPanel')) { ytChanging = false; syncMusic(); }
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && ytChanging) { ytChanging = false; syncMusic(); } });
   function setYtVol(v) {
@@ -1745,6 +1725,8 @@ function initRoom(roomId) {
     if (state?.duel) renderDuel(state.duel);
     const people_ = list;
     const row = p => `<button class="menu-item person-item" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}"><span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span><span>${nick(p.pid, p.name)}${p.pid === myPid() ? ' <small>это вы</small>' : p.pid?.startsWith('d') ? ' <small>Discord</small>' : ''}</span></button>`;
+    $('#people').innerHTML = list.slice(0, 6).map(p => `<span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
+      + (list.length > 6 ? `<span class="ava ava-more">+${list.length - 6}</span>` : '');
     $('#peopleNum').textContent = String(list.length);
     $('#peopleBtn').setAttribute('aria-label', `В комнате ${list.length} ${plural(list.length, 'человек', 'человека', 'человек')}`);
     $('#peopleMenu').innerHTML = `<div class="menu-label">В комнате</div>` + list.map(row).join('');

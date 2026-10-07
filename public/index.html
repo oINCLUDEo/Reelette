@@ -63,7 +63,7 @@
       <button class="ghost sm icon" id="ytReplay" hidden><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
       <button class="ghost sm music-btn" id="musicBtn" aria-label="Общая музыка" title="Общая музыка из YouTube, её слышат все в комнате"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Музыка</span></button>
       <div class="yt-card" id="ytCard" hidden>
-        <div class="yt-frame"><div id="ytHost"></div><button class="yt-unmute" id="ytUnmute" hidden title="Браузер ждёт клика, чтобы включить звук">Слушать</button></div>
+        <button class="yt-thumb" id="ytThumb" type="button" title="Плеер, очередь и добавить трек" aria-label="Показать плеер и очередь"></button>
         <div class="yt-info"><b id="ytTitle"></b><span id="ytBy"></span></div>
         <div class="yt-ctrl">
           <button class="nav-icon" id="ytToggle"></button>
@@ -74,15 +74,6 @@
         </div>
         <input type="range" id="ytVol" min="0" max="100" value="50" title="Громкость у вас" aria-label="Громкость общей музыки у вас">
       </div>
-      <form class="yt-add" id="ytAdd" hidden>
-        <span class="label">Общая музыка <span class="m">слышат все в комнате</span></span>
-        <input id="ytUrl" placeholder="Ссылка на трек на YouTube" autocomplete="off">
-        <div class="yt-add-row">
-          <button class="btn btn-primary" type="submit" data-mode="queue" id="ytQueueBtn">В очередь</button>
-          <button class="btn btn-ghost" type="submit" data-mode="now" id="ytNowBtn">Включить сейчас</button>
-        </div>
-        <div class="yt-queue" id="ytQueue"></div>
-      </form>
     </div>
     <div class="nav-karaoke" id="navKaraoke" hidden>
       <span class="eq" id="kEq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
@@ -109,7 +100,7 @@
         </div>
       </div>
       <div class="menu-wrap people-wrap">
-        <button class="ghost sm people-count" id="peopleBtn" aria-haspopup="true" aria-expanded="false" aria-controls="peopleMenu" title="Кто в комнате"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg><b id="peopleNum">0</b></button>
+        <button class="ghost sm people-count" id="peopleBtn" aria-haspopup="true" aria-expanded="false" aria-controls="peopleMenu" title="Кто в комнате"><span class="people" id="people"></span><span class="pc-num"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg><b id="peopleNum">0</b></span></button>
         <div class="pop-menu people-menu" id="peopleMenu" aria-label="Кто в комнате" hidden></div>
       </div>
       <button id="inviteBtn" class="ghost sm" aria-label="Пригласить: скопировать ссылку на комнату" title="Скопировать ссылку на комнату"><svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg><span>Пригласить</span></button>
@@ -117,8 +108,26 @@
     </div>
   </div></header>
 
+  <div class="yt-panel" id="ytPanel" hidden>
+    <div class="yt-player" id="ytPlayer">
+      <div id="ytHost"></div>
+      <button class="yt-unmute" id="ytUnmute" hidden title="Браузер ждёт клика, чтобы включить звук">Слушать</button>
+      <button class="yt-expand" id="ytExpand" type="button" title="Очередь и добавить трек" aria-label="Развернуть плеер: очередь и добавить трек"><svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h8"/><path d="M19 15v6M16 18h6"/></svg></button>
+    </div>
+    <form class="yt-add" id="ytAdd" hidden>
+      <span class="label">Общая музыка <span class="m">слышат все в комнате</span></span>
+      <input id="ytUrl" placeholder="Ссылка на трек на YouTube" autocomplete="off">
+      <div class="yt-add-row">
+        <button class="btn btn-primary" type="submit" data-mode="queue" id="ytQueueBtn">В очередь</button>
+        <button class="btn btn-ghost" type="submit" data-mode="now" id="ytNowBtn">Включить сейчас</button>
+      </div>
+      <div class="yt-queue" id="ytQueue"></div>
+    </form>
+  </div>
+
   <div class="layout">
     <aside class="sheet b films-panel">
+      <div class="rate-box" id="rateBox" hidden></div>
       <div class="panel-head">
         <div class="tabs lp-tabs" id="lpTabs" role="tablist">
           <span class="tabs-ind"></span>
@@ -155,8 +164,6 @@
         <button type="button" class="armed-chip" id="armedChip" hidden></button>
 
         <form class="chat-form" id="chatForm"><input id="chatInput" maxlength="200" placeholder="Написать всем…" autocomplete="off"></form>
-        <button type="button" class="chat-log-btn" id="chatLogBtn" title="История чата"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
-        <div class="chat-log" id="chatLog" hidden></div>
       </div>
       <div class="stage-in">
         <div class="stage-top" id="stageTop">
@@ -280,14 +287,6 @@
       </div>
     </section>
 
-    <aside class="sheet b side" id="side">
-      <div class="rate-box" id="rateBox" hidden></div>
-      <section class="side-sec side-chat">
-        <div class="side-head">Чат</div>
-        <div id="chatFeed" class="chat-feed" aria-live="polite"></div>
-        <div id="chatSlot" class="chat-slot"></div>
-      </section>
-    </aside>
   </div>
 </div>
 
