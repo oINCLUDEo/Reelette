@@ -1444,3 +1444,12 @@ html { overflow-x: clip; }
 .nav-music .yt-card { padding: 3px 8px 3px 3px; height: 44px; }
 .nav-music .yt-frame { width: 64px; height: 36px; border-radius: 8px; background: #000 center/cover no-repeat; }
 .nav-music .yt-frame iframe { opacity: 0; }
+
+/* телефон: в мини-плеере только пауза и очередь, видео-слой скрыт, но продолжает играть */
+@media (max-width: 860px) {
+  .nav-music .yt-card { width: auto; padding: 3px; gap: 2px; background: var(--ghost); }
+  .nav-music .yt-frame { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
+  .nav-music .yt-ctrl > :not(#ytToggle):not(#ytChange), .nav-music #ytVol { display: none; }
+  /* браузер ждёт клика, чтобы включить звук: кнопку «Слушать» показываем */
+  .nav-music .yt-frame:has(.yt-unmute:not([hidden])) { position: relative; width: 64px; height: 36px; opacity: 1; pointer-events: auto; }
+}

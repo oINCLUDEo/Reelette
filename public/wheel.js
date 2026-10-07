@@ -226,7 +226,8 @@ class Wheel {
       const fs = Math.min(R * 0.072, arcH * 0.62);
       // узкий сектор: мелкую подпись не прочитать, остаётся постер (название всё равно видно над колесом)
       const dpr = S / (this.cv?.clientWidth || S);
-      if (fs / dpr < 10.5) return;
+      // порог и в CSS-пикселях, и в реальных: при отдалении страницы буквы физически мельче
+      if (fs / dpr < 10.5 || fs < 9) return;
       g.save();
       g.translate(c, c); g.rotate(mid);
       const flip = Math.cos(mid) < -0.01;
