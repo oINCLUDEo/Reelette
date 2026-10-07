@@ -1307,14 +1307,15 @@ html { overflow-x: clip; }
   body.karaoke-on #room .layout > .stage { height: auto; }
 }
 /* планшет: фильмы + колесо, правая колонка под ними */
-@media (min-width: 861px) and (max-width: 1099px) {
-  #room .layout { grid-template-columns: minmax(280px, 330px) minmax(0, 1fr); }
-  #room .films-panel { max-height: calc(100vh - 94px); }
+@media (min-width: 768px) and (max-width: 1099px) {
+  #room .layout { grid-template-columns: minmax(270px, 320px) minmax(0, 1fr); align-items: start; }
+  #room .layout > .stage { order: 0; }
+  #room .films-panel { position: sticky; top: 78px; max-height: calc(100dvh - 86px); }
   #room .side { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   #room .side > .rate-box, #room .side > .mod-banner { grid-column: 1 / -1; }
   #room .side .chat-feed { max-height: 260px; }
 }
-@media (max-width: 860px) {
+@media (max-width: 767px) {
   #room .films-panel { max-height: 70vh; }
   #room .side .chat-feed { max-height: 240px; }
 }
@@ -1372,7 +1373,7 @@ html { overflow-x: clip; }
 
 /* выезжающая панель настроек */
 .modal.drawer { place-items: stretch end; padding: 8px; }
-.drawer-card { width: min(420px, 100%); height: 100%; max-height: none; border-radius: 24px; gap: 0; padding: 24px; }
+.drawer-card { overflow-x: hidden; width: min(420px, 100%); height: 100%; max-height: none; border-radius: 24px; gap: 0; padding: 24px; }
 .drawer-card > h2 { margin-bottom: 4px; }
 .modal.drawer > .modal-card { transform: translateX(40px); }
 .modal.drawer.open > .modal-card { transform: none; }
