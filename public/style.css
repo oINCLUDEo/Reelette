@@ -463,8 +463,8 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .trailer-frame { border-radius: 28px 28px 0 0; }
 
 /* ---------- плеер Kodik ---------- */
-.watch-card { width: min(1100px, 100%); padding: 0; overflow: visible; background: var(--sheetB); max-height: none; gap: 0; }
-.watch-card .modal-x { top: -48px; right: 0; background: var(--s2); color: var(--tx); }
+.watch-card { width: min(1100px, 100%); padding: 0; overflow: hidden; background: var(--sheetB); gap: 0; }
+.watch-card .modal-x { position: static; flex: none; background: var(--s2); color: var(--tx); }
 #watchModal { z-index: 60; }
 .watch-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 18px; }
 .watch-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -472,7 +472,7 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .watch-name b { font: 800 19px/1.2 var(--f-head); letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .watch-head-btns { display: flex; gap: 8px; flex: none; }
 .watch-head-btns .btn { height: 42px; }
-.watch-frame { aspect-ratio: 16/9; width: 100%; background: #000; overflow: hidden; }
+.watch-frame { aspect-ratio: 16/9; width: 100%; max-height: calc(100vh - 230px); background: #000; overflow: hidden; }
 .watch-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
 .watch-msg { height: 100%; display: grid; align-content: center; justify-items: center; gap: 8px; padding: 24px; text-align: center; color: var(--tx2); font-size: 14.5px; }
 .watch-msg span { color: var(--tx3); font-size: 13px; }
