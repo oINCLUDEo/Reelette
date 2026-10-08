@@ -873,11 +873,15 @@ function kodikItems(list) {
     .slice(0, 12);
 }
 
+// Отдаём плееру все номера, какие знаем: Kodik ищет по любому из них.
+// Без своего токена у Kodik открыто только аниме и только по IMDb и Shikimori,
+// по номеру Кинопоиска публичный доступ не находит ничего.
 const kodikIds = f => {
   const kp = f.kpId || (f.source === 'kinopoisk' ? f.sourceId : '');
-  if (/^\d+$/.test(String(kp))) return { kinopoiskID: String(kp) };
-  if (/^tt\d+$/.test(String(f.imdbId || ''))) return { imdbID: String(f.imdbId) };
-  return null;
+  const ids = {};
+  if (/^tt\d+$/.test(String(f.imdbId || ''))) ids.imdbID = String(f.imdbId);
+  if (/^\d+$/.test(String(kp))) ids.kinopoiskID = String(kp);
+  return Object.keys(ids).length ? ids : null;
 };
 
 async function kodikLookup(f) {
@@ -903,11 +907,14 @@ async function kodikLookup(f) {
     out.api = true;
     out.items = kodikItems(found.results || []);
     if (!out.items.length) continue;
-    if (!out.find) {
-      const m = (found.results || []).find(x => x.kinopoisk_id || x.imdb_id || x.shikimori_id);
-      if (m?.kinopoisk_id) out.find = { kinopoiskID: String(m.kinopoisk_id) };
-      else if (m?.imdb_id) out.find = { imdbID: String(m.imdb_id) };
-      else if (m?.shikimori_id) out.find = { shikimoriID: String(m.shikimori_id) };
+    // нашли фильм по названию: забираем у Kodik его номера для плеера
+    const m = (found.results || []).find(x => x.imdb_id || x.shikimori_id || x.kinopoisk_id);
+    if (m) {
+      out.find = { ...out.find };
+      if (/^tt\d+$/.test(String(m.imdb_id || ''))) out.find.imdbID = String(m.imdb_id);
+      if (/^\d+$/.test(String(m.shikimori_id || ''))) out.find.shikimoriID = String(m.shikimori_id);
+      if (/^\d+$/.test(String(m.kinopoisk_id || ''))) out.find.kinopoiskID = String(m.kinopoisk_id);
+      if (!Object.keys(out.find).length) out.find = null;
     }
     return out;
   }
