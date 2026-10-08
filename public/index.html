@@ -452,6 +452,7 @@
       <p class="note">Победитель будет приходить в канал Discord с постером и описанием. Бот не нужен: в Discord откройте настройки канала → Интеграция → Вебхуки → Новый вебхук → Копировать URL вебхука.</p>
       <button id="saveSettings" class="btn btn-primary btn-block">Сохранить</button>
     </section>
+    <button type="button" class="btn btn-ghost btn-block news-open" id="newsBtn">Что нового в Reelette</button>
     <div class="field"><span class="label">Палитра</span>
       <div class="pals" id="pals">
         <button data-p="night"><i style="background:#7C6BFF"></i>Ночь</button>
@@ -465,6 +466,15 @@
       <button id="deleteRoom" class="btn btn-ghost">Удалить комнату</button>
       <button id="claimRoom" class="btn btn-ghost" hidden>Стать создателем комнаты</button>
     </div>
+  </div>
+</div>
+
+<div class="modal" id="newsModal" hidden>
+  <div class="modal-card small-card news-card">
+    <button class="modal-x" data-close aria-label="Закрыть"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <h2 id="newsTitle">Что нового</h2>
+    <div id="newsBody" class="news-body"></div>
+    <button class="btn btn-primary btn-block" data-close>Понятно</button>
   </div>
 </div>
 

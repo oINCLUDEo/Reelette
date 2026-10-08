@@ -158,6 +158,55 @@ document.fonts?.ready.then(() => $$('.seg, .tabs').forEach(placeSeg));
 // Аккаунт: Discord, если настроен на сервере, иначе гость.
 const account = { user: null, discord: false };
 const accountReady = api('/me').then(r => Object.assign(account, r)).catch(() => {});
+
+// ---------- что нового: CHANGELOG.md, новые пункты показываются при заходе ----------
+// запись — «## ГГГГ-ММ-ДД» или «## ГГГГ-ММ-ДД.2», пункты — строки «- …»
+const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const newsKey = id => { const m = String(id).match(/^(\d{4}-\d{2}-\d{2})(?:\.(\d+))?/); return m ? `${m[1]}.${String(m[2] || 1).padStart(3, '0')}` : ''; };
+let newsCache = null;
+async function loadNews() {
+  if (newsCache) return newsCache;
+  const text = await (await fetch('/changelog.md', { cache: 'no-cache' })).text();
+  newsCache = text.split(/^## /m).slice(1).map(part => {
+    const [head, ...lines] = part.split(/\r?\n/);
+    return { id: head.trim(), items: lines.filter(l => /^\s*[-*] /.test(l)).map(l => l.replace(/^\s*[-*] /, '').trim()) };
+  }).filter(e => newsKey(e.id) && e.items.length);
+  return newsCache;
+}
+function showNews(entries, title) {
+  // записи одного дня — одним блоком
+  const days = [];
+  for (const e of entries) {
+    const day = e.id.slice(0, 10);
+    if (days.at(-1)?.day === day) days.at(-1).items.push(...e.items);
+    else days.push({ day, items: [...e.items] });
+  }
+  const fmt = d => { const [y, m, dd] = d.split('-').map(Number); return `${dd} ${MONTHS[m - 1]}${y !== new Date().getFullYear() ? ` ${y}` : ''}`; };
+  $('#newsTitle').textContent = title;
+  $('#newsBody').innerHTML = days.map(d => `<section class="news-day"><h3>${fmt(d.day)}</h3><ul>${d.items.map(i => `<li>${esc(i).replace(/«([^»]+)»/g, '<b>«$1»</b>')}</li>`).join('')}</ul></section>`).join('');
+  openModal('#newsModal');
+}
+(async () => {
+  let entries;
+  try { entries = await loadNews(); } catch { return; }
+  if (!entries.length) return;
+  const latest = newsKey(entries[0].id);
+  const seen = ls.get('newsSeen', null);
+  let fresh;
+  if (seen === null) {
+    // заходил до появления списка — покажем последний день; совсем новым людям ничего не показываем
+    const returning = ls.get('rooms', []).length > 0 || Boolean(ls.get('name', ''));
+    fresh = returning ? entries.filter(e => e.id.slice(0, 10) === entries[0].id.slice(0, 10)) : [];
+  } else fresh = entries.filter(e => newsKey(e.id) > seen);
+  if (!fresh.length) { ls.set('newsSeen', latest); return; }
+  // не перебиваем другие окна (например, ввод имени): ждём, пока они закроются
+  const show = () => {
+    if (anyModalOpen()) return setTimeout(show, 1500);
+    showNews(fresh, 'Что нового');
+    ls.set('newsSeen', latest);
+  };
+  setTimeout(show, 900);
+})();
 const loginUrl = () => `/auth/discord?back=${encodeURIComponent(location.pathname)}`;
 async function logout() {
   await fetch('/auth/logout', { method: 'POST' }).catch(() => {});
@@ -2311,6 +2360,10 @@ function initRoom(roomId) {
     openModal('#settingsModal');
   }
   $('#settingsBtn').addEventListener('click', openSettings);
+  $('#newsBtn').addEventListener('click', async () => {
+    try { const all = await loadNews(); closeModal('#settingsModal'); showNews(all, 'Все изменения'); }
+    catch { toast('Не получилось загрузить список изменений', true); }
+  });
   $('#roomTitle').addEventListener('click', openSettings);
   $('#pals').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) applyPalette(b.dataset.p); });
   $('#saveSettings').addEventListener('click', async () => {

@@ -1641,3 +1641,12 @@ body.yt-docked #room .films-panel { padding-bottom: 0; }
 /* счётчик группы: сколько фильмов человека ещё на колесе */
 .group-head .g-count.part { color: var(--tx); }
 .group-head .g-count i { font-style: normal; color: var(--tx3); font-weight: 700; }
+
+/* что нового */
+.news-card { width: min(520px, 100%); gap: 16px; }
+.news-body { display: flex; flex-direction: column; gap: 24px; }
+.news-day h3 { font: 800 16px var(--f-head); letter-spacing: -.02em; color: var(--tx); margin: 0 0 8px; }
+.news-day ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: var(--tx2); font-size: 14px; line-height: 1.5; }
+.news-day li::marker { color: var(--acc-hi); }
+.news-day b { color: var(--tx); font-weight: 700; }
+.drawer-card .news-open { margin-top: 16px; }

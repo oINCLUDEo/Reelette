@@ -1423,6 +1423,15 @@ http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/auth/') && await auth.handle(req, res, url)) return;
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (url.pathname === '/' || /^\/r\/[A-Za-z0-9]+\/?$/.test(url.pathname)) return serveStatic(res, 'index.html');
+    // список изменений: сайт показывает новые пункты тем, кто заходил раньше
+    if (url.pathname === '/changelog.md') {
+      fs.readFile(path.join(__dirname, 'CHANGELOG.md'), (err, buf) => {
+        if (err) { res.writeHead(404); return res.end(); }
+        res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'no-cache' });
+        res.end(buf);
+      });
+      return;
+    }
     if (!serveStatic(res, decodeURIComponent(url.pathname))) { res.writeHead(404); res.end('Not found'); }
   } catch (e) {
     console.error(e);
