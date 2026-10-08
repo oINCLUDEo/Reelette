@@ -882,7 +882,9 @@ const kodikIds = f => {
 
 async function kodikLookup(f) {
   const out = { find: kodikIds(f), items: [], api: false };
-  const client = await kodikApi();
+  let client = null;
+  // не достучались до Kodik за токеном — не беда: плеер найдёт фильм сам
+  try { client = await kodikApi(); } catch (e) { console.warn(`Kodik: токен не получен (${e.message})`); }
   if (!client) return out;
   // по id точнее всего, по названию — если id нет или в базе фильм лежит под другим id
   const tries = [];
