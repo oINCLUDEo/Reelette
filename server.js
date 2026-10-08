@@ -820,9 +820,11 @@ async function fetchDetails(f) {
     if (/^tt\d+$/.test(j.imdbId || '')) f.imdbId = String(j.imdbId);
   } else return;
   f.detailsAt = Date.now();
+  f.idsAt = Date.now(); // отметка, что номер IMDb уже пробовали достать
 }
 
-const needsDetails = f => !f.detailsAt;
+// фильмы, добавленные до появления плеера, разок перезапрашиваем ради номера IMDb
+const needsDetails = f => !f.detailsAt || !f.idsAt;
 
 // ---------- Kodik: плеер для выпавшего фильма ----------
 // Что есть в базе Kodik, спрашиваем через kodikwrapper (нужен свой токен, KODIK_TOKEN).
@@ -888,8 +890,46 @@ const kodikIds = f => {
   return Object.keys(ids).length ? ids : null;
 };
 
+// Номеров нет совсем (фильм добавлен руками или сервис не отдал их) — ищем по названию
+// и забираем номер IMDb из карточки: по нему Kodik находит, по номеру Кинопоиска — нет.
+async function resolveImdb(f) {
+  const year = Number(f.year) || 0;
+  const imdbOf = probe => (/^tt\d+$/.test(probe.imdbId || '') ? probe.imdbId : '');
+  // сначала по своей же карточке: детали могли дойти до того, как мы научились брать номер
+  if (f.source && f.sourceId) {
+    try {
+      const probe = { source: f.source, sourceId: f.sourceId };
+      await fetchDetails(probe);
+      if (imdbOf(probe)) return probe.imdbId;
+    } catch (e) { console.warn(`Kodik: номер для «${f.title}» из карточки: ${e.message}`); }
+  }
+  // «Человек-бензопила. Фильм: История Резе» в одном сервисе может лежать под коротким
+  // названием, поэтому пробуем и оригинал, и название до первой точки или двоеточия
+  const queries = [...new Set([f.title, f.original, String(f.title || '').split(/[.:]/)[0]])]
+    .map(q => String(q || '').trim())
+    .filter(q => q.length > 2);
+  for (const src of ['tmdb', 'kinopoisk'].filter(x => PROVIDERS.includes(x))) {
+    for (const q of queries) {
+      try {
+        const found = await searchMovies(q, src);
+        const hit = found.find(x => !year || !Number(x.year) || Math.abs(Number(x.year) - year) <= 1);
+        if (!hit) continue;
+        const probe = { source: hit.source, sourceId: hit.sourceId };
+        await fetchDetails(probe);
+        if (imdbOf(probe)) return probe.imdbId;
+      } catch (e) { console.warn(`Kodik: номер для «${q}» через ${src}: ${e.message}`); }
+    }
+  }
+  return '';
+}
+
 async function kodikLookup(f) {
   const out = { find: kodikIds(f), items: [], api: false };
+  // по номеру Кинопоиска Kodik не находит ничего, поэтому номер IMDb достаём всегда
+  if (!out.find?.imdbID) {
+    const imdb = await resolveImdb(f);
+    if (imdb) { f.imdbId = imdb; save(); out.find = { ...out.find, imdbID: imdb }; }
+  }
   let client = null;
   // не достучались до Kodik за токеном — не беда: плеер найдёт фильм сам
   try { client = await kodikApi(); } catch (e) { console.warn(`Kodik: токен не получен (${e.message})`); }
@@ -931,7 +971,8 @@ async function kodikFor(f) {
   if (hit && Date.now() - hit.at < KODIK_TTL) return hit.data;
   const data = await kodikLookup(f);
   if (kodikCache.size > 400) kodikCache.clear();
-  kodikCache.set(f.id, { at: Date.now(), data });
+  // нечего показывать — храним недолго: номер может подтянуться через минуту
+  kodikCache.set(f.id, { at: data.find ? Date.now() : Date.now() - KODIK_TTL + 300_000, data });
   return data;
 }
 
