@@ -791,7 +791,7 @@ async function fetchDetails(f) {
     const [type, tid] = f.sourceId.split('/');
     if (!/^(movie|tv)$/.test(type) || !/^\d+$/.test(tid)) return;
     const bearer = TMDB_KEY.length > 40;
-    const u = `https://api.themoviedb.org/3/${type}/${tid}?language=ru-RU&append_to_response=videos&include_video_language=ru,en,null${bearer ? '' : `&api_key=${TMDB_KEY}`}`;
+    const u = `https://api.themoviedb.org/3/${type}/${tid}?language=ru-RU&append_to_response=videos,external_ids&include_video_language=ru,en,null${bearer ? '' : `&api_key=${TMDB_KEY}`}`;
     const j = await getJson(u, bearer ? { Authorization: `Bearer ${TMDB_KEY}` } : {});
     f.runtime = Number(j.runtime || j.episode_run_time?.[0] || 0) || 0;
     if (j.genres?.length) f.genres = j.genres.map(g => str(g.name, 30).toLowerCase()).slice(0, 3);
@@ -799,6 +799,7 @@ async function fetchDetails(f) {
     const vids = (j.videos?.results || []).filter(v => v.site === 'YouTube');
     const pick = ['Trailer', 'Teaser'].flatMap(t => [vids.find(v => v.type === t && v.iso_639_1 === 'ru'), vids.find(v => v.type === t)]).find(Boolean) || vids[0];
     f.trailer = pick ? str(pick.key, 20) : '';
+    if (/^tt\d+$/.test(j.external_ids?.imdb_id || '')) f.imdbId = j.external_ids.imdb_id;
   } else if (f.source === 'kinopoisk' && KP_KEY) {
     const base = `https://kinopoiskapiunofficial.tech/api/v2.2/films/${encodeURIComponent(f.sourceId)}`;
     const j = await getJson(base, { 'X-API-KEY': KP_KEY });
@@ -812,11 +813,114 @@ async function fetchDetails(f) {
       f.trailer = (v.items || []).map(x => ytKey(x.url)).find(Boolean) || '';
     } catch { f.trailer = ''; }
     f.kpId = String(f.sourceId);
+    if (/^tt\d+$/.test(j.imdbId || '')) f.imdbId = String(j.imdbId);
   } else return;
   f.detailsAt = Date.now();
 }
 
 const needsDetails = f => !f.detailsAt;
+
+// ---------- Kodik: плеер для выпавшего фильма ----------
+// Что есть в базе Kodik, спрашиваем через kodikwrapper (нужен свой токен, KODIK_TOKEN).
+// Сам плеер встраивается страницей find-player: она подписывает домен сама, поэтому
+// работает и без токена — ей нужен только id фильма на Кинопоиске или IMDb.
+const KODIK_TOKEN = envClean('KODIK_TOKEN');
+const KODIK_API_URL = envClean('KODIK_API_URL');
+const KODIK_TTL = 6 * 3600_000;
+
+let kodikLib; // false, если пакет не установлен
+let kodikClient = null;
+let kodikClientAt = 0;
+function kodikModule() {
+  if (kodikLib === undefined) {
+    try { kodikLib = require('kodikwrapper'); }
+    catch { kodikLib = false; console.warn('kodikwrapper не установлен (npm i): плеер будет искать фильм сам, без списка озвучек'); }
+  }
+  return kodikLib;
+}
+// Клиент живёт 12 часов: публичный токен Kodik иногда меняется
+async function kodikApi() {
+  const lib = kodikModule();
+  if (!lib) return null;
+  if (kodikClient && Date.now() - kodikClientAt < 12 * 3600_000) return kodikClient;
+  const token = KODIK_TOKEN || await lib.getPublicToken();
+  kodikClient = lib.Client.fromToken(token, KODIK_API_URL ? { kodikApiUrl: KODIK_API_URL } : undefined);
+  kodikClientAt = Date.now();
+  return kodikClient;
+}
+
+const qRank = s => (/2160|4k/i.test(s) ? 4 : /1080/.test(s) ? 3 : /720/.test(s) ? 2 : 1);
+// Одна озвучка — одна строка: из нескольких качеств оставляем лучшее
+function kodikItems(list) {
+  const by = new Map();
+  for (const mat of list) {
+    if (!mat.link) continue;
+    const item = {
+      translation: str(mat.translation?.title, 60) || 'Озвучка',
+      subs: mat.translation?.type === 'subtitles',
+      quality: str(mat.quality, 40),
+      camrip: Boolean(mat.camrip),
+      serial: /serial|multi-part/.test(String(mat.type || '')),
+      seasons: Math.max(0, num(mat.last_season, 0)),
+      episodes: Math.max(0, num(mat.last_episode, 0) || num(mat.episodes_count, 0)),
+    };
+    const key = String(mat.translation?.id || mat.id);
+    const cur = by.get(key);
+    if (!cur || qRank(item.quality) > qRank(cur.quality)) by.set(key, item);
+  }
+  return [...by.values()]
+    .sort((a, b) => a.camrip - b.camrip || a.subs - b.subs || qRank(b.quality) - qRank(a.quality))
+    .slice(0, 12);
+}
+
+const kodikIds = f => {
+  const kp = f.kpId || (f.source === 'kinopoisk' ? f.sourceId : '');
+  if (/^\d+$/.test(String(kp))) return { kinopoiskID: String(kp) };
+  if (/^tt\d+$/.test(String(f.imdbId || ''))) return { imdbID: String(f.imdbId) };
+  return null;
+};
+
+async function kodikLookup(f) {
+  const out = { find: kodikIds(f), items: [], api: false };
+  const client = await kodikApi();
+  if (!client) return out;
+  // по id точнее всего, по названию — если id нет или в базе фильм лежит под другим id
+  const tries = [];
+  if (out.find?.kinopoiskID) tries.push({ kinopoisk_id: Number(out.find.kinopoiskID) });
+  if (out.find?.imdbID) tries.push({ imdb_id: out.find.imdbID });
+  tries.push({ title: f.title, ...(/^\d{4}$/.test(f.year || '') ? { year: Number(f.year) } : {}) });
+  for (const q of tries) {
+    let found;
+    try {
+      found = await client.search({ ...q, limit: 40, with_seasons: true });
+    } catch (e) {
+      // чаще всего «неверный токен»: у публичного токена поиска нет, остаётся встроить плеер как есть
+      console.warn(`Kodik: поиск не ответил (${e.message})`);
+      return out;
+    }
+    out.api = true;
+    out.items = kodikItems(found.results || []);
+    if (!out.items.length) continue;
+    if (!out.find) {
+      const m = (found.results || []).find(x => x.kinopoisk_id || x.imdb_id || x.shikimori_id);
+      if (m?.kinopoisk_id) out.find = { kinopoiskID: String(m.kinopoisk_id) };
+      else if (m?.imdb_id) out.find = { imdbID: String(m.imdb_id) };
+      else if (m?.shikimori_id) out.find = { shikimoriID: String(m.shikimori_id) };
+    }
+    return out;
+  }
+  return out;
+}
+
+const kodikCache = new Map(); // id фильма → что нашли, на 6 часов
+async function kodikFor(f) {
+  const hit = kodikCache.get(f.id);
+  if (hit && Date.now() - hit.at < KODIK_TTL) return hit.data;
+  const data = await kodikLookup(f);
+  if (kodikCache.size > 400) kodikCache.clear();
+  kodikCache.set(f.id, { at: Date.now(), data });
+  return data;
+}
 
 const enrichQueue = [];
 const enrichQueued = new Set();
@@ -1131,6 +1235,22 @@ async function api(req, res, url) {
   }
 
   // реакции: летят у всех, не хранятся; у каждого лимит, считаем для бейджа
+  // Kodik: что есть в базе для этого фильма (озвучки, качество, сериал ли)
+  if (sub === 'kodik' && m === 'GET') {
+    const f = r.films.find(x => x.id === parts[3]) || r.history.find(h => h.film.id === parts[3])?.film;
+    if (!f) return json(res, 404, { error: 'Фильм не найден' });
+    try { return json(res, 200, await kodikFor(f)); }
+    catch (e) { return json(res, 502, { error: `Kodik не ответил (${e.message})` }); }
+  }
+
+  // «Включить всем»: у всех в комнате открывается плеер с этим фильмом
+  if (sub === 'kodik' && m === 'POST') {
+    const f = r.films.find(x => x.id === parts[3]) || r.history.find(h => h.film.id === parts[3])?.film;
+    if (!f) return json(res, 404, { error: 'Фильм не найден' });
+    broadcast(r.id, { type: 'watch', filmId: f.id, title: f.title, by: who, pid: personKey(me, b) });
+    return json(res, 200, { ok: true });
+  }
+
   if (sub === 'react' && m === 'POST') {
     const kind = str(b.kind, 12);
     if (!REACTIONS.includes(kind)) return json(res, 400, { error: 'Нет такой реакции' });

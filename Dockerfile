@@ -2,7 +2,10 @@ FROM node:22-alpine
 RUN apk add --no-cache su-exec
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000 DATA_DIR=/data
-COPY package.json server.js auth.js CHANGELOG.md ./
+COPY package.json package-lock.json ./
+# kodikwrapper: поиск фильма в базе Kodik для плеера в карточке
+RUN npm ci --omit=dev
+COPY server.js auth.js CHANGELOG.md ./
 COPY public ./public
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh

@@ -462,6 +462,30 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .trailer-bar .btn { flex: none; height: 42px; }
 .trailer-frame { border-radius: 28px 28px 0 0; }
 
+/* ---------- плеер Kodik ---------- */
+.watch-card { width: min(1100px, 100%); padding: 0; overflow: visible; background: var(--sheetB); max-height: none; gap: 0; }
+.watch-card .modal-x { top: -48px; right: 0; background: var(--s2); color: var(--tx); }
+#watchModal { z-index: 60; }
+.watch-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 18px; }
+.watch-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.watch-label { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--tx3); }
+.watch-name b { font: 800 19px/1.2 var(--f-head); letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.watch-head-btns { display: flex; gap: 8px; flex: none; }
+.watch-head-btns .btn { height: 42px; }
+.watch-frame { aspect-ratio: 16/9; width: 100%; background: #000; overflow: hidden; }
+.watch-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+.watch-msg { height: 100%; display: grid; align-content: center; justify-items: center; gap: 8px; padding: 24px; text-align: center; color: var(--tx2); font-size: 14.5px; }
+.watch-msg span { color: var(--tx3); font-size: 13px; }
+.watch-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 13px 18px; background: var(--sheetB); border-radius: 0 0 28px 28px; color: var(--tx2); font-size: 13.5px; }
+.watch-bar .m { color: var(--tx3); }
+.watch-bar .btn { flex: none; height: 38px; margin-left: auto; }
+.watch-tr { display: flex; flex-wrap: wrap; gap: 5px; }
+.watch-tr i { font-style: normal; font-size: 12.5px; font-weight: 700; padding: 4px 9px; border-radius: 8px; background: var(--s2); color: var(--tx); }
+@media (max-width: 700px) {
+  .watch-head { flex-wrap: wrap; }
+  .watch-bar .btn { margin-left: 0; }
+}
+
 /* ---------- голоса ---------- */
 .my-votes { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 20px 12px; padding: 10px 12px; border-radius: 13px; background: var(--s1); border: 1px solid var(--bd); font-size: 13px; font-weight: 700; color: var(--tx); }
 .my-votes .m { font-weight: 600; width: 100%; }

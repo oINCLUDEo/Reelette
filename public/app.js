@@ -99,6 +99,7 @@ function closeModal(m) {
   el._t = setTimeout(() => {
     el.hidden = true;
     if (el.id === 'trailerModal') $('#trailerFrame').innerHTML = '';
+    if (el.id === 'watchModal') $('#watchFrame').innerHTML = '';
   }, 300);
 }
 function openTrailer(key) {
@@ -114,11 +115,16 @@ document.addEventListener('click', e => {
 }, true);
 const fmtRuntime = m => (m >= 60 ? `${Math.floor(m / 60)} ч ${m % 60} мин` : `${m} мин`);
 // Кинопоиск: страница фильма, если он там найден, иначе поиск по названию и году
+const kpUrl = f => {
+  const id = f.kpId || (f.source === 'kinopoisk' ? f.sourceId : '');
+  return id ? `https://www.kinopoisk.ru/film/${encodeURIComponent(id)}/` : `https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(f.title + (f.year ? ' ' + f.year : ''))}`;
+};
 const kpBtn = f => {
   const id = f.kpId || (f.source === 'kinopoisk' ? f.sourceId : '');
-  const href = id ? `https://www.kinopoisk.ru/film/${encodeURIComponent(id)}/` : `https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(f.title + (f.year ? ' ' + f.year : ''))}`;
-  return `<a class="btn btn-ghost" href="${href}" target="_blank" rel="noopener">${id ? 'На Кинопоиске' : 'Найти на Кинопоиске'}</a>`;
+  return `<a class="btn btn-ghost" href="${kpUrl(f)}" target="_blank" rel="noopener">${id ? 'На Кинопоиске' : 'Найти на Кинопоиске'}</a>`;
 };
+// Kodik: плеер открывается в окне поверх сайта
+const watchBtn = f => `<button class="btn btn-ghost" data-watch="${esc(f.id)}"><svg viewBox="0 0 24 24"><path d="M3.5 5.5h17v11h-17zM8.5 20.5h7"/><path d="M11 9.5v3.5l3-1.75z" fill="currentColor"/></svg>Смотреть</button>`;
 const trailerBtn = f => (f.trailer ? `<button class="btn btn-ghost" data-trailer="${esc(f.trailer)}"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>Трейлер</button>` : '');
 const anyModalOpen = () => $$('.modal:not([hidden])').length > 0;
 function messageModal(html) {
@@ -334,6 +340,12 @@ function initRoom(roomId) {
     if (msg.type === 'profiles') { profilesMap = msg.profiles || {}; render(); return; }
     if (msg.type === 'react') { spawnReaction(msg.kind, msg.pid, msg.name); return; }
     if (msg.type === 'throw') { throwItem(msg); return; }
+    if (msg.type === 'watch') {
+      if (msg.pid === myPid()) return;
+      toast(`${msg.by} включил(а) «${msg.title}»`);
+      openWatch(msg.filmId, msg.by);
+      return;
+    }
     if (msg.type === 'chat') {
       flyMessage(msg.msg);
       if (!msg.msg.guess && state) state.chat = [...(state.chat || []), msg.msg].slice(-50);
@@ -579,6 +591,7 @@ function initRoom(roomId) {
           ${kind === 'win' && f.overview ? `<p>${esc(f.overview)}</p>` : ''}
           ${kind === 'win' ? `<div class="detail-actions">
             ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Открыть страницу фильма</a>` : ''}
+            ${watchBtn(f)}
             ${trailerBtn(f)}
             ${kpBtn(f)}
             ${state.films.some(x => x.id === f.id) && canDelete(f) ? `<button class="btn btn-ghost" data-remove="${esc(f.id)}">Убрать из колеса</button>` : ''}
@@ -601,6 +614,64 @@ function initRoom(roomId) {
     if (f.addedBy) parts.push(`<span>Добавил(а) <button class="person" data-person="${esc(personOf(f))}" data-name="${esc(f.addedBy)}">${esc(f.addedBy)}</button></span>`);
     return parts.length ? `<div class="facts">${parts.join('')}</div>` : '';
   }
+
+  // ---- Kodik: смотрим выпавший фильм прямо на сайте ----
+  // Плеер встраиваем страницей find-player: Kodik сам подписывает домен, ключ не нужен.
+  // Что в базе есть (озвучки, качество, сериал ли) спрашиваем у сервера через kodikwrapper.
+  let watchId = null;
+  const filmById = id => state?.films.find(f => f.id === id) || state?.history.find(h => h.film.id === id)?.film;
+  async function openWatch(id, by) {
+    const f = filmById(id);
+    if (!f) return;
+    watchId = id;
+    $('#watchLabel').textContent = by ? `${by} включил(а) для всех` : 'Смотрим в Kodik';
+    $('#watchTitle').textContent = f.title + (f.year ? ` (${f.year})` : '');
+    $('#watchFrame').innerHTML = '<div class="watch-msg">Ищем в Kodik…</div>';
+    $('#watchBar').innerHTML = '';
+    $('#watchAll').hidden = true;
+    openModal('#watchModal');
+    let data;
+    try {
+      data = await api(`/rooms/${roomId}/kodik/${id}?cid=${encodeURIComponent(me.cid)}`);
+    } catch (e) {
+      if (watchId === id) $('#watchFrame').innerHTML = `<div class="watch-msg">${esc(e.message)}</div>`;
+      return;
+    }
+    if (watchId !== id) return; // пока искали, открыли другой фильм
+    renderWatch(f, data, by);
+  }
+  function renderWatch(f, data, by) {
+    const items = data.items || [];
+    const found = Boolean(data.find) && !(data.api && !items.length);
+    if (!data.find) {
+      $('#watchFrame').innerHTML = `<div class="watch-msg">Kodik ищет фильм по номеру на Кинопоиске или IMDb, а у «${esc(f.title)}» его нет.<span>Добавьте фильм через поиск — номер подтянется сам.</span></div>`;
+    } else if (!found) {
+      $('#watchFrame').innerHTML = `<div class="watch-msg">В базе Kodik этого фильма нет.<span>Остаётся трейлер и свой способ посмотреть.</span></div>`;
+    } else {
+      $('#watchFrame').innerHTML = `<iframe src="https://kodikplayer.com/find-player?${new URLSearchParams(data.find)}" allow="autoplay *; fullscreen *; encrypted-media *" allowfullscreen></iframe>`;
+    }
+    const serial = items.find(i => i.serial);
+    const bar = [];
+    if (items.length) bar.push(`<span class="watch-tr">${items.slice(0, 6).map(i => `<i>${esc(i.translation)}${i.subs ? ' · субтитры' : ''}${i.quality ? ` · ${esc(i.quality)}` : ''}</i>`).join('')}</span>`);
+    if (serial) bar.push(`<span>Сериал${serial.seasons ? `, сезонов ${serial.seasons}` : ''}${serial.episodes ? `, серий ${serial.episodes}` : ''}.</span>`);
+    if (found) bar.push('<span class="m">Озвучку, качество, серию и полный экран переключает сам плеер Kodik.</span>');
+    bar.push(`<a class="btn btn-ghost" href="${esc(kpUrl(f))}" target="_blank" rel="noopener">На Кинопоиске</a>`);
+    $('#watchBar').innerHTML = bar.join('');
+    $('#watchAll').dataset.film = f.id;
+    $('#watchAll').hidden = !found || Boolean(by);
+  }
+  $('#watchAll').addEventListener('click', async e => {
+    const id = e.currentTarget.dataset.film;
+    if (!id) return;
+    try {
+      await api(`/rooms/${roomId}/kodik/${id}`, { method: 'POST', body: { cid: me.cid, by: me.name } });
+      toast('Плеер открылся у всех в комнате');
+    } catch (err) { toast(err.message, true); }
+  });
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-watch]');
+    if (t) { e.stopPropagation(); openWatch(t.dataset.watch); }
+  }, true);
 
   // ---- отрисовка ----
   // Смена режима (колесо, караоке, игра) — с анимированным переходом, если браузер умеет View Transitions.
@@ -1938,6 +2009,7 @@ function initRoom(roomId) {
         <p>${f.overview ? esc(f.overview) : '<span class="muted">Описания нет.</span>'}</p>
         <div class="detail-actions">
           ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Страница фильма</a>` : ''}
+          ${watchBtn(f)}
           ${trailerBtn(f)}
           ${kpBtn(f)}
           ${!fromHistory ? `<button class="btn btn-ghost${iVoted(f) ? ' on' : ''}" data-vote-detail>${ICON.heart}${iVoted(f) ? 'Снять голос' : 'Хочу посмотреть'}</button>` : ''}
