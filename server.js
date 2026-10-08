@@ -116,7 +116,7 @@ function publicState(r) {
     films: r.films, history: r.history, eliminated: r.eliminated,
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
-    rules: { votes: VOTES_PER_PERSON, winVotes: WIN_VOTES, points: VOTE_POINTS, cap: VOTE_CAP },
+    rules: { votes: VOTES_PER_PERSON, points: VOTE_POINTS, cap: VOTE_CAP },
     fair: r.fair !== false, modifiers: r.mods || {},
     // во время раунда «Угадай мелодию» название трека не отдаём
     music: r.music?.quiz && r.quiz?.state === 'playing' ? { ...r.music, title: 'Угадай мелодию', author: '' } : r.music || null,
@@ -132,9 +132,10 @@ function publicState(r) {
 // ---------- голоса ----------
 // У каждого 3 голоса, на фильм не больше одного своего. Голос даёт +25% к шансу, засчитывается до 4 голосов (максимум ×2).
 const VOTES_PER_PERSON = 3;
-// за каждый свой выбранный фильм (он в истории) — ещё голос, но не больше WIN_VOTES сверху
-const WIN_VOTES = 2;
-const votesFor = (r, pid) => VOTES_PER_PERSON + Math.min(WIN_VOTES, r.history.filter(h => personOf(h.film) === pid).length);
+// бонусные голоса за хорошую оценку последнего выпавшего фильма: 8–9,9 → +2, 10 → +4
+// держатся вместе с бонусом к шансам — пока снова не выпадет фильм этого человека
+const bonusVotes = factor => (factor >= 2 ? 4 : factor > 1 ? 2 : 0);
+const votesFor = (r, pid) => VOTES_PER_PERSON + bonusVotes(r.mods?.[pid]?.factor || 1);
 const VOTE_BONUS = 0.25;
 // Голос добавляет фильму фиксированные 4 пункта к колесу (колесо = 100 пунктов + голоса),
 // поэтому весит одинаково, сколько бы фильмов ни было у автора.

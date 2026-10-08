@@ -352,9 +352,9 @@ function initRoom(roomId) {
   }
   // ---- голоса: тот же расчёт веса, что на сервере ----
   const rules = () => state?.rules || { votes: 3, points: 4, cap: 4 };
-  // голоса человека: базовые плюс по одному за каждый его выбранный фильм (не больше winVotes)
-  const winVotesOf = pid => Math.min(rules().winVotes || 0, (state?.history || []).filter(h => personOf(h.film) === pid).length);
-  const votesMax = pid => rules().votes + winVotesOf(pid);
+  // голоса человека: базовые плюс бонус за хорошую оценку его последнего выпавшего фильма (как на сервере)
+  const bonusVotesOf = pid => { const f = state?.modifiers?.[pid]?.factor || 1; return f >= 2 ? 4 : f > 1 ? 2 : 0; };
+  const votesMax = pid => rules().votes + bonusVotesOf(pid);
   const votePoints = f => (rules().points ?? 4) * Math.min(rules().cap, (f.votes || []).length);
   const myPid = () => (account.user ? 'd' + account.user.id : 'g' + me.cid);
   const myVotesUsed = () => state.films.reduce((n, f) => n + (f.votes || []).filter(v => v.id === myPid()).length, 0);
@@ -586,14 +586,15 @@ function initRoom(roomId) {
     const out = new Set(state.eliminated);
     const watched = watchedIds();
 
-    const used = myVotesUsed(), R = rules(), vMax = votesMax(myPid()), vWin = winVotesOf(myPid());
-    $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: vMax }, (_, i) => `<i class="${i < vMax - used ? 'on' : ''}${i >= R.votes ? ' win' : ''}"></i>`).join('')}</span><span class="m">${used < vMax ? `осталось ${vMax - used}, каждый даёт фильму около ${R.points ?? 4}% колеса` : 'все отданы, голос можно снять'}${vWin ? ` · +${vWin} за ${plural(vWin, 'выбранный фильм', 'выбранных фильма', 'выбранных фильмов')}` : ''}</span>`;
+    const used = myVotesUsed(), R = rules(), vMax = votesMax(myPid()), vWin = bonusVotesOf(myPid());
+    $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: vMax }, (_, i) => `<i class="${i < vMax - used ? 'on' : ''}${i >= R.votes ? ' win' : ''}"></i>`).join('')}</span><span class="m">${used < vMax ? `осталось ${vMax - used}, каждый даёт фильму около ${R.points ?? 4}% колеса` : 'все отданы, голос можно снять'}${vWin ? ` · +${vWin} за ${vWin >= 4 ? 'оценку 10' : 'хорошую оценку'} вашего фильма` : ''}</span>`;
 
     // бонус или штраф человека — значком у его процента, подробности в подсказке
     const modChip = pid => {
       const m = state.modifiers?.[pid];
       if (!m || m.factor === 1) return '';
-      const tip = `${m.factor > 1 ? 'Бонус' : 'Штраф'} ${fmtFactor(m.factor)} к шансам: «${m.title}» получил среднюю ${String(m.avg).replace('.', ',')}. Действует, пока снова не выпадет фильм этого человека.`;
+      const bv = bonusVotesOf(pid);
+      const tip = `${m.factor > 1 ? 'Бонус' : 'Штраф'} ${fmtFactor(m.factor)} к шансам${bv ? ` и +${bv} голоса` : ''}: «${m.title}» получил среднюю ${String(m.avg).replace('.', ',')}. Действует, пока снова не выпадет фильм этого человека.`;
       return `<button type="button" class="mod-chip ${m.factor < 1 ? 'down' : 'up'}" data-tt="${esc(tip)}" aria-label="${esc(tip)}">${fmtFactor(m.factor)}</button>`;
     };
     $('#fairOn').checked = state.fair !== false;
@@ -1459,7 +1460,7 @@ function initRoom(roomId) {
     const fct = a === null ? null : ratingFactor(a);
     const whoT = h.film.addedBy || 'автора';
     const effect = !h.src ? `Бонус ${whoT} уже задаёт его более новый фильм.`
-      : a === null ? `Средняя оценка даст фильмам ${whoT} бонус или штраф до следующего выпадения его фильма: меньше 5 — ×0,5, 8–9,9 — ×1,5, 10 — ×2.`
+      : a === null ? `Средняя оценка даст фильмам ${whoT} бонус или штраф до следующего выпадения его фильма: меньше 5 — ×0,5; 8–9,9 — ×1,5 и +2 голоса; 10 — ×2 и +4 голоса.`
       : fct === 1 ? `Средняя ${a.toFixed(1).replace('.', ',')}: шанс фильмов ${whoT} не меняется.`
       : `Средняя ${a.toFixed(1).replace('.', ',')}: фильмы ${whoT} получают ${fmtFactor(fct)}, пока снова не выпадет его фильм.`;
     box.innerHTML = `
