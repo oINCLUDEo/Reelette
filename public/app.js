@@ -2499,7 +2499,7 @@ function initRoom(roomId) {
     const b = e.target.closest('[data-src]');
     if (!b || b.dataset.src === state?.provider) return;
     state.provider = b.dataset.src;
-    renderSrc();
+    syncProvider();
     try { await api(`/rooms/${roomId}`, { method: 'PATCH', body: { provider: b.dataset.src, cid: me.cid } }); }
     catch (err) { toast(err.message, true); }
   });
