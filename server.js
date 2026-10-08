@@ -132,9 +132,9 @@ function publicState(r) {
 // ---------- голоса ----------
 // У каждого 3 голоса, на фильм не больше одного своего. Голос даёт +25% к шансу, засчитывается до 4 голосов (максимум ×2).
 const VOTES_PER_PERSON = 3;
-// бонусные голоса за хорошую оценку последнего выпавшего фильма: 8–9,9 → +2, 10 → +4
-// держатся вместе с бонусом к шансам — пока снова не выпадет фильм этого человека
-const bonusVotes = factor => (factor >= 2 ? 4 : factor > 1 ? 2 : 0);
+// голоса от оценки последнего выпавшего фильма: 8–9,9 → +2, 10 → +4, ниже 6 → −2 (остаётся 1)
+// держатся вместе с бонусом или штрафом к шансам — пока снова не выпадет фильм этого человека
+const bonusVotes = factor => (factor >= 2 ? 4 : factor > 1 ? 2 : factor < 1 ? -2 : 0);
 const votesFor = (r, pid) => VOTES_PER_PERSON + bonusVotes(r.mods?.[pid]?.factor || 1);
 const VOTE_BONUS = 0.25;
 // Голос добавляет фильму фиксированные 4 пункта к колесу (колесо = 100 пунктов + голоса),
@@ -149,10 +149,10 @@ const effWeight = f => f.weight * voteMul(f);
 const personOf = f => (f.addedById ? (/^\d+$/.test(f.addedById) ? 'd' + f.addedById : f.addedById) : 'n:' + (f.addedBy || ''));
 
 // ---------- оценка после просмотра: разовый бонус или штраф автору на следующий выбор ----------
-// Средняя оценка остальных (без автора): <5 → ×0.5, 5–7.9 → ×1, 8–9.9 → ×1.5, 10 → ×2.
+// Средняя оценка остальных (без автора): <6 → ×0.5, 6–7.9 → ×1, 8–9.9 → ×1.5, 10 → ×2.
 // Действует, пока снова не выпадет фильм этого автора.
 function ratingFactor(avg) {
-  if (avg < 5) return 0.5;
+  if (avg < 6) return 0.5;
   if (avg < 8) return 1;
   if (avg < 10) return 1.5;
   return 2;
@@ -169,10 +169,11 @@ function modFromEntry(h) {
 // множители могли поменяться: действующие бонусы пересчитываются по текущим правилам
 for (const r of Object.values(rooms)) {
   if (!r.mods) continue;
-  for (const a of Object.keys(r.mods)) {
-    const h = (r.history || []).find(x => x.src && personOf(x.film) === a);
-    const mm = h && modFromEntry(h);
-    if (mm && mm.factor !== 1) r.mods[a] = mm; else delete r.mods[a];
+  r.mods = {};
+  for (const h of r.history || []) {
+    if (!h.src) continue;
+    const mm = modFromEntry(h);
+    if (mm && mm.factor !== 1) r.mods[personOf(h.film)] = mm;
   }
 }
 // старые комнаты: бонусы по последнему выпавшему фильму каждого автора

@@ -353,7 +353,7 @@ function initRoom(roomId) {
   // ---- голоса: тот же расчёт веса, что на сервере ----
   const rules = () => state?.rules || { votes: 3, points: 4, cap: 4 };
   // голоса человека: базовые плюс бонус за хорошую оценку его последнего выпавшего фильма (как на сервере)
-  const bonusVotesOf = pid => { const f = state?.modifiers?.[pid]?.factor || 1; return f >= 2 ? 4 : f > 1 ? 2 : 0; };
+  const bonusVotesOf = pid => { const f = state?.modifiers?.[pid]?.factor || 1; return f >= 2 ? 4 : f > 1 ? 2 : f < 1 ? -2 : 0; };
   const votesMax = pid => rules().votes + bonusVotesOf(pid);
   const votePoints = f => (rules().points ?? 4) * Math.min(rules().cap, (f.votes || []).length);
   const myPid = () => (account.user ? 'd' + account.user.id : 'g' + me.cid);
@@ -438,7 +438,7 @@ function initRoom(roomId) {
     return out;
   }
   const viewWeights = list => (elimView() ? elimWeights(chanceWeights(list), list) : chanceWeights(list));
-  const ratingFactor = avg => (avg < 5 ? 0.5 : avg < 8 ? 1 : avg < 10 ? 1.5 : 2);
+  const ratingFactor = avg => (avg < 6 ? 0.5 : avg < 8 ? 1 : avg < 10 ? 1.5 : 2);
   function syncWheel() {
     const list = activeFilms();
     const W = viewWeights(list);
@@ -587,14 +587,14 @@ function initRoom(roomId) {
     const watched = watchedIds();
 
     const used = myVotesUsed(), R = rules(), vMax = votesMax(myPid()), vWin = bonusVotesOf(myPid());
-    $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: vMax }, (_, i) => `<i class="${i < vMax - used ? 'on' : ''}${i >= R.votes ? ' win' : ''}"></i>`).join('')}</span><span class="m">${used < vMax ? `осталось ${vMax - used}, каждый даёт фильму около ${R.points ?? 4}% колеса` : 'все отданы, голос можно снять'}${vWin ? ` · +${vWin} за ${vWin >= 4 ? 'оценку 10' : 'хорошую оценку'} вашего фильма` : ''}</span>`;
+    $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: vMax }, (_, i) => `<i class="${i < vMax - used ? 'on' : ''}${i >= R.votes ? ' win' : ''}"></i>`).join('')}</span><span class="m">${used < vMax ? `осталось ${vMax - used}, каждый даёт фильму около ${R.points ?? 4}% колеса` : 'все отданы, голос можно снять'}${vWin > 0 ? ` · +${vWin} за ${vWin >= 4 ? 'оценку 10' : 'хорошую оценку'} вашего фильма` : vWin < 0 ? ` · ${vWin} за низкую оценку вашего фильма` : ''}</span>`;
 
     // бонус или штраф человека — значком у его процента, подробности в подсказке
     const modChip = pid => {
       const m = state.modifiers?.[pid];
       if (!m || m.factor === 1) return '';
       const bv = bonusVotesOf(pid);
-      const tip = `${m.factor > 1 ? 'Бонус' : 'Штраф'} ${fmtFactor(m.factor)} к шансам${bv ? ` и +${bv} голоса` : ''}: «${m.title}» получил среднюю ${String(m.avg).replace('.', ',')}. Действует, пока снова не выпадет фильм этого человека.`;
+      const tip = `${m.factor > 1 ? 'Бонус' : 'Штраф'} ${fmtFactor(m.factor)} к шансам${bv > 0 ? ` и +${bv} голоса` : bv < 0 ? `, голосов всего ${votesMax(pid)}` : ''}: «${m.title}» получил среднюю ${String(m.avg).replace('.', ',')}. Действует, пока снова не выпадет фильм этого человека.`;
       return `<button type="button" class="mod-chip ${m.factor < 1 ? 'down' : 'up'}" data-tt="${esc(tip)}" aria-label="${esc(tip)}">${fmtFactor(m.factor)}</button>`;
     };
     $('#fairOn').checked = state.fair !== false;
@@ -609,6 +609,12 @@ function initRoom(roomId) {
       const p = personOf(f);
       if (!groups.has(p)) groups.set(p, { pid: p, name: f.addedBy || 'Без имени', films: [] });
       groups.get(p).films.push(f);
+    }
+    // в группе сначала фильмы, которые сейчас крутятся, потом выбывшие, выпавшие и отсеянные фильтрами
+    const onWheel = new Set(active.map(f => f.id));
+    for (const g of groups.values()) {
+      g.left = g.films.filter(f => onWheel.has(f.id)).length;
+      g.films = [...g.films.filter(f => onWheel.has(f.id)), ...g.films.filter(f => !onWheel.has(f.id))];
     }
     const ordered = [...groups.values()].sort((a, b) => (b.pid === myPid()) - (a.pid === myPid()) || b.films.length - a.films.length);
     const avatarOf = pid => people.find(p => p.pid === pid)?.avatar
@@ -650,7 +656,7 @@ function initRoom(roomId) {
             ${ava ? `<img class="${frameCls(g.pid)}" style="${frameVars(g.pid)}" src="${esc(ava)}" alt="">` : `<span class="g-ava${frameCls(g.pid)}" style="background:hsl(${hue(g.name)} 55% 42%);${frameVars(g.pid)}">${initial(g.name)}</span>`}
             <b>${nick(g.pid, g.name)}${g.pid === myPid() ? ' <span class="m">(вы)</span>' : ''}</b>
           </span>
-          <span class="g-count">${g.films.length}</span>
+          <span class="g-count${g.left < g.films.length ? ' part' : ''}" title="${g.left < g.films.length ? `На колесе ${g.left} из ${g.films.length}` : `${g.films.length} ${plural(g.films.length, 'фильм', 'фильма', 'фильмов')} на колесе`}">${g.left < g.films.length ? `${g.left}<i>/${g.films.length}</i>` : g.films.length}</span>
           ${modChip(g.pid)}
           <em>${gShare ? `${(gShare * 100).toFixed(gShare < 0.1 ? 1 : 0)}%` : '—'}</em>
         </div>
@@ -1460,7 +1466,7 @@ function initRoom(roomId) {
     const fct = a === null ? null : ratingFactor(a);
     const whoT = h.film.addedBy || 'автора';
     const effect = !h.src ? `Бонус ${whoT} уже задаёт его более новый фильм.`
-      : a === null ? `Средняя оценка даст фильмам ${whoT} бонус или штраф до следующего выпадения его фильма: меньше 5 — ×0,5; 8–9,9 — ×1,5 и +2 голоса; 10 — ×2 и +4 голоса.`
+      : a === null ? `Средняя оценка даст фильмам ${whoT} бонус или штраф до следующего выпадения его фильма: ниже 6 — ×0,5 и 1 голос вместо 3; 8–9,9 — ×1,5 и +2 голоса; 10 — ×2 и +4 голоса.`
       : fct === 1 ? `Средняя ${a.toFixed(1).replace('.', ',')}: шанс фильмов ${whoT} не меняется.`
       : `Средняя ${a.toFixed(1).replace('.', ',')}: фильмы ${whoT} получают ${fmtFactor(fct)}, пока снова не выпадет его фильм.`;
     box.innerHTML = `
@@ -1486,7 +1492,7 @@ function initRoom(roomId) {
       clearTimeout(rateTimer);
       rateTimer = setTimeout(() => { renderRate(); if (detailHid && $('#filmModal').classList.contains('open')) showHist(detailHid); }, left + 300);
     }
-    return `<div class="rate-scale" data-hid="${esc(h.hid)}">${Array.from({ length: 10 }, (_, i) => `<button class="${i + 1 === mine ? 'on' : ''} ${i + 1 < 5 ? 'low' : i + 1 < 8 ? 'mid' : 'high'}" data-score="${i + 1}">${i + 1}</button>`).join('')}</div>
+    return `<div class="rate-scale" data-hid="${esc(h.hid)}">${Array.from({ length: 10 }, (_, i) => `<button class="${i + 1 === mine ? 'on' : ''} ${i + 1 < 6 ? 'low' : i + 1 < 8 ? 'mid' : 'high'}" data-score="${i + 1}">${i + 1}</button>`).join('')}</div>
       ${mine ? '<p class="note rate-hint">Поменять можно в течение минуты</p>' : ''}`;
   }
   // оценка в карточке выпавшего фильма

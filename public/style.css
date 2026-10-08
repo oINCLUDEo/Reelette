@@ -1637,3 +1637,7 @@ body.yt-docked #room .films-panel { padding-bottom: 0; }
 .nav-music .nav-unmute[hidden] { display: none; }
 .nav-music .nav-unmute:hover { background: var(--acc-hi); }
 .my-votes .dots i.win.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+
+/* счётчик группы: сколько фильмов человека ещё на колесе */
+.group-head .g-count.part { color: var(--tx); }
+.group-head .g-count i { font-style: normal; color: var(--tx3); font-weight: 700; }
