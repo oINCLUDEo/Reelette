@@ -116,7 +116,7 @@ function publicState(r) {
     films: r.films, history: r.history, eliminated: r.eliminated,
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
-    rules: { votes: VOTES_PER_PERSON, points: VOTE_POINTS, cap: VOTE_CAP },
+    rules: { votes: VOTES_PER_PERSON, winVotes: WIN_VOTES, points: VOTE_POINTS, cap: VOTE_CAP },
     fair: r.fair !== false, modifiers: r.mods || {},
     // во время раунда «Угадай мелодию» название трека не отдаём
     music: r.music?.quiz && r.quiz?.state === 'playing' ? { ...r.music, title: 'Угадай мелодию', author: '' } : r.music || null,
@@ -132,6 +132,9 @@ function publicState(r) {
 // ---------- голоса ----------
 // У каждого 3 голоса, на фильм не больше одного своего. Голос даёт +25% к шансу, засчитывается до 4 голосов (максимум ×2).
 const VOTES_PER_PERSON = 3;
+// за каждый свой выбранный фильм (он в истории) — ещё голос, но не больше WIN_VOTES сверху
+const WIN_VOTES = 2;
+const votesFor = (r, pid) => VOTES_PER_PERSON + Math.min(WIN_VOTES, r.history.filter(h => personOf(h.film) === pid).length);
 const VOTE_BONUS = 0.25;
 // Голос добавляет фильму фиксированные 4 пункта к колесу (колесо = 100 пунктов + голоса),
 // поэтому весит одинаково, сколько бы фильмов ни было у автора.
@@ -145,13 +148,13 @@ const effWeight = f => f.weight * voteMul(f);
 const personOf = f => (f.addedById ? (/^\d+$/.test(f.addedById) ? 'd' + f.addedById : f.addedById) : 'n:' + (f.addedBy || ''));
 
 // ---------- оценка после просмотра: разовый бонус или штраф автору на следующий выбор ----------
-// Средняя оценка остальных (без автора): <5 → ×0.5, 5–7.9 → ×1, 8–9.9 → ×1.25, 10 → ×1.5.
-// Действует, пока не выбран следующий фильм, потом сбрасывается.
+// Средняя оценка остальных (без автора): <5 → ×0.5, 5–7.9 → ×1, 8–9.9 → ×1.5, 10 → ×2.
+// Действует, пока снова не выпадет фильм этого автора.
 function ratingFactor(avg) {
   if (avg < 5) return 0.5;
   if (avg < 8) return 1;
-  if (avg < 10) return 1.25;
-  return 1.5;
+  if (avg < 10) return 1.5;
+  return 2;
 }
 // Бонус или штраф автору считается по оценкам его последнего выпавшего фильма (без оценки самого автора)
 // и действует, пока снова не выпадет его фильм — тогда сгорает, а новый фильм оценивают заново.
@@ -161,6 +164,15 @@ function modFromEntry(h) {
   if (!scores.length) return null;
   const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
   return { pid: author, name: h.film.addedBy || '', title: h.film.title, avg: Math.round(avg * 10) / 10, count: scores.length, factor: ratingFactor(avg) };
+}
+// множители могли поменяться: действующие бонусы пересчитываются по текущим правилам
+for (const r of Object.values(rooms)) {
+  if (!r.mods) continue;
+  for (const a of Object.keys(r.mods)) {
+    const h = (r.history || []).find(x => x.src && personOf(x.film) === a);
+    const mm = h && modFromEntry(h);
+    if (mm && mm.factor !== 1) r.mods[a] = mm; else delete r.mods[a];
+  }
 }
 // старые комнаты: бонусы по последнему выпавшему фильму каждого автора
 for (const r of Object.values(rooms)) {
@@ -1334,7 +1346,7 @@ async function api(req, res, url) {
         const pid = personKey(me, b);
         dup.votes ||= [];
         const used = r.films.reduce((n, x) => n + (x.votes || []).filter(v => v.id === pid).length, 0);
-        if (pid && !dup.votes.some(v => v.id === pid) && used < VOTES_PER_PERSON) {
+        if (pid && !dup.votes.some(v => v.id === pid) && used < votesFor(r, pid)) {
           dup.votes.push({ id: pid, name: who, avatar: me?.avatar || '' });
           voted.push(dup.title);
         }
@@ -1357,7 +1369,8 @@ async function api(req, res, url) {
       if (i >= 0) f.votes.splice(i, 1);
       else {
         const used = r.films.reduce((n, x) => n + (x.votes || []).filter(v => v.id === pid).length, 0);
-        if (used >= VOTES_PER_PERSON) return json(res, 400, { error: `Все ${VOTES_PER_PERSON} голоса уже отданы. Снимите голос с другого фильма.` });
+        const max = votesFor(r, pid);
+        if (used >= max) return json(res, 400, { error: `Все голоса (${max}) уже отданы. Снимите голос с другого фильма.` });
         f.votes.push({ id: pid, name: who, avatar: me?.avatar || '' });
       }
       pushState(r); return json(res, 200, { ok: true });

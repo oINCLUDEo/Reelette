@@ -63,6 +63,7 @@
       <button class="ghost sm icon" id="ytReplay" hidden><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
       <button class="ghost sm music-btn" id="musicBtn" aria-label="Общая музыка" title="Общая музыка из YouTube, её слышат все в комнате"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Музыка</span></button>
       <div class="yt-card" id="ytCard" hidden>
+        <button class="yt-unmute nav-unmute" id="ytUnmute" type="button" hidden title="Браузер ждёт клика, чтобы включить звук">Слушать</button>
         <button class="yt-thumb" id="ytThumb" type="button" title="Плеер, очередь и добавить трек" aria-label="Показать плеер и очередь"></button>
         <div class="yt-info"><b id="ytTitle"></b><span id="ytBy"></span></div>
         <div class="yt-ctrl">
@@ -112,8 +113,7 @@
   <div class="yt-panel" id="ytPanel" hidden>
     <div class="yt-player" id="ytPlayer">
       <div id="ytHost"></div>
-      <button class="yt-unmute" id="ytUnmute" hidden title="Браузер ждёт клика, чтобы включить звук">Слушать</button>
-      <button class="yt-expand" id="ytExpand" type="button" title="Очередь и добавить трек" aria-label="Развернуть плеер: очередь и добавить трек"><svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h8"/><path d="M19 15v6M16 18h6"/></svg></button>
+      <button class="yt-expand" id="ytExpand" type="button" hidden></button>
     </div>
     <form class="yt-add" id="ytAdd" hidden>
       <span class="label">Общая музыка <span class="m">слышат все в комнате</span></span>

@@ -1625,3 +1625,15 @@ html { overflow-x: clip; }
 .pe-body > .pe-group:first-child { padding-top: 8px; }
 /* ник со значками не залезает под крестик закрытия */
 .profile-card:not(.editing) .profile-head { padding-right: 40px; }
+
+/* музыка без видео: плеер YouTube нужен только ради звука — он отрисован, но невидим и не мешает */
+.yt-panel.docked { opacity: 0; pointer-events: none; left: 0 !important; right: auto !important; bottom: 0 !important; top: auto; width: 320px !important; max-width: none; z-index: -1; border: 0; box-shadow: none; background: none; }
+.yt-panel .yt-player { position: absolute; left: 0; top: 0; width: 320px; height: 180px; min-height: 0; opacity: 0; pointer-events: none; z-index: -1; }
+.yt-panel.open .yt-player { position: absolute; }
+.yt-expand { display: none !important; }
+body.yt-docked #room .films-panel { padding-bottom: 0; }
+/* «Слушать» — в мини-плеере, когда браузер ждёт клика для звука */
+.nav-music .nav-unmute { position: static; inset: auto; height: 36px; padding: 0 12px; border-radius: 10px; background: var(--acc); color: var(--on-acc); font: 800 13px var(--f-ui); flex: none; display: inline-grid; place-items: center; }
+.nav-music .nav-unmute[hidden] { display: none; }
+.nav-music .nav-unmute:hover { background: var(--acc-hi); }
+.my-votes .dots i.win.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }

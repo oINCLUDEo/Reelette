@@ -352,6 +352,9 @@ function initRoom(roomId) {
   }
   // ---- голоса: тот же расчёт веса, что на сервере ----
   const rules = () => state?.rules || { votes: 3, points: 4, cap: 4 };
+  // голоса человека: базовые плюс по одному за каждый его выбранный фильм (не больше winVotes)
+  const winVotesOf = pid => Math.min(rules().winVotes || 0, (state?.history || []).filter(h => personOf(h.film) === pid).length);
+  const votesMax = pid => rules().votes + winVotesOf(pid);
   const votePoints = f => (rules().points ?? 4) * Math.min(rules().cap, (f.votes || []).length);
   const myPid = () => (account.user ? 'd' + account.user.id : 'g' + me.cid);
   const myVotesUsed = () => state.films.reduce((n, f) => n + (f.votes || []).filter(v => v.id === myPid()).length, 0);
@@ -435,7 +438,7 @@ function initRoom(roomId) {
     return out;
   }
   const viewWeights = list => (elimView() ? elimWeights(chanceWeights(list), list) : chanceWeights(list));
-  const ratingFactor = avg => (avg < 5 ? 0.5 : avg < 8 ? 1 : avg < 10 ? 1.25 : 1.5);
+  const ratingFactor = avg => (avg < 5 ? 0.5 : avg < 8 ? 1 : avg < 10 ? 1.5 : 2);
   function syncWheel() {
     const list = activeFilms();
     const W = viewWeights(list);
@@ -583,8 +586,8 @@ function initRoom(roomId) {
     const out = new Set(state.eliminated);
     const watched = watchedIds();
 
-    const used = myVotesUsed(), R = rules();
-    $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: R.votes }, (_, i) => `<i class="${i < R.votes - used ? 'on' : ''}"></i>`).join('')}</span><span class="m">${used < R.votes ? `осталось ${R.votes - used}, каждый даёт фильму около ${R.points ?? 4}% колеса` : 'все отданы, голос можно снять'}</span>`;
+    const used = myVotesUsed(), R = rules(), vMax = votesMax(myPid()), vWin = winVotesOf(myPid());
+    $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: vMax }, (_, i) => `<i class="${i < vMax - used ? 'on' : ''}${i >= R.votes ? ' win' : ''}"></i>`).join('')}</span><span class="m">${used < vMax ? `осталось ${vMax - used}, каждый даёт фильму около ${R.points ?? 4}% колеса` : 'все отданы, голос можно снять'}${vWin ? ` · +${vWin} за ${plural(vWin, 'выбранный фильм', 'выбранных фильма', 'выбранных фильмов')}` : ''}</span>`;
 
     // бонус или штраф человека — значком у его процента, подробности в подсказке
     const modChip = pid => {
@@ -798,7 +801,6 @@ function initRoom(roomId) {
     $('#ytPanel').hidden = !ytChanging && !playerHere;
     $('#ytPanel').classList.toggle('open', ytChanging);
     $('#ytPanel').classList.toggle('docked', !ytChanging && playerHere);
-    document.body.classList.toggle('yt-docked', !ytChanging && playerHere);
     $('#ytPlayer').hidden = !playerHere;
     renderQueue();
     $('#musicBtn').hidden = Boolean(m);
@@ -1457,7 +1459,7 @@ function initRoom(roomId) {
     const fct = a === null ? null : ratingFactor(a);
     const whoT = h.film.addedBy || 'автора';
     const effect = !h.src ? `Бонус ${whoT} уже задаёт его более новый фильм.`
-      : a === null ? `Средняя оценка даст фильмам ${whoT} бонус или штраф до следующего выпадения его фильма: меньше 5 — ×0,5, 8–9,9 — ×1,25, 10 — ×1,5.`
+      : a === null ? `Средняя оценка даст фильмам ${whoT} бонус или штраф до следующего выпадения его фильма: меньше 5 — ×0,5, 8–9,9 — ×1,5, 10 — ×2.`
       : fct === 1 ? `Средняя ${a.toFixed(1).replace('.', ',')}: шанс фильмов ${whoT} не меняется.`
       : `Средняя ${a.toFixed(1).replace('.', ',')}: фильмы ${whoT} получают ${fmtFactor(fct)}, пока снова не выпадет его фильм.`;
     box.innerHTML = `
@@ -1626,7 +1628,7 @@ function initRoom(roomId) {
       </div>
       <section class="profile-sec"><h3>Бейджи <span class="m">${d.earned.length} из ${BADGES.length}</span></h3><div class="bdgs">${d.earned.map(b => badgeHtml(b, true, d.stats)).join('')}${d.locked.map(b => badgeHtml(b, false, d.stats)).join('')}</div></section>
       ${d.genres.length ? `<section class="profile-sec"><h3>Любимые жанры</h3><div class="chips">${d.genres.map(g => `<span class="chip on-static">${esc(g)}</span>`).join('')}</div></section>` : ''}
-      ${sec(`${you ? 'Хочу посмотреть' : 'Хочет посмотреть'} <span class="m">${d.voted.length} из ${rules().votes} голосов</span>`, d.voted)}
+      ${sec(`${you ? 'Хочу посмотреть' : 'Хочет посмотреть'} <span class="m">${d.voted.length} из ${votesMax(pid)} голосов</span>`, d.voted)}
       ${sec(you ? 'Выбирали ваши фильмы' : 'Выбирали его фильмы', d.wins)}
       ${sec(you ? 'Вы добавили в колесо' : 'Добавил(а) в колесо', d.added)}`;
   }
