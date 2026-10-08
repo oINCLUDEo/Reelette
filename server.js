@@ -14,6 +14,8 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const KP_KEY = process.env.KINOPOISK_API_KEY || '';
 const TMDB_KEY = process.env.TMDB_API_KEY || '';
 const PROVIDER = (process.env.MOVIE_PROVIDER || (KP_KEY ? 'kinopoisk' : TMDB_KEY ? 'tmdb' : 'none')).toLowerCase();
+// какие источники вообще доступны: между ними можно переключаться в настройках комнаты
+const PROVIDERS = [KP_KEY && 'kinopoisk', TMDB_KEY && 'tmdb'].filter(Boolean);
 
 // Docker env_file не снимает кавычки и пробелы, чистим сами
 const envClean = k => (process.env[k] || '').trim().replace(/^["']|["']$/g, '').trim();
@@ -118,6 +120,7 @@ function publicState(r) {
     filters: r.filters || cleanFilters({}), duel: r.duel || null,
     rules: { votes: VOTES_PER_PERSON, points: VOTE_POINTS, cap: VOTE_CAP },
     fair: r.fair !== false, modifiers: r.mods || {},
+    provider: PROVIDERS.includes(r.provider) ? r.provider : (PROVIDERS.includes(PROVIDER) ? PROVIDER : 'none'), providers: PROVIDERS,
     // во время раунда «Угадай мелодию» название трека не отдаём
     music: r.music?.quiz && r.quiz?.state === 'playing' ? { ...r.music, title: 'Угадай мелодию', author: '' } : r.music || null,
     quiz: publicQuiz(r), quizWins: r.quizWins || {}, chat: r.chat || [], queue: r.queue || [], lastTrack: r.music ? null : r.lastTrack || null,
@@ -488,8 +491,9 @@ async function postWebhook(r, film) {
 }
 
 // ---------- поиск фильмов ----------
-async function searchMovies(q) {
-  if (PROVIDER === 'kinopoisk' && KP_KEY) {
+async function searchMovies(q, src) {
+  const use = PROVIDERS.includes(src) ? src : PROVIDER;
+  if (use === 'kinopoisk' && KP_KEY) {
     const u = `https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=${encodeURIComponent(q)}&page=1`;
     const j = await getJson(u, { 'X-API-KEY': KP_KEY });
     return (j.films || []).slice(0, 12).map(f => ({
@@ -503,7 +507,7 @@ async function searchMovies(q) {
       url: `https://www.kinopoisk.ru/film/${f.filmId}/`,
     }));
   }
-  if (PROVIDER === 'tmdb' && TMDB_KEY) {
+  if (use === 'tmdb' && TMDB_KEY) {
     const bearer = TMDB_KEY.length > 40;
     const u = `https://api.themoviedb.org/3/search/multi?language=ru-RU&include_adult=false&query=${encodeURIComponent(q)}${bearer ? '' : `&api_key=${TMDB_KEY}`}`;
     const j = await getJson(u, bearer ? { Authorization: `Bearer ${TMDB_KEY}` } : {});
@@ -971,6 +975,34 @@ async function getJson(url, headers) {
 }
 
 // ---------- HTTP ----------
+// ---------- постеры через свой домен ----------
+// image.tmdb.org у части людей в России не открывается, а сервер до него достаёт.
+// Поэтому картинку забирает сервер и отдаёт со своего адреса; заодно TMDB не видит гостей.
+const IMG_HOSTS = new Set([
+  'image.tmdb.org', 'st.kp.yandex.net', 'avatars.mds.yandex.net', 'kinopoiskapiunofficial.tech',
+  'images.metahub.space', 'm.media-amazon.com',
+]);
+const IMG_MAX = 8 * 1024 * 1024;
+async function proxyImage(res, raw) {
+  let u;
+  try { u = new URL(String(raw || '')); } catch { res.writeHead(400); return res.end('bad url'); }
+  if (u.protocol !== 'https:' || !IMG_HOSTS.has(u.hostname)) { res.writeHead(403); return res.end('host not allowed'); }
+  try {
+    const up = await fetch(u, { headers: { Accept: 'image/*,*/*', 'User-Agent': 'Reelette' }, signal: AbortSignal.timeout(10000) });
+    const type = up.headers.get('content-type') || '';
+    if (!up.ok || !type.startsWith('image/')) { res.writeHead(502); return res.end('not an image'); }
+    if (Number(up.headers.get('content-length') || 0) > IMG_MAX) { res.writeHead(413); return res.end('too big'); }
+    const body = Buffer.from(await up.arrayBuffer());
+    if (body.length > IMG_MAX) { res.writeHead(413); return res.end('too big'); }
+    // постеры не меняются: пусть лежат в кеше браузера неделю
+    res.writeHead(200, { 'Content-Type': type, 'Content-Length': body.length, 'Cache-Control': 'public, max-age=604800, immutable' });
+    res.end(body);
+  } catch (e) {
+    res.writeHead(504);
+    res.end('upstream timeout');
+  }
+}
+
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
 
 function json(res, code, body) {
@@ -1017,7 +1049,7 @@ async function api(req, res, url) {
   const me = auth.user(req);
   if (parts[0] === 'me') return json(res, 200, { user: me, discord: auth.enabled });
 
-  if (parts[0] === 'config') return json(res, 200, { provider: PROVIDER === 'none' || (!KP_KEY && !TMDB_KEY) ? 'none' : PROVIDER });
+  if (parts[0] === 'config') return json(res, 200, { provider: PROVIDERS.includes(PROVIDER) ? PROVIDER : 'none', providers: PROVIDERS });
 
   if (parts[0] === 'profile' && m === 'POST') {
     const b = await readBody(req);
@@ -1032,7 +1064,7 @@ async function api(req, res, url) {
   if (parts[0] === 'search' && m === 'GET') {
     const q = str(url.searchParams.get('q'), 100);
     if (q.length < 2) return json(res, 200, { results: [] });
-    try { return json(res, 200, { results: await searchMovies(q) }); }
+    try { return json(res, 200, { results: await searchMovies(q, str(url.searchParams.get('src'), 20)) }); }
     catch (e) { return json(res, 502, { error: `Сервис фильмов не ответил (${e.message})` }); }
   }
 
@@ -1096,6 +1128,11 @@ async function api(req, res, url) {
       r.eliminated = []; r.plan = null;
       const rt = runtime(r);
       rt.series = false; clearTimeout(rt.next); rt.next = null;
+    }
+    if (b.provider !== undefined) {
+      const src = str(b.provider, 20);
+      if (!PROVIDERS.includes(src)) return json(res, 400, { error: 'Такого источника на сервере нет' });
+      r.provider = src;
     }
     if (b.name !== undefined) r.name = str(b.name, 60) || r.name;
     if (b.webhook !== undefined) {
@@ -1551,6 +1588,7 @@ http.createServer(async (req, res) => {
   try {
     if (url.pathname.startsWith('/auth/') && await auth.handle(req, res, url)) return;
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
+    if (url.pathname === '/img') return await proxyImage(res, url.searchParams.get('u'));
     if (url.pathname === '/' || /^\/r\/[A-Za-z0-9]+\/?$/.test(url.pathname)) return serveStatic(res, 'index.html');
     // список изменений: сайт показывает новые пункты тем, кто заходил раньше
     if (url.pathname === '/changelog.md') {

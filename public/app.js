@@ -224,7 +224,9 @@ if (new URLSearchParams(location.search).has('login_error')) {
   setTimeout(() => toast(why === 'cancel' ? 'Вход через Discord отменён' : 'Не удалось войти через Discord', why !== 'cancel'), 300);
 }
 function hue(s) { let h = 0; for (const ch of s) h = (h * 31 + ch.codePointAt(0)) % 360; return h; }
-function posterStyle(f) { return f.poster ? `background-image:url('${esc(f.poster)}')` : `--c:hsl(${hue(f.title)} 35% 24%)`; }
+// Постеры идут через свой домен: у части людей в России image.tmdb.org не открывается.
+const pimg = u => (/^https:\/\//.test(u || '') ? '/img?u=' + encodeURIComponent(u) : (u || ''));
+function posterStyle(f) { return f.poster ? `background-image:url('${esc(pimg(f.poster))}')` : `--c:hsl(${hue(f.title)} 35% 24%)`; }
 function initial(t) { return esc((t || '?').trim()[0]?.toUpperCase() || '?'); }
 function timeAgo(ts) {
   const d = new Date(ts);
@@ -503,13 +505,13 @@ function initRoom(roomId) {
   function syncWheel() {
     const list = activeFilms();
     const W = viewWeights(list);
-    wheel.setItems(list.map(f => ({ ...f, weight: W.get(f.id) })));
+    wheel.setItems(list.map(f => ({ ...f, poster: pimg(f.poster), weight: W.get(f.id) })));
   }
 
   function runSpin(spin) {
     spinningSid = spin.sid;
     const byId = new Map(state.films.map(f => [f.id, f]));
-    wheel.setItems(spin.snapshot.map(s => ({ ...byId.get(s.id), weight: s.weight })).filter(f => f.id), { snap: true });
+    wheel.setItems(spin.snapshot.map(s => ({ ...byId.get(s.id), poster: pimg(byId.get(s.id)?.poster), weight: s.weight })).filter(f => f.id), { snap: true });
     const elapsed = Date.now() + serverOffset - spin.startedAt;
     $$('.modal.winner').forEach(closeModal);
     stopCountdown();
@@ -581,9 +583,9 @@ function initRoom(roomId) {
     $('#winDetail').dataset.id = f.id;
     const label = title || (kind === 'out' ? `Выбывает${left > 1 ? `, осталось ${left}` : ''}` : 'Сегодня смотрим');
     $('#winDetail').innerHTML = `
-      ${f.poster ? `<div class="win-bg" style="--img:url('${esc(f.poster)}')"></div>` : ''}
+      ${f.poster ? `<div class="win-bg" style="--img:url('${esc(pimg(f.poster))}')"></div>` : ''}
       <div class="win-inner">
-        ${f.poster ? `<img src="${esc(f.poster)}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"></div>`}
+        ${f.poster ? `<img src="${esc(pimg(f.poster))}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"></div>`}
         <div>
           <div class="win-label">${label}</div>
           <div class="win-title">${esc(f.title)}</div>
@@ -698,6 +700,7 @@ function initRoom(roomId) {
   function renderNow() {
     if (!state) return;
     $('#roomTitle').textContent = state.name;
+    syncProvider();
     const spinning = Boolean(spinningSid || state.spin);
     const active = activeFilms();
     const W = chanceWeights(active);
@@ -1998,7 +2001,7 @@ function initRoom(roomId) {
     const votes = f.votes || [];
     const votersLine = votes.length ? `<div class="voters-line">Хотят посмотреть: ${votes.map(v => `<button class="person" data-person="${esc(v.id)}" data-name="${esc(v.name)}">${esc(v.name)}</button>`).join(', ')}${!fromHistory ? ` <span class="m">около +${votePoints(f)}% колеса</span>` : ''}</div>` : '';
     $('#filmDetail').innerHTML = `<div class="detail">
-      ${f.poster ? `<img src="${esc(f.poster)}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"></div>`}
+      ${f.poster ? `<img src="${esc(pimg(f.poster))}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"></div>`}
       <div>
         <h2>${esc(f.title)}</h2>
         ${f.original ? `<div class="orig">${esc(f.original)}</div>` : ''}
@@ -2123,7 +2126,7 @@ function initRoom(roomId) {
     let results = [];
     if (provider !== 'none') {
       box.innerHTML = '<p class="note">Ищу…</p>';
-      try { results = (await api('/search?q=' + encodeURIComponent(q))).results; }
+      try { results = (await api('/search?q=' + encodeURIComponent(q) + srcParam())).results; }
       catch (e) { if (seq === searchSeq) toast(e.message, true); }
     }
     if (seq !== searchSeq) return;
@@ -2198,7 +2201,7 @@ function initRoom(roomId) {
     toast(`Добавлено: ${r.added.length}${r.merged.length ? `, уже были: ${r.merged.length}` : ''}${r.voted.length ? `, за ${r.voted.length} из них отдан ваш голос` : ''}`);
   }
   async function findFilm(q) {
-    try { return (await api('/search?q=' + encodeURIComponent(q))).results.slice(0, 6); } catch { return []; }
+    try { return (await api('/search?q=' + encodeURIComponent(q) + srcParam())).results.slice(0, 6); } catch { return []; }
   }
   function showBulkReview(on) {
     $('#bulkEdit').hidden = on;
@@ -2473,6 +2476,32 @@ function initRoom(roomId) {
     if (!confirm('Удалить все фильмы из колеса?')) return;
     await api(`/rooms/${roomId}/clear`, { method: 'POST', body: { what: 'films', cid: me.cid } }).catch(e => toast(e.message, true));
     closeModal('#settingsModal');
+  });
+
+  // ---- источник карточек фильмов: Кинопоиск или TMDB ----
+  const srcParam = () => (state?.provider && state.provider !== 'none' ? '&src=' + encodeURIComponent(state.provider) : '');
+  // источник выбирается на комнату, поэтому подпись и поиск идут за состоянием
+  function syncProvider() {
+    if (!state?.provider) return;
+    provider = state.provider;
+    $('#providerNote').textContent = provider === 'kinopoisk' ? 'с Кинопоиска' : provider === 'tmdb' ? 'из TMDB' : '';
+    $('#searchInput').placeholder = provider === 'none' ? 'Название фильма (поиск постеров не настроен)' : 'Название фильма или сериала';
+    renderSrc();
+  }
+  function renderSrc() {
+    const list = state?.providers || [];
+    $('#srcCtl').hidden = list.length < 2;
+    if (list.length < 2) return;
+    $$('#srcSeg button').forEach(b => b.classList.toggle('on', b.dataset.src === state.provider));
+    placeSeg($('#srcSeg'));
+  }
+  $('#srcSeg').addEventListener('click', async e => {
+    const b = e.target.closest('[data-src]');
+    if (!b || b.dataset.src === state?.provider) return;
+    state.provider = b.dataset.src;
+    renderSrc();
+    try { await api(`/rooms/${roomId}`, { method: 'PATCH', body: { provider: b.dataset.src, cid: me.cid } }); }
+    catch (err) { toast(err.message, true); }
   });
 
   // ---- старт ----

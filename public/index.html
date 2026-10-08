@@ -449,6 +449,13 @@
         </div>
       </div>
     </section>
+    <section class="ctl" id="srcCtl" hidden>
+      <div class="ctl-head">Поиск фильмов</div>
+      <div class="field">
+        <span class="label">Откуда брать карточки <button type="button" class="hint" data-hint="Общая настройка комнаты. У Кинопоиска русские названия и постеры, которые открываются из России. У TMDB больше фильмов, жанров и трейлеров, но его картинки в России открываются не у всех. Уже добавленные фильмы не меняются." aria-label="Подсказка: откуда брать карточки">?</button></span>
+        <div class="seg" id="srcSeg"><span class="seg-ind"></span><button data-src="kinopoisk">Кинопоиск</button><button data-src="tmdb">TMDB</button></div>
+      </div>
+    </section>
     <section class="ctl" id="ownerCtl">
       <div class="ctl-head">Создатель комнаты</div>
       <label class="check" id="addLockWrap" hidden><input type="checkbox" role="switch" id="addLockOn"><span class="box"></span><span class="check-text">Закрыть добавление фильмов <button type="button" class="hint" data-hint="Пока включено, добавлять фильмы можете только вы. Во время выбывания добавлять нельзя никому, чтобы колесо не менялось посреди серии." aria-label="Подсказка: закрыть добавление фильмов">?</button></span></label>
