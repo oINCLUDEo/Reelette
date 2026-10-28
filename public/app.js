@@ -287,10 +287,12 @@ function initRoom(roomId) {
 
   let state = null;
   let spinningSid = null;
+  let curSpin = null; // прокрут, который сейчас крутится у нас (сообщение о нём бывает раньше состояния)
   let serverOffset = 0;
   let es = null;
   let provider = 'none';
-  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', false), sound: ls.get('sound', true), showOut: ls.get('showOut', true), flyChat: ls.get('flyChat', true), music: ls.get('music', false), delay: 0 };
+  // серия «до победителя» по умолчанию включена: на выбывании колесо само крутит до финала
+  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', true), sound: ls.get('sound', true), showOut: ls.get('showOut', true), flyChat: ls.get('flyChat', true), music: ls.get('music', false), delay: 0 };
   let people = [];
   let countdown = null; // секунд до старта, пока идёт отсчёт
   let countdownTimer = null;
@@ -306,25 +308,77 @@ function initRoom(roomId) {
     hubButton: true,
     onTick: tick,
     onCurrent: it => {
-      $('#currentTitle').textContent = it ? it.title : ' ';
+      if (!outShown) setCurrent(it ? it.title : ' ');
       $$('.film').forEach(el => el.classList.toggle('hot', el.dataset.id === it?.id));
     },
   });
+
+  // заголовок над колесом: фильм под стрелкой, а сразу после выбывания — зачёркнутое название
+  let outShown = false, outTimer = null;
+  function setCurrent(text, out = false) {
+    $('#current').classList.toggle('out', out);
+    $('#currentTitle').textContent = text;
+  }
+  function flashOut(f) {
+    outShown = true;
+    setCurrent(f.title, true);
+    clearTimeout(outTimer);
+    outTimer = setTimeout(clearOut, 1800);
+  }
+  function clearOut() {
+    clearTimeout(outTimer);
+    if (!outShown) return;
+    outShown = false;
+    const it = wheel.items[wheel.currentIndex()];
+    setCurrent(it ? it.title : ' ');
+  }
 
   // короткий сигнал отсчёта, на старте выше
   function beep(go) {
     if (settings.sound) Sfx.beep(go);
   }
-  // музыка прокрута подстраивает темп под скорость колеса; свой трек на это время приглушается
-  function musicOn() {
-    window.setBackdropActive?.(true);
+  // музыка прокрута подстраивает темп под скорость колеса; свой трек на это время приглушается.
+  // В серии музыка между прокрутами не выключается.
+  let musicLive = false;
+  function musicOn(stage) {
+    musicLive = true;
+    window.setBackdropActive?.(stage === 'final' ? 1.6 : 1);
     ytDuck(true);
     if (settings.music) Sfx.spinStart(() => wheel.speed || 0);
   }
   function musicOff() {
+    if (!musicLive) return;
+    musicLive = false;
     window.setBackdropActive?.(false);
     ytDuck(false);
     Sfx.spinStop();
+  }
+
+  // ---- драматургия выбывания: заставка «Финал», режим фокуса, сердцебиение на доползании ----
+  let heartTimer = null;
+  function setStage(stage) {
+    if (stage) document.body.dataset.stage = stage; else delete document.body.dataset.stage;
+  }
+  function showFinale(spin) {
+    const byId = new Map(state.films.map(f => [f.id, f]));
+    const pair = spin.snapshot.map(s => byId.get(s.id)).filter(Boolean);
+    setHTML($('#finalePair'), pair.map(f => `<figure><span class="finale-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</span><figcaption>${esc(f.title)}</figcaption></figure>`).join(''));
+    const el = $('#finale');
+    clearTimeout(el._t);
+    el.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  }
+  function hideFinale() {
+    const el = $('#finale');
+    if (el.hidden) return;
+    el.classList.remove('on');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.hidden = true; }, 700);
+  }
+  function endDrama() {
+    clearInterval(heartTimer); heartTimer = null;
+    hideFinale();
+    setStage(null);
   }
 
   // ---- подключение ----
@@ -365,6 +419,8 @@ function initRoom(roomId) {
       remember();
       if (state.spin && state.spin.sid !== spinningSid) runSpin(state.spin);
       if (!state.spin && !spinningSid) { syncWheel(); wheel.setAngle(state.angle); }
+      // серию остановили между прокрутами: музыка прокрута больше не нужна
+      if (!state.spin && !state.series && !spinningSid) musicOff();
       render();
       syncMusic();
     } else if (msg.type === 'spin') {
@@ -375,9 +431,12 @@ function initRoom(roomId) {
       showResult(msg);
     } else if (msg.type === 'cancel') {
       stopCountdown();
+      endDrama();
       musicOff();
       wheel.anim = null;
+      wheel.mood = null;
       spinningSid = null;
+      curSpin = null;
       wheel.setAngle(state.angle);
       syncWheel();
       toast(msg.by ? `${msg.by} отменил(а) прокрут` : 'Прокрут отменён');
@@ -510,21 +569,36 @@ function initRoom(roomId) {
 
   function runSpin(spin) {
     spinningSid = spin.sid;
+    curSpin = spin;
     const byId = new Map(state.films.map(f => [f.id, f]));
     wheel.setItems(spin.snapshot.map(s => ({ ...byId.get(s.id), poster: pimg(byId.get(s.id)?.poster), weight: s.weight })).filter(f => f.id), { snap: true });
     const elapsed = Date.now() + serverOffset - spin.startedAt;
     $$('.modal.winner').forEach(closeModal);
     stopCountdown();
-    if (elapsed < 0) startCountdown(spin);
-    else musicOn();
+    clearOut();
+    endDrama();
+    setStage(spin.stage);
+    if (elapsed < 0) {
+      musicOff(); // перед стартом тишина и отсчёт
+      if (spin.stage === 'final') showFinale(spin);
+      startCountdown(spin);
+    } else musicOn(spin.stage);
+    if (spin.stage === 'final') {
+      heartTimer = setInterval(() => { if (settings.sound && wheel.anim && wheel.speed > 0 && wheel.speed < 0.35) Sfx.heart(); }, 860);
+    }
     wheel.spin(spin, state.angle, elapsed, () => {
       spinningSid = null;
-      musicOff();
+      curSpin = null;
+      clearInterval(heartTimer); heartTimer = null;
+      // в серии музыка играет и между прокрутами, выключается, когда серия закончилась
+      if (!state.series) musicOff();
       if (!state.spin || state.spin.sid === spin.sid) {
         state.angle = Wheel.endAngle(spin);
         // если итог уже пришёл (вкладка была свёрнута), сразу показываем актуальное колесо
         if (!state.spin) syncWheel();
       }
+      // после финала фокус держится до окна победителя
+      setTimeout(() => { if (!spinningSid) setStage(null); }, spin.stage === 'final' ? 1700 : 0);
       render();
     });
     render();
@@ -535,8 +609,9 @@ function initRoom(roomId) {
       const left = spin.startedAt - (Date.now() + serverOffset);
       if (left <= 0) {
         stopCountdown();
+        hideFinale();
         beep(true);
-        musicOn();
+        musicOn(spin.stage);
         render();
         return;
       }
@@ -544,6 +619,7 @@ function initRoom(roomId) {
       if (sec !== countdown) {
         countdown = sec;
         beep(false);
+        $('#finaleCount').textContent = String(sec);
         render();
         const b = $('#spinBtn');
         b.classList.remove('beat'); void b.offsetWidth; b.classList.add('beat');
@@ -566,7 +642,9 @@ function initRoom(roomId) {
     if (msg.mode !== 'elimination' && settings.music) setTimeout(() => Sfx.win(), msg.mode === 'final' ? 1700 : msg.mode === 'duel' ? 600 : 0);
     if (msg.mode === 'elimination') {
       if (settings.sound) Sfx.out();
-      if (!settings.showOut) { toast(`Выбывает: ${f.title}${msg.left > 1 ? `, осталось ${msg.left}` : ''}`); return; }
+      flashOut(f);
+      // на разгоне хватает зачёркнутого названия над колесом, окно — только когда осталось пять и меньше
+      if (!settings.showOut || msg.left > 5) return;
       showWin(f, 'out', msg.left);
       if (msg.left > 1) setTimeout(() => { if ($('#winDetail').dataset.id === f.id) closeModal('#winModal'); }, 2300);
     } else if (msg.mode === 'final') {
@@ -710,7 +788,11 @@ function initRoom(roomId) {
     const watched = watchedIds();
 
     const used = myVotesUsed(), R = rules(), vMax = votesMax(myPid()), vWin = bonusVotesOf(myPid());
-    $('#myVotes').innerHTML = `<span>Ваши голоса</span><span class="dots">${Array.from({ length: vMax }, (_, i) => `<i class="${i < vMax - used ? 'on' : ''}${i >= R.votes ? ' win' : ''}"></i>`).join('')}</span><span class="m">${used < vMax ? `осталось ${vMax - used}, каждый даёт фильму около ${R.points ?? 4}% колеса` : 'все отданы, голос можно снять'}${vWin > 0 ? ` · +${vWin} за ${vWin >= 4 ? 'оценку 10' : 'хорошую оценку'} вашего фильма` : vWin < 0 ? ` · ${vWin} за низкую оценку вашего фильма` : ''}</span>`;
+    // голоса — одной строкой, объяснение в подсказке
+    const vLeft = Math.max(0, vMax - used);
+    setHTML($('#myVotes'), `<span>Ваши голоса</span><span class="dots">${Array.from({ length: vMax }, (_, i) => `<i class="${i < vLeft ? 'on' : ''}${i >= R.votes ? ' win' : ''}"></i>`).join('')}</span><span class="m">${vLeft ? `осталось ${vLeft}` : 'все отданы'}</span>`);
+    $('#myVotes').dataset.tt = `Сердечко у фильма — ваш голос: около +${R.points ?? 4}% колеса этому фильму, на фильм не больше одного своего.${vLeft ? '' : ' Голос можно снять и отдать другому.'}`
+      + (vWin > 0 ? ` +${vWin} ${plural(vWin, 'голос', 'голоса', 'голосов')} за ${vWin >= 4 ? 'оценку 10' : 'хорошую оценку'} вашего фильма.` : vWin < 0 ? ` На ${-vWin} ${plural(-vWin, 'голос', 'голоса', 'голосов')} меньше за низкую оценку вашего фильма.` : '');
 
     // бонус или штраф человека — значком у его процента, подробности в подсказке
     const modChip = pid => {
@@ -818,10 +900,19 @@ function initRoom(roomId) {
 
     $('#stopBtn').hidden = !counting && !state.series;
     $('#stopBtn').textContent = counting ? 'Отменить прокрут' : 'Остановить серию';
+    // выбывание: «осталось N из M» и тонкая полоска прогресса под ней
+    const elimTotal = active.length + state.eliminated.length;
+    const elimOn = !duel && (state.eliminated.length > 0 || (spinning && (state.spin || curSpin)?.mode === 'elimination'));
+    $('#stageStatus').classList.toggle('prog', elimOn && elimTotal > 1);
+    $('#stageStatus').style.setProperty('--p', elimTotal > 1 ? (state.eliminated.length / (elimTotal - 1)).toFixed(3) : 0);
     if (spinning) {
-      const by = state.spin?.by || '';
-      $('#stageStatus').textContent = counting ? (by ? `${by} запускает колесо` : 'Колесо сейчас запустится')
-        : state.series ? `Серия до победителя, осталось ${active.length}` : by ? `Крутит ${by}` : 'Колесо крутится';
+      const sp = state.spin || curSpin;
+      const by = sp?.by || '';
+      $('#stageStatus').textContent = sp?.stage === 'final' ? 'Финал'
+        : counting ? (by ? `${by} запускает колесо` : 'Колесо сейчас запустится')
+        : sp?.stage === 'semi' ? 'Полуфинал, осталось 3'
+        : sp?.mode === 'elimination' ? `Осталось ${active.length} из ${elimTotal}`
+        : by ? `Крутит ${by}` : 'Колесо крутится';
     }
     $('#resetBtn').hidden = !state.eliminated.length || spinning;
     const addClosed = (state.addLock && !isRoomOwner()) || state.elimActive;
@@ -858,9 +949,11 @@ function initRoom(roomId) {
       $('#stageStatus').textContent = active.length < 2
         ? (state.eliminated.length && active.length === 1 ? 'Остался один фильм. Чтобы начать заново, верните выбывших.'
           : state.films.length ? 'Для прокрута нужно хотя бы два фильма' : '')
-        : settings.mode === 'elimination' && state.eliminated.length ? `В колесе осталось ${active.length}`
-        : locked ? 'Прокруты закрыты: крутить может только создатель комнаты'
-        : settings.mode === 'duel' ? 'Нажмите на центр колеса, чтобы начать дуэль' : 'Нажмите на центр колеса или пробел';
+        : state.eliminated.length ? `Осталось ${active.length} из ${elimTotal}`
+        : locked ? 'Крутит только создатель комнаты'
+        : settings.mode === 'elimination' ? 'Колесо выбивает по фильму, последний побеждает'
+        : settings.mode === 'duel' ? 'Фильмы выходят парами, проигравший вылетает'
+        : 'Один прокрут выбирает фильм на вечер';
     }
   }
 
@@ -900,6 +993,7 @@ function initRoom(roomId) {
     $('#ytQCount').hidden = !q.length;
     $('#ytQCount').textContent = q.length;
     $('#ytQueueBtn').hidden = !m;
+    $('#ytRestart').hidden = $('#ytStop').hidden = !m;
     $('#ytNowBtn').textContent = m ? 'Включить сейчас' : 'Включить';
     $('#ytNowBtn').className = m ? 'btn btn-ghost' : 'btn btn-primary';
     $('#ytNext').disabled = !m;
@@ -2095,32 +2189,14 @@ function initRoom(roomId) {
     $('#quickSearch').focus({ preventScroll: true });
   });
 
-  // ---- добавление ----
+  // ---- добавление: одиночный фильм — полем над списком, несколько — окном «Добавить списком» ----
   $('#addBtn').addEventListener('click', () => {
-    $('#addTabs [data-tab="list"]').click();
     openModal('#addModal');
-    requestAnimationFrame(() => placeSeg($('#addTabs')));
-    setTimeout(() => $('#searchInput').focus({ preventScroll: true }), 120);
-  });
-  $('#addTabs').addEventListener('click', e => {
-    const b = e.target.closest('[data-tab]');
-    if (!b) return;
-    $$('#addTabs button').forEach(x => x.classList.toggle('on', x === b));
-    placeSeg($('#addTabs'));
-    $$('#addModal [data-pane]').forEach(p => (p.hidden = p.dataset.pane !== b.dataset.tab));
+    setTimeout(() => { if (!$('#bulkEdit').hidden) $('#bulkInput').focus({ preventScroll: true }); }, 120);
   });
 
-  let searchTimer = null, searchSeq = 0, lastResults = [];
-  $('#searchInput').addEventListener('input', e => {
-    clearTimeout(searchTimer);
-    const q = e.target.value.trim();
-    searchTimer = setTimeout(() => search(q), 350);
-  });
-  $('#searchInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); $('#searchResults .res')?.click(); }
-  });
-
-  async function search(q, box = $('#searchResults')) {
+  let searchSeq = 0, lastResults = [];
+  async function search(q, box) {
     const seq = ++searchSeq;
     if (q.length < 2) { box.innerHTML = ''; return; }
     let results = [];
@@ -2178,7 +2254,6 @@ function initRoom(roomId) {
   document.addEventListener('click', e => { if (!qr.hidden && !e.target.closest('#quickResults, #quickSearch')) showQuick(false); });
   addEventListener('resize', placeQuick);
   document.addEventListener('scroll', placeQuick, true);
-  $('#searchResults').addEventListener('click', e => addFromResults(e, $('#searchInput')));
   qr.addEventListener('click', e => addFromResults(e, $('#quickSearch')));
   async function addFromResults(e, input) {
     const b = e.target.closest('.res');
@@ -2319,13 +2394,11 @@ function initRoom(roomId) {
     $$('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
     placeSeg($('#modeSeg'));
     if (state && !spinningSid && !state.spin) syncWheel();
-    $('#modeHint').dataset.hint = m === 'normal'
-      ? 'Один прокрут выбирает один фильм. Шанс фильма равен его доле в колесе.'
-      : m === 'elimination' ? 'Каждый прокрут выбивает один фильм, последний оставшийся побеждает. Шанс победить тот же, что в обычном режиме, а колесо показывает шанс вылететь следующим: чем больше у фильма шанс выиграть, тем уже его сектор.'
-      : 'Фильмы выходят парами, все голосуют. Проигравший вылетает, пока не останется один. При ничьей победителя выбирает жребий с учётом веса.';
     $('#autoWrap').hidden = m !== 'elimination';
-    $('#durField').hidden = m === 'duel';
-    $('#delayField').hidden = m === 'duel';
+    // в дуэли прокрута нет; на выбывании длительность задаёт темп серии, ползунок только для обычного режима
+    $('#spinCtl').hidden = m === 'duel';
+    $('#durField').hidden = m !== 'normal';
+    $('#paceNote').hidden = m !== 'elimination';
     render();
   }
   $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
@@ -2480,12 +2553,13 @@ function initRoom(roomId) {
 
   // ---- источник карточек фильмов: Кинопоиск или TMDB ----
   const srcParam = () => (state?.provider && state.provider !== 'none' ? '&src=' + encodeURIComponent(state.provider) : '');
+  const providerNote = () => (provider === 'kinopoisk' ? 'По одному на строку, постеры и описания с Кинопоиска'
+    : provider === 'tmdb' ? 'По одному на строку, постеры и описания из TMDB' : 'По одному на строку, без постеров: поиск на сервере не настроен');
   // источник выбирается на комнату, поэтому подпись и поиск идут за состоянием
   function syncProvider() {
     if (!state?.provider) return;
     provider = state.provider;
-    $('#providerNote').textContent = provider === 'kinopoisk' ? 'с Кинопоиска' : provider === 'tmdb' ? 'из TMDB' : '';
-    $('#searchInput').placeholder = provider === 'none' ? 'Название фильма (поиск постеров не настроен)' : 'Название фильма или сериала';
+    $('#providerNote').textContent = providerNote();
     renderSrc();
   }
   function renderSrc() {
@@ -2507,8 +2581,7 @@ function initRoom(roomId) {
   // ---- старт ----
   api('/config').then(c => {
     provider = c.provider;
-    $('#providerNote').textContent = provider === 'kinopoisk' ? 'с Кинопоиска' : provider === 'tmdb' ? 'из TMDB' : '';
-    if (provider === 'none') $('#searchInput').placeholder = 'Название фильма (поиск постеров не настроен)';
+    $('#providerNote').textContent = providerNote();
   }).catch(() => {});
 
   Promise.all([api(`/rooms/${roomId}`), accountReady]).then(() => {

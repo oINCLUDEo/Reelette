@@ -287,12 +287,24 @@ function pickWeighted(list, weights) {
   return list[list.length - 1];
 }
 
+// Темп выбывания: пока фильмов много, колесо крутится быстро, с каждым порогом дольше, финал самый долгий.
+// n — сколько фильмов на колесе перед прокрутом; pause — пауза серии после прокрута; intro — заставка «Финал» перед ним.
+function elimPace(n) {
+  if (n <= 2) return { stage: 'final', duration: 20, turns: 15, pause: 0, intro: 4 };
+  if (n === 3) return { stage: 'semi', duration: 14, turns: 11, pause: 3 };
+  if (n <= 5) return { stage: 'top', duration: 10, turns: 8, pause: 3 };
+  if (n <= 10) return { stage: 'mid', duration: 6.5, turns: 5, pause: 2 };
+  if (n <= 20) return { stage: 'fast', duration: 4, turns: 3, pause: 1.4 };
+  return { stage: 'fast', duration: 2.8, turns: 2, pause: 1.1 };
+}
+
 function startSpin(r, { mode, duration, auto, by, delay }) {
   const list = activeFilms(r);
   if (list.length < 2) return 'Нужно хотя бы два фильма в колесе';
   mode = mode === 'elimination' ? 'elimination' : 'normal';
-  duration = Math.min(60, Math.max(0, num(duration, 12))); // 0 — сразу результат, без вращения
-  delay = Math.min(15, Math.max(0, Math.round(num(delay, 0))));
+  const pace = mode === 'elimination' ? elimPace(list.length) : null;
+  duration = pace ? pace.duration : Math.min(60, Math.max(0, num(duration, 12))); // 0 — сразу результат, без вращения
+  delay = Math.max(pace?.intro || 0, Math.min(15, Math.max(0, Math.round(num(delay, 0)))));
   const rt = runtime(r);
   // обычный режим: сектор = шанс победить; выбывание: сектор = шанс вылететь, стрелка выбивает именно по нему
   let W = chanceWeights(r, list);
@@ -308,13 +320,17 @@ function startSpin(r, { mode, duration, auto, by, delay }) {
     W = E;
   }
 
+  // в финале стрелка встаёт у самой границы сектора: колесо еле доползает или чуть не проскакивает.
+  // Исход это не меняет, фильм уже выбран выше.
+  const edge = 0.04 + (crypto.randomInt(0, 1000) / 1000) * 0.08;
   r.spin = {
     sid: id(6), mode, duration, auto: Boolean(auto) && mode === 'elimination', by: str(by, 32),
     startedAt: Date.now() + delay * 1000, delay,
     snapshot: list.map(f => ({ id: f.id, weight: Math.round(W.get(f.id) * 1000) / 1000 })),
     filmId: landed.id,
-    offset: 0.12 + (crypto.randomInt(0, 1000) / 1000) * 0.76,
-    turns: duration ? Math.max(2, Math.round(duration * 0.9)) : 0,
+    offset: pace?.stage === 'final' ? (crypto.randomInt(0, 2) ? edge : 1 - edge) : 0.12 + (crypto.randomInt(0, 1000) / 1000) * 0.76,
+    turns: pace ? pace.turns : duration ? Math.max(2, Math.round(duration * 0.9)) : 0,
+    stage: pace?.stage || null, left: list.length,
   };
   rt.series = r.spin.auto;
   broadcast(r.id, { type: 'spin', spin: r.spin, now: Date.now() });
@@ -350,8 +366,8 @@ function finishSpin(r, sid) {
     } else if (rt.series) {
       rt.next = setTimeout(() => {
         rt.next = null;
-        if (rooms[r.id] && !r.spin && rt.series) startSpin(r, { mode: 'elimination', duration: s.duration, auto: true, by: s.by });
-      }, 2600);
+        if (rooms[r.id] && !r.spin && rt.series) startSpin(r, { mode: 'elimination', auto: true, by: s.by });
+      }, elimPace(s.left).pause * 1000);
     }
   }
   pushState(r);

@@ -129,7 +129,7 @@
   readColors();
   document.querySelectorAll('canvas.backdrop').forEach(init);
   window.setBackdropColors = readColors;
-  window.setBackdropActive = on => { target = on ? 1 : 0; };
+  window.setBackdropActive = on => { target = typeof on === 'number' ? on : on ? 1 : 0; }; // число — сила, в финале ярче
   window.setBackdropFx = v => {
     fx = v;
     if (v.beat && !reduce) for (const s of scenes) { s.waves.push({ age: 0, s: v.beat }); s.kick = Math.max(s.kick, v.beat); }

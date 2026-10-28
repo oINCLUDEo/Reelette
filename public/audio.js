@@ -75,7 +75,8 @@
   let spin = null;
   function spinStart(getSpeed) {
     ac();
-    spinStop(true);
+    // серия на выбывании: музыка не обрывается между прокрутами, между ними темп просто опускается
+    if (spin) { spin.getSpeed = getSpeed; return; }
     const bus = ctx.createGain();
     bus.gain.value = 0.0001;
     bus.gain.exponentialRampToValueAtTime(0.55, ctx.currentTime + 0.4);
@@ -160,9 +161,16 @@
     tone(t, { freq: hz(67), type: 'triangle', peak: 0.1, decay: 0.18, glide: hz(64) });
     tone(t + 0.16, { freq: hz(62), type: 'triangle', peak: 0.1, decay: 0.4, glide: hz(55) });
   }
+  // сердцебиение, пока финальное колесо доползает: два глухих удара
+  function heart() {
+    ac();
+    const t = ctx.currentTime;
+    tone(t, { freq: 62, type: 'sine', peak: 0.3, attack: 0.008, decay: 0.16, glide: 40 });
+    tone(t + 0.17, { freq: 54, type: 'sine', peak: 0.2, attack: 0.008, decay: 0.2, glide: 36 });
+  }
 
   window.Sfx = {
-    unlock: ac, tick, beep, win, out, splat, caw,
+    unlock: ac, tick, beep, win, out, splat, caw, heart,
     analyser: () => analyser,
     spinStart, spinStop: () => spinStop(false),
   };

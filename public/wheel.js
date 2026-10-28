@@ -93,20 +93,29 @@ class Wheel {
     return ((1 - acc / total) % 1 + 1) % 1;
   }
 
+  // Ближе к финалу выбывания: замах назад перед стартом (wind, мс; back — доля оборота) и более долгое доползание (k).
+  static feel(stage) {
+    if (stage === 'final') return { k: 4, wind: 900, back: 0.06 };
+    if (stage === 'semi') return { k: 3.8, wind: 650, back: 0.04 };
+    return { k: 3.4, wind: 0, back: 0 };
+  }
+
   spin(spin, fromAngle, elapsedMs, done) {
     const target = Wheel.endAngle(spin);
     const from = fromAngle;
     const delta = ((target - from) % 1 + 1) % 1;
     const to = from + spin.turns + delta;
     const dur = Math.max(1, spin.duration * 1000); // при нулевой длительности колесо встаёт сразу
-    if (elapsedMs >= dur) { this.rot = target; this.anim = null; done?.(); return; }
+    if (elapsedMs >= dur) { this.rot = target; this.anim = null; this.mood = null; done?.(); return; }
+    const { k, wind, back } = Wheel.feel(spin.stage);
     this.rot = from;
-    this.anim = { from, to, dur, start: performance.now() - elapsedMs, done };
+    this.mood = spin.stage || null;
+    this.anim = { from, to, dur, k, wind: Math.min(wind, dur / 4), back, start: performance.now() - elapsedMs, done };
   }
 
   setAngle(a) { if (!this.anim) this.rot = a; }
 
-  static ease(t) { return 1 - Math.pow(1 - t, 3.4); }
+  static ease(t, k = 3.4) { return 1 - Math.pow(1 - t, k); }
 
   currentIndex() {
     const total = this.total;
@@ -140,9 +149,15 @@ class Wheel {
 
     const prevRot = this.rot;
     if (this.anim) {
-      const t = Math.min(1, Math.max(0, (now - this.anim.start) / this.anim.dur)); // до старта (отсчёт) t = 0
-      this.rot = this.anim.from + (this.anim.to - this.anim.from) * Wheel.ease(t);
-      if (t >= 1) { const d = this.anim.done; this.anim = null; this.rot %= 1; d?.(); }
+      const a = this.anim, el = now - a.start; // до старта (отсчёт) el < 0, колесо стоит
+      if (el < a.wind) {
+        const u = Math.max(0, el / a.wind);
+        this.rot = a.from - a.back * (1 - (1 - u) * (1 - u)); // плавно оттягивается назад и замирает
+      } else {
+        const t = Math.min(1, Math.max(0, (el - a.wind) / (a.dur - a.wind)));
+        this.rot = a.from - a.back + (a.to - a.from + a.back) * Wheel.ease(t, a.k);
+        if (t >= 1) { this.anim = null; this.mood = null; this.rot %= 1; a.done?.(); }
+      }
     } else if (this.idleSpeed) this.rot += this.idleSpeed * dt;
     this.speed = this.anim && dt > 0 ? Math.abs(this.rot - prevRot) / dt : 0;
 
@@ -289,17 +304,18 @@ class Wheel {
     x.beginPath(); x.arc(c, c, R, 0, Math.PI * 2);
     x.lineWidth = S / 160; x.strokeStyle = 'rgba(0,0,0,.55)'; x.stroke();
 
-    // лампочки
+    // лампочки: в покое ровные и тусклые, при прокруте бегут; в финале на доползании горят все и дышат
     const n = 36;
-    const speed = this.anim ? 14 : 1.2;
-    const phase = now / 1000 * speed;
     const lr = (c * 0.995 + R) / 2;
+    const chase = Math.floor(now / 1000 * 14);
+    const crawl = this.anim && this.mood === 'final' && this.speed < 0.6;
+    const breath = 0.5 + 0.5 * Math.sin(now / 1000 * 7.4);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
-      const on = this.anim ? (Math.floor(phase) + i) % 3 === 0 : 0.5 + 0.5 * Math.sin(phase + i * 0.9) > 0.5;
+      const on = crawl || (this.anim && (chase + i) % 3 === 0);
       x.beginPath(); x.arc(c + Math.cos(a) * lr, c + Math.sin(a) * lr, S / 170, 0, Math.PI * 2);
-      x.fillStyle = on ? this.colors.light : 'rgba(255,255,255,.14)';
-      x.shadowColor = this.colors.accent; x.shadowBlur = on ? S / 50 : 0;
+      x.fillStyle = on ? this.colors.light : 'rgba(255,255,255,.16)';
+      x.shadowColor = this.colors.accent; x.shadowBlur = on ? S / (crawl ? 40 + breath * 60 : 50) : 0;
       x.fill();
     }
     x.shadowBlur = 0;
