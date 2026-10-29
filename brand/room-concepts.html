@@ -1,0 +1,1004 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reelette: концепты комнаты</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;400;500;600;700;800&family=Wix+Madefor+Display:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   Этап 1. Сетка — одна на все концепты.
+   Компьютер 1440×900: 12 колонок по 94 px, интервал 24, поля 24, модуль 8.
+   Телефон 390×844: 4 колонки, интервал 16, поля 16.
+   Шрифты: 12/16 · 13/16 · 14/20 · 15/20 · 17/24 · 20/24 · 24/32 · 28/32 · 34/40 · 44/48.
+   Скругления концентричные: 28 → (отступ 8) 20 → (отступ 6) 14 → (отступ 4) 10.
+   Контролы: 48 · 44 · 40 · 36 · 32 · 28.
+   ===================================================================== */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #121215; color: #EDEDF0; font: 500 14px/1.45 Manrope, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: default; }
+svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+h2, p, figure { margin: 0; }
+
+/* ---------- оболочка страницы концептов ---------- */
+.shell-top { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; padding: 14px 24px; background: rgba(18,18,21,.88); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,.06); }
+.shell-title { margin-right: auto; font: 800 18px/24px 'Wix Madefor Display', Manrope, sans-serif; letter-spacing: -.02em; }
+.shell-title span { display: block; font: 500 13px/16px Manrope, sans-serif; letter-spacing: 0; color: #8E8E93; }
+.sw { display: inline-flex; padding: 3px; border-radius: 12px; background: rgba(255,255,255,.07); }
+.sw button { height: 32px; padding: 0 12px; border-radius: 9px; font-weight: 600; font-size: 13px; color: #A1A1A6; cursor: pointer; transition: background .2s, color .2s; }
+.sw button:hover:not(.on) { color: #fff; }
+.sw button.on { background: #fff; color: #000; }
+.sw button kbd { font: 600 11px Manrope; opacity: .45; margin-left: 6px; }
+.stagearea { display: flex; justify-content: center; align-items: flex-start; gap: 24px; padding: 24px 24px 8px; }
+.fcol { flex: none; display: flex; flex-direction: column; gap: 12px; }
+.fw { position: relative; overflow: hidden; border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.07); }
+.all .fw { cursor: zoom-in; }
+.cap b { display: block; font: 700 15px/20px Manrope; color: #fff; }
+.cap span { display: block; font: 500 13px/18px Manrope; color: #8E8E93; max-width: 60ch; }
+.legend { max-width: 1240px; margin: 8px auto 40px; padding: 0 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; color: #A1A1A6; font-size: 13px; line-height: 1.55; }
+.legend b { display: block; margin-bottom: 4px; font: 700 14px/20px Manrope; color: #fff; }
+
+/* ---------- кадр: сетка экрана ---------- */
+.frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; isolation: isolate; display: grid; row-gap: 0;
+  background: var(--bg); color: var(--ink); font: 500 15px/20px Manrope, sans-serif; letter-spacing: -.005em; }
+.dv-desk { width: 1440px; height: 900px; --c2: 212px; --c3: 330px; --c4: 448px; }
+.dv-phone { width: 390px; height: 844px; --c2: 171px; --c3: 264.5px; --c4: 358px; }
+.dv-desk.frame, .dv-desk .grid { grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 24px; padding: 16px 24px 24px; }
+.dv-phone.frame, .dv-phone .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 16px; padding: 12px 16px 16px; }
+.frame > * { min-width: 0; min-height: 0; }
+.frame > .bg, .frame > .finale, .frame > .win, .frame > .gridlines { position: absolute; inset: 0; }
+.bg { z-index: -1; overflow: hidden; }
+.bg i { position: absolute; }
+/* наложение сетки: колонки и модуль 8 px */
+.gridlines { z-index: 60; display: none; pointer-events: none; background-image: repeating-linear-gradient(180deg, rgba(255,69,58,.11) 0 1px, transparent 1px 8px); }
+.show-grid .gridlines { display: grid; }
+.gridlines i { background: rgba(255,69,58,.07); box-shadow: inset 1px 0 rgba(255,69,58,.45), inset -1px 0 rgba(255,69,58,.45); }
+.gridlines b { position: absolute; right: 24px; bottom: 6px; font: 700 11px/16px Manrope; color: #FF453A; letter-spacing: .02em; }
+.dv-phone .gridlines b { right: 16px; }
+
+/* ---------- общие детали (вид задаёт концепт) ---------- */
+.av { width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; font: 800 12px/1 Manrope; color: #fff; background: hsl(var(--h) 52% 46%); }
+.pst { flex: none; position: relative; overflow: hidden; background:
+  radial-gradient(46% 30% at 72% 22%, hsl(var(--h) 90% 80% / .55), transparent 72%),
+  radial-gradient(70% 45% at 20% 100%, hsl(var(--h2) 70% 45% / .5), transparent 72%),
+  linear-gradient(160deg, hsl(var(--h) 52% 46%), hsl(var(--h2) 58% 20%) 62%, hsl(var(--h2) 60% 9%)); }
+.pst b { position: absolute; left: 8%; right: 8%; bottom: 7%; font: 800 1em/1.02 'Wix Madefor Display', sans-serif; letter-spacing: -.04em; color: #fff; text-wrap: balance; text-shadow: 0 2px 12px rgba(0,0,0,.35); }
+.pst small { position: absolute; left: 8%; top: 6%; font: 700 .42em/1 Manrope; letter-spacing: .08em; color: rgba(255,255,255,.75); }
+.side { display: flex; flex-direction: column; min-height: 0; }
+.side-head, .peek-head, .side-sub { display: none; }
+.side-head { align-items: center; gap: 6px; }
+.rate, .add, .votes, .np, .ghead, .row, .tools, .avs, .ng, .seg, .auto, .status, .dock, .room-top, .current { display: flex; align-items: center; }
+.list { flex: 1; min-height: 0; overflow: hidden; }
+.ghead { gap: 8px; }
+.ghead .av { width: 22px; height: 22px; font-size: 10px; }
+.ghead b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gc, .gs, .pc, .tab i, .h-num b, .st-txt, .fn-count { font-variant-numeric: tabular-nums; }
+.row { position: relative; gap: 12px; }
+.row .rt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.row .rt b, .row .rt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.out .rt b { text-decoration: line-through; }
+.row .shr { display: none; }
+.ht { min-width: 32px; height: 32px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; flex: none; }
+.ht svg { width: 16px; height: 16px; }
+.ht.on svg { fill: currentColor; }
+.ht em { font: 700 12px/16px Manrope; font-style: normal; font-variant-numeric: tabular-nums; }
+.av.more .mp { display: none; }
+.dv-phone .av.more .md { display: none; }
+.dv-phone .av.more .mp { display: inline; }
+.wheel > svg { fill: none; stroke: none; }
+.wheel text { font-family: Manrope, sans-serif; font-weight: 700; fill: #fff; letter-spacing: -.01em; }
+.vd { display: flex; gap: 5px; }
+.vd i { width: 8px; height: 8px; border-radius: 50%; }
+.tabs { display: flex; }
+.tabs .tab { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.fld { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.ib { display: grid; place-items: center; flex: none; }
+.tools { gap: 12px; }
+.avs .av { margin-left: -8px; }
+.avs .av:first-child { margin-left: 0; }
+.ng { gap: 2px; }
+.ng button { display: grid; place-items: center; }
+.seg button { display: flex; align-items: center; justify-content: center; white-space: nowrap; position: relative; }
+.auto { gap: 12px; white-space: nowrap; }
+.tg { position: relative; flex: none; width: 44px; height: 28px; border-radius: 14px; }
+.tg::after { content: ""; position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+.hero { display: flex; flex-direction: column; }
+.h-num b { display: block; }
+.h-num b small { font-size: .5em; letter-spacing: -.02em; margin-left: 2px; }
+.h-specs > div { display: flex; justify-content: space-between; align-items: center; }
+.h-actions { display: flex; gap: 8px; }
+.h-actions button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.h-by { display: flex; align-items: center; gap: 8px; }
+.h-by .av { width: 24px; height: 24px; font-size: 10px; }
+.current { gap: 10px; min-width: 0; }
+.current .c-t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c-m, .c-pct { display: none; }
+.wheel { position: relative; aspect-ratio: 1; }
+.wheel > svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.hub { position: absolute; left: 50%; top: 50%; width: 23.75%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; z-index: 2; text-align: center; }
+.hub b { font: 800 22px/24px 'Wix Madefor Display', sans-serif; letter-spacing: -.035em; }
+.hub span { font: 600 12px/16px Manrope; }
+.pin { position: absolute; left: 50%; top: 0; transform: translateX(-50%); z-index: 3; }
+.status { gap: 16px; }
+.st-txt { display: flex; flex-direction: column; align-items: center; gap: 5px; font: 600 14px/20px Manrope; white-space: nowrap; }
+.bar { display: block; width: 200px; height: 3px; border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 2px; }
+.st-act { height: 28px; padding: 0 12px; border-radius: 14px; font: 600 13px/16px Manrope; white-space: nowrap; }
+.dock { gap: 2px; }
+.dock .rx { width: 40px; height: 40px; border-radius: 20px; display: grid; place-items: center; font-size: 20px; line-height: 1; }
+.dock .rx svg { width: 22px; height: 22px; fill: currentColor; stroke: none; }
+.dock .dsep { width: 1px; height: 24px; margin: 0 6px; flex: none; }
+.dock .chat { display: flex; align-items: center; width: 208px; height: 40px; padding: 0 16px; border-radius: 20px; font: 500 14px/20px Manrope; white-space: nowrap; }
+.dock .chat-ib { display: none; }
+.np .art { flex: none; display: grid; place-items: center; }
+.np .nt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.np .nt b, .np .nt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np .nb { display: flex; gap: 2px; }
+.np .nb button { display: grid; place-items: center; }
+
+/* оверлеи: финал и победитель — на той же сетке */
+.finale, .win { display: none; z-index: 30; }
+.st-final .finale, .st-win .win { display: grid; }
+.finale { align-content: center; }
+.fn-in { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.fn-h { display: flex; flex-direction: column; align-items: center; }
+.fn-pair { display: flex; gap: 24px; }
+.dv-phone .fn-pair { gap: 16px; }
+.fn-pair figure { width: var(--c2); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.fn-pair .pst { width: 100%; aspect-ratio: 2 / 3; font-size: 28px; }
+.dv-phone .fn-pair .pst { font-size: 22px; }
+.fn-pair figcaption { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
+.fn-pair figcaption b { font: 700 15px/20px Manrope; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.fn-pair figcaption span { font: 500 13px/16px Manrope; }
+.win { grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr); }
+.w-amb, .w-card { display: none; }
+.w-poster { grid-row: 2; align-self: center; aspect-ratio: 2 / 3; }
+.w-text { grid-row: 2; align-self: center; display: flex; flex-direction: column; }
+.w-act { display: flex; flex-wrap: wrap; gap: 12px; }
+.w-act button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
+.w-act button svg { width: 16px; height: 16px; }
+.w-facts { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.w-facts span b { font-weight: 700; }
+.w-x { position: absolute; top: 24px; right: 24px; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; z-index: 2; }
+.w-x svg { width: 16px; height: 16px; }
+.dv-phone .win { grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr); row-gap: 24px; }
+.dv-phone .w-poster { grid-column: 2 / 4; grid-row: 2; }
+.dv-phone .w-text { grid-column: 1 / -1; grid-row: 3; align-items: center; text-align: center; }
+.dv-phone .w-act { justify-content: center; }
+.dv-phone .w-facts { justify-content: center; }
+.dv-phone .w-x { top: 12px; right: 16px; }
+
+/* =====================================================================
+   Концепт 1. «Сеанс» — колесо в кинозале.
+   Фон — постер фильма под стрелкой, сильно размытый. Панели из стекла поверх него.
+   Две оси: текст слева по линии колонки 4 (x 378), колесо и всё, что к нему относится, по оси x 1074.
+   Ряды: 56 шапка · 46 · 640 колесо · 16 · 28 статус · гибкий · 48 док.
+   ===================================================================== */
+.cx-tv { --bg: #07060C; --ink: #FFFFFF; --tx2: rgba(235,235,245,.66); --tx3: rgba(235,235,245,.42); --acc: #7C6BFF; --hi: #B8ADFF; --fill: rgba(255,255,255,.08); }
+.cx-tv :is(.side, .seg, .auto, .ng, .dock, .st-act) { background: rgba(24,22,36,.42); border: 1px solid rgba(255,255,255,.14); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); box-shadow: 0 24px 60px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.1); }
+.cx-tv .bg .amb { inset: -12%; background: var(--amb); filter: blur(30px) saturate(135%); }
+.cx-tv .bg .scrim { inset: 0; background: linear-gradient(90deg, rgba(7,6,12,.62) 0%, rgba(7,6,12,.3) 42%, rgba(7,6,12,.1) 70%, rgba(7,6,12,.3) 100%), linear-gradient(180deg, rgba(7,6,12,.15), rgba(7,6,12,.6)); }
+
+.cx-tv.dv-desk { grid-template-rows: 56px 46px 640px 16px 28px minmax(0, 1fr) 48px; }
+.cx-tv.dv-desk .side { grid-column: 1 / 4; grid-row: 1 / -1; }
+.cx-tv.dv-desk .room-top { display: none; }
+.cx-tv.dv-desk .seg { grid-column: 4 / 7; grid-row: 1; justify-self: start; }
+.cx-tv.dv-desk .auto { grid-column: 7 / 10; grid-row: 1; justify-self: start; }
+.cx-tv.dv-desk .tools { grid-column: 10 / 13; grid-row: 1; justify-self: end; }
+.cx-tv.dv-desk .hero { grid-column: 4 / 7; grid-row: 3; align-self: center; }
+.cx-tv.dv-desk .current { display: none; }
+.cx-tv.dv-desk .wheel { grid-column: 7 / 13; grid-row: 3; justify-self: center; width: 640px; }
+.cx-tv.dv-desk .status { grid-column: 7 / 13; grid-row: 5; justify-self: center; }
+.cx-tv.dv-desk .dock { grid-column: 7 / 13; grid-row: 7; justify-self: center; }
+
+/* панель фильмов: стекло 28, внутри всё скруглено на 20 (28 − 8) */
+.cx-tv .side { gap: 8px; padding: 8px; border-radius: 28px; }
+.cx-tv .side-head { display: flex; height: 48px; padding: 0 12px; }
+.cx-tv .sh-room { font: 800 20px/24px 'Wix Madefor Display', sans-serif; letter-spacing: -.03em; }
+.cx-tv .sh-films { display: none; }
+.cx-tv .side-head svg { width: 14px; height: 14px; color: var(--tx3); }
+.cx-tv .rate { gap: 10px; height: 48px; padding: 0 12px 0 8px; border-radius: 20px; background: var(--fill); }
+.cx-tv .rate .pst { width: 22px; height: 32px; border-radius: 5px; }
+.cx-tv .rate .rt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cx-tv .rate b { font: 600 14px/20px Manrope; }
+.cx-tv .rate small { font: 500 12px/16px Manrope; color: var(--tx2); }
+.cx-tv .rate > svg { width: 14px; height: 14px; color: var(--tx3); }
+.cx-tv .tabs { height: 44px; padding: 4px; border-radius: 22px; background: var(--fill); }
+.cx-tv .tabs .tab { flex: 1; height: 36px; border-radius: 18px; font: 600 14px/20px Manrope; color: var(--tx2); }
+.cx-tv .tabs .tab i { font-style: normal; color: var(--tx3); }
+.cx-tv .tabs .tab.on { background: #fff; color: #0A0A0F; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.cx-tv .tabs .tab.on i { color: rgba(10,10,15,.45); }
+.cx-tv .add { gap: 8px; }
+.cx-tv .fld { height: 40px; padding: 0 14px; border-radius: 20px; background: var(--fill); font: 500 14px/20px Manrope; color: var(--tx3); }
+.cx-tv .fld svg { width: 16px; height: 16px; }
+.cx-tv .ib { width: 40px; height: 40px; border-radius: 20px; background: var(--fill); color: var(--tx2); }
+.cx-tv .votes { gap: 10px; height: 32px; padding: 0 12px; font: 600 13px/16px Manrope; color: var(--tx2); }
+.cx-tv .votes .m { margin-left: auto; font-weight: 500; color: var(--tx3); }
+.cx-tv .vd i { background: rgba(255,255,255,.18); }
+.cx-tv .vd i.on { background: var(--acc); box-shadow: 0 0 8px rgba(124,107,255,.7); }
+.cx-tv .ghead { height: 40px; padding: 0 12px; }
+.cx-tv .ghead > svg { width: 12px; height: 12px; color: var(--tx3); }
+.cx-tv .ghead b { font: 700 14px/20px Manrope; }
+.cx-tv .ghead b em { font-style: normal; font-weight: 500; color: var(--tx3); }
+.cx-tv .gc { font: 600 13px/16px Manrope; color: var(--tx3); }
+.cx-tv .gs { min-width: 40px; text-align: right; font: 700 13px/16px Manrope; color: var(--hi); }
+.cx-tv .row { height: 56px; padding: 0 4px 0 12px; border-radius: 20px; }
+.cx-tv .row .pst { width: 32px; height: 48px; border-radius: 6px; }
+.cx-tv .row .rt b { font: 600 15px/20px Manrope; }
+.cx-tv .row .rt small { font: 500 13px/16px Manrope; color: var(--tx3); }
+.cx-tv .row .pc { font: 700 13px/16px Manrope; color: var(--tx2); }
+.cx-tv .row .ht { color: var(--tx3); }
+.cx-tv .row .ht.on { color: var(--hi); }
+.cx-tv .row.hot { background: rgba(255,255,255,.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+.cx-tv .row.hot .pc { color: var(--ink); }
+.cx-tv .row.out { opacity: .38; }
+.cx-tv .np { gap: 12px; height: 64px; padding: 8px; border-radius: 20px; background: var(--fill); }
+.cx-tv .np .art { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #FFB347, #E8432E 60%, #3A1C71); color: rgba(255,255,255,.9); }
+.cx-tv .np .nt b { font: 600 14px/20px Manrope; }
+.cx-tv .np .nt small { font: 500 12px/16px Manrope; color: var(--tx2); }
+.cx-tv .np .nb button { width: 36px; height: 36px; border-radius: 18px; }
+
+/* шапка над сценой: капсулы стекла, связанные кнопки — одной группой */
+.cx-tv .seg { height: 44px; padding: 4px; border-radius: 22px; }
+.cx-tv .seg button { height: 36px; padding: 0 16px; border-radius: 18px; font: 600 15px/20px Manrope; color: var(--tx2); }
+.cx-tv .seg button.on { background: #fff; color: #0A0A0F; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.cx-tv .auto { height: 44px; padding: 0 8px 0 16px; border-radius: 22px; font: 600 14px/20px Manrope; }
+.cx-tv .tg { background: var(--acc); }
+.cx-tv .tg::after { background: #fff; }
+.cx-tv .avs .av { border: 2px solid rgba(7,6,12,.7); }
+.cx-tv .avs .more { background: rgba(255,255,255,.16); }
+.cx-tv .ng { height: 44px; padding: 3px; border-radius: 22px; }
+.cx-tv .ng button { width: 36px; height: 36px; border-radius: 18px; }
+
+/* герой: фильм под стрелкой */
+.cx-tv .h-poster, .cx-tv .h-specs, .cx-tv .h-actions { display: none; }
+.cx-tv .h-title { font: 800 44px/48px 'Wix Madefor Display', sans-serif; letter-spacing: -.045em; text-wrap: balance; text-shadow: 0 2px 30px rgba(0,0,0,.25); }
+.cx-tv .h-meta { margin-top: 8px; font: 500 15px/20px Manrope; color: var(--tx2); }
+.cx-tv .h-num { margin-top: 40px; }
+.cx-tv .h-num b { font: 800 64px/64px Manrope; letter-spacing: -.06em; background: linear-gradient(180deg, #fff 30%, var(--hi) 130%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 24px rgba(124,107,255,.55)); }
+.cx-tv .h-num span { display: block; margin-top: 4px; font: 600 13px/16px Manrope; color: var(--tx2); }
+.cx-tv .h-num em { display: block; font: 500 13px/16px Manrope; font-style: normal; color: var(--tx3); }
+.cx-tv .h-by { margin-top: 32px; font: 500 14px/20px Manrope; color: var(--tx2); }
+.cx-tv .h-by b { color: var(--ink); font-weight: 600; }
+
+/* колесо: световое кольцо, белая булавка, белая кнопка */
+.cx-tv .wheel::before { content: ""; position: absolute; inset: -16%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, transparent 66%, rgba(184,173,255,.32) 71%, rgba(124,107,255,.12) 80%, transparent 100%); }
+.cx-tv .hub { background: radial-gradient(circle at 50% 30%, #fff, #E6E2FF 75%); color: #0A0A0F; box-shadow: 0 0 0 6px rgba(7,6,12,.92), 0 0 0 9px rgba(184,173,255,.5), 0 16px 40px rgba(0,0,0,.5), 0 0 60px rgba(124,107,255,.45); }
+.cx-tv .hub span { opacity: .55; }
+.cx-tv .pin { top: -14px; width: 6.25%; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)) drop-shadow(0 0 14px rgba(124,107,255,.6)); }
+.cx-tv .pin svg { width: 100%; height: auto; display: block; fill: #fff; stroke: none; }
+.cx-tv .wheel text { paint-order: stroke; stroke: rgba(0,0,0,.45); stroke-width: 4px; stroke-linejoin: round; }
+.cx-tv .st-txt { color: var(--tx2); }
+.cx-tv .bar { background: rgba(255,255,255,.14); }
+.cx-tv .bar i { background: var(--hi); box-shadow: 0 0 10px rgba(184,173,255,.8); }
+.cx-tv .st-act { color: var(--ink); }
+.cx-tv .dock { height: 48px; padding: 4px; border-radius: 24px; }
+.cx-tv .dock .dsep { background: rgba(255,255,255,.16); }
+.cx-tv .dock .chat { background: var(--fill); color: var(--tx3); }
+
+/* ---------- «Сеанс», телефон: колесо на весь экран, фильмы — шторкой снизу ---------- */
+.cx-tv.dv-phone { grid-template-rows: 44px 12px 40px 16px 28px 4px 16px 16px 358px 16px 28px 16px 48px minmax(0, 1fr); }
+.cx-tv.dv-phone .room-top { grid-column: 1 / 3; grid-row: 1; gap: 6px; font: 800 17px/24px 'Wix Madefor Display', sans-serif; letter-spacing: -.02em; }
+.cx-tv.dv-phone .room-top svg { width: 14px; height: 14px; color: var(--tx3); }
+.cx-tv.dv-phone .room-top .rlogo { display: none; }
+.cx-tv.dv-phone .tools { grid-column: 3 / 5; grid-row: 1; justify-self: end; gap: 8px; }
+.cx-tv.dv-phone .avs .av { width: 28px; height: 28px; font-size: 10px; }
+.cx-tv.dv-phone .avs .av:nth-child(n+3):not(.more) { display: none; }
+.cx-tv.dv-phone .ng { height: 40px; }
+.cx-tv.dv-phone .ng button { width: 32px; height: 32px; border-radius: 16px; }
+.cx-tv.dv-phone .ng button:first-child { display: none; }
+.cx-tv.dv-phone .seg { grid-column: 1 / -1; grid-row: 3; height: 40px; border-radius: 20px; }
+.cx-tv.dv-phone .seg button { flex: 1; height: 32px; padding: 0; border-radius: 16px; font-size: 14px; }
+.cx-tv.dv-phone .current { grid-column: 1 / -1; grid-row: 5 / 8; flex-direction: column; align-items: center; gap: 4px; }
+.cx-tv.dv-phone .c-t { max-width: 100%; font: 800 24px/28px 'Wix Madefor Display', sans-serif; letter-spacing: -.04em; }
+.cx-tv.dv-phone .c-m { display: block; font: 500 13px/16px Manrope; color: var(--tx2); }
+.cx-tv.dv-phone .hero { display: none; }
+.cx-tv.dv-phone .wheel { grid-column: 1 / -1; grid-row: 9; width: 358px; }
+.cx-tv.dv-phone .hub b { font-size: 15px; line-height: 18px; }
+.cx-tv.dv-phone .hub span { display: none; }
+.cx-tv.dv-phone .pin { top: -9px; }
+.cx-tv.dv-phone .status { grid-column: 1 / 3; grid-row: 11; justify-self: start; }
+.cx-tv.dv-phone .st-txt { align-items: flex-start; font-size: 13px; line-height: 20px; }
+.cx-tv.dv-phone .bar { width: 120px; }
+.cx-tv.dv-phone .st-act { display: none; }
+.cx-tv.dv-phone .auto { grid-column: 3 / 5; grid-row: 11; justify-self: end; height: 28px; padding: 0 3px 0 12px; gap: 8px; font-size: 13px; }
+.cx-tv.dv-phone .tg { width: 36px; height: 22px; }
+.cx-tv.dv-phone .tg::after { top: 2px; right: 2px; width: 18px; height: 18px; }
+.cx-tv.dv-phone .dock { grid-column: 1 / -1; grid-row: 13; justify-self: center; }
+.cx-tv.dv-phone .dock .rx { width: 36px; height: 36px; font-size: 18px; }
+.cx-tv.dv-phone .dock .dsep, .cx-tv.dv-phone .dock .chat { display: none; }
+.cx-tv.dv-phone .dock .chat-ib { display: grid; }
+.cx-tv.dv-phone .side { position: absolute; left: 0; right: 0; bottom: 0; height: 168px; padding: 8px 8px 0; border-radius: 28px 28px 0 0; border-bottom: 0; }
+.cx-tv.dv-phone .side > :not(.peek-head):not(.list) { display: none; }
+.cx-tv.dv-phone .peek-head { display: flex; flex-direction: column; flex: none; }
+.cx-tv .peek-head .grab { align-self: center; width: 36px; height: 5px; margin: 0 0 10px; border-radius: 3px; background: rgba(255,255,255,.3); }
+.cx-tv .peek-head .ph { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 4px 0 12px; }
+.cx-tv .peek-head .ph b { font: 800 20px/24px 'Wix Madefor Display', sans-serif; letter-spacing: -.03em; }
+.cx-tv .peek-head .ph span { margin-right: auto; font: 500 13px/16px Manrope; color: var(--tx2); }
+.cx-tv .peek-head .ph .ib { width: 36px; height: 36px; border-radius: 18px; }
+
+/* ---------- «Сеанс»: финал ---------- */
+.cx-tv .finale { background: radial-gradient(40% 55% at 38% 50%, hsl(var(--fa) 60% 40% / .45), transparent 70%), radial-gradient(40% 55% at 62% 50%, hsl(var(--fb) 60% 40% / .45), transparent 70%), rgba(7,6,12,.86); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.cx-tv .fn-in { gap: 40px; }
+.cx-tv .fn-t { font: 800 120px/112px 'Wix Madefor Display', sans-serif; letter-spacing: -.055em; padding-bottom: 8px; background: linear-gradient(180deg, #fff 30%, var(--hi) 125%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 40px rgba(124,107,255,.6)); }
+.cx-tv .fn-s { margin-top: 8px; font: 500 17px/24px Manrope; color: var(--tx2); }
+.cx-tv .fn-pair .pst { border-radius: 18px; box-shadow: 0 30px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.1), 0 0 60px hsl(var(--h) 70% 50% / .35); }
+.cx-tv .fn-pair figure:first-child { transform: rotate(-3deg); }
+.cx-tv .fn-pair figure:last-child { transform: rotate(3deg); }
+.cx-tv .fn-pair figcaption span { color: var(--tx3); }
+.cx-tv .fn-count { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 36px; font: 800 36px/1 Manrope; letter-spacing: -.04em; color: #fff; background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 0 40px rgba(124,107,255,.4); }
+.cx-tv.dv-phone .fn-in { gap: 28px; }
+.cx-tv.dv-phone .fn-t { font-size: 72px; line-height: 72px; }
+.cx-tv.dv-phone .fn-s { font-size: 15px; line-height: 20px; }
+
+/* ---------- «Сеанс»: победитель — как страница фильма в Apple TV ---------- */
+.cx-tv .win { background: #07060C; }
+.cx-tv .w-amb { display: block; position: absolute; inset: 0; background: var(--wamb); }
+.cx-tv .w-amb::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(7,6,12,.82) 0%, rgba(7,6,12,.5) 45%, rgba(7,6,12,.12) 100%), linear-gradient(180deg, transparent 60%, rgba(7,6,12,.6)); }
+.cx-tv.dv-desk .w-text { grid-column: 2 / 7; }
+.cx-tv.dv-desk .w-poster { grid-column: 8 / 12; border-radius: 24px; font-size: 54px; box-shadow: 0 40px 90px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.12), 0 0 90px hsl(var(--h) 70% 50% / .45); }
+.cx-tv .w-k { font: 600 17px/24px Manrope; color: var(--tx2); }
+.cx-tv .w-t { margin-top: 8px; font: 800 80px/80px 'Wix Madefor Display', sans-serif; letter-spacing: -.055em; padding-bottom: 6px; background: linear-gradient(180deg, #fff 30%, var(--hi) 130%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 30px rgba(124,107,255,.45)); text-wrap: balance; }
+.cx-tv .w-m { margin-top: 16px; font: 500 17px/24px Manrope; color: var(--tx2); }
+.cx-tv .w-d { margin-top: 16px; max-width: 520px; font: 500 17px/26px Manrope; color: var(--tx2); }
+.cx-tv .w-act { margin-top: 32px; }
+.cx-tv .w-act button { height: 52px; padding: 0 24px; border-radius: 26px; font: 700 16px/20px Manrope; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.16); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.cx-tv .w-act button.pri { background: #fff; color: #0A0A0F; border-color: #fff; }
+.cx-tv .w-facts { margin-top: 32px; font: 500 14px/20px Manrope; color: var(--tx3); }
+.cx-tv .w-facts b { color: var(--tx2); }
+.cx-tv .w-x { background: rgba(255,255,255,.12); color: #fff; }
+.cx-tv.dv-phone .w-poster { border-radius: 18px; font-size: 26px; box-shadow: 0 30px 60px rgba(0,0,0,.6), 0 0 60px hsl(var(--h) 70% 50% / .45); }
+.cx-tv.dv-phone .w-t { font-size: 40px; line-height: 44px; }
+.cx-tv.dv-phone .w-m, .cx-tv.dv-phone .w-d { font-size: 14px; line-height: 20px; margin-top: 8px; }
+.cx-tv.dv-phone .w-d { display: none; }
+.cx-tv.dv-phone .w-act { margin-top: 20px; gap: 8px; }
+.cx-tv.dv-phone .w-act button { height: 44px; padding: 0 18px; font-size: 15px; }
+.cx-tv.dv-phone .w-act button:last-child, .cx-tv.dv-phone .w-facts { display: none; }
+
+/* =====================================================================
+   Концепт 2. «Афиша» — чёрно-белая программа сеанса.
+   Симметричный триптих вокруг центра экрана (x 720, середина интервала между колонками 6 и 7):
+   программа слева (колонки 1–3), колесо в центре (4–9), карточка фильма справа (10–12).
+   Цвета нет нигде, кроме фильма под стрелкой и победителя. Тонкие линии вместо подложек.
+   Все три колонки начинаются на одной линии y 118 и кончаются на y 876.
+   ===================================================================== */
+.cx-mono { --bg: #000; --ink: #F5F5F7; --tx2: #A1A1A6; --tx3: #6E6E73; --hair: rgba(255,255,255,.14); --fill: #1C1C1E; }
+.cx-mono .bg { display: none; }
+
+.cx-mono.dv-desk { grid-template-rows: 56px 46px 640px 16px 28px minmax(0, 1fr) 48px; }
+.cx-mono.dv-desk .room-top { grid-column: 1 / 4; grid-row: 1; }
+.cx-mono.dv-desk .seg { grid-column: 4 / 10; grid-row: 1; justify-self: center; }
+.cx-mono.dv-desk .tools { grid-column: 10 / 13; grid-row: 1; justify-self: end; }
+.cx-mono.dv-desk .side { grid-column: 1 / 4; grid-row: 3 / -1; }
+.cx-mono.dv-desk .wheel { grid-column: 4 / 10; grid-row: 3; justify-self: center; width: 640px; }
+.cx-mono.dv-desk .hero { grid-column: 10 / 13; grid-row: 3 / 6; align-self: start; }
+.cx-mono.dv-desk .current { display: none; }
+/* статус и «До победителя» — зеркально по обе стороны от оси */
+.cx-mono.dv-desk .status { grid-column: 4 / 7; grid-row: 5; justify-self: end; }
+.cx-mono.dv-desk .auto { grid-column: 7 / 10; grid-row: 5; justify-self: start; }
+.cx-mono.dv-desk .dock { grid-column: 4 / 10; grid-row: 7; justify-self: center; }
+
+.cx-mono .room-top { gap: 10px; font: 700 17px/24px Manrope; letter-spacing: -.02em; }
+.cx-mono .room-top .rlogo { width: 24px; height: 24px; stroke: none; fill: currentColor; }
+.cx-mono .room-top > svg:last-child { width: 14px; height: 14px; color: var(--tx3); }
+/* режимы — текстом, выбранный подчёркнут */
+.cx-mono .seg { gap: 32px; height: 56px; }
+.cx-mono .seg button { height: 56px; font: 600 15px/20px Manrope; color: var(--tx3); }
+.cx-mono .seg button.on { color: var(--ink); }
+.cx-mono .seg button.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: 12px; height: 2px; border-radius: 1px; background: var(--ink); }
+.cx-mono .auto { height: 28px; gap: 10px; font: 600 14px/20px Manrope; color: var(--tx2); }
+.cx-mono .tg { width: 36px; height: 22px; border-radius: 11px; background: var(--ink); }
+.cx-mono .tg::after { top: 2px; right: 2px; width: 18px; height: 18px; background: #000; box-shadow: none; }
+.cx-mono .avs .av { width: 30px; height: 30px; border: 2px solid #000; background: #2C2C2E; color: var(--ink); font-size: 11px; }
+.cx-mono .ng { height: 44px; padding: 3px; border-radius: 22px; box-shadow: inset 0 0 0 1px var(--hair); }
+.cx-mono .ng button { width: 36px; height: 36px; border-radius: 18px; color: var(--ink); }
+
+/* программа: крупные вкладки, тонкие линии, доля колеса — полоской под строкой */
+.cx-mono .side { gap: 0; }
+.cx-mono .tabs { gap: 20px; height: 32px; }
+.cx-mono .tabs .tab { justify-content: flex-start; font: 700 24px/32px Manrope; letter-spacing: -.035em; color: var(--tx3); }
+.cx-mono .tabs .tab i { font-style: normal; color: var(--tx3); }
+.cx-mono .tabs .tab.on { color: var(--ink); }
+.cx-mono .side-sub { display: block; margin-top: 4px; font: 500 15px/20px Manrope; color: var(--tx2); }
+.cx-mono .rate { order: 3; margin-top: 16px; gap: 10px; height: 40px; padding: 0 12px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--hair); }
+.cx-mono .rate .pst { display: none; }
+.cx-mono .rate .rt { flex: 1; min-width: 0; display: flex; gap: 8px; align-items: baseline; }
+.cx-mono .rate b { font: 600 14px/20px Manrope; white-space: nowrap; }
+.cx-mono .rate small { font: 500 13px/16px Manrope; color: var(--tx3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-mono .rate > svg { width: 14px; height: 14px; color: var(--tx3); }
+.cx-mono .add { order: 4; margin-top: 8px; gap: 8px; }
+.cx-mono .fld { height: 40px; padding: 0 12px; border-radius: 10px; background: var(--fill); font: 500 14px/20px Manrope; color: var(--tx3); }
+.cx-mono .fld svg { width: 16px; height: 16px; }
+.cx-mono .ib { width: 40px; height: 40px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--hair); color: var(--ink); }
+.cx-mono .votes { order: 5; gap: 10px; height: 40px; font: 600 13px/16px Manrope; color: var(--tx2); }
+.cx-mono .votes .m { margin-left: auto; font-weight: 500; color: var(--tx3); }
+.cx-mono .vd i { background: #3A3A3C; }
+.cx-mono .vd i.on { background: var(--ink); }
+/* список уходит на 12 px в поле, чтобы цветная метка строки под стрелкой не обрезалась; строки остаются на линии колонки */
+.cx-mono .list { order: 6; margin-left: -12px; padding-left: 12px; }
+.cx-mono .list > :first-child { box-shadow: inset 0 1px 0 var(--hair); }
+.cx-mono .np { order: 7; }
+.cx-mono .ghead { height: 40px; }
+.cx-mono .ghead > svg { display: none; }
+.cx-mono .ghead .av { width: 20px; height: 20px; background: #2C2C2E; color: var(--ink); font-size: 9px; }
+.cx-mono .ghead b { font: 600 13px/16px Manrope; color: var(--tx2); }
+.cx-mono .ghead b em { font-style: normal; font-weight: 500; color: var(--tx3); }
+.cx-mono .gc { font: 600 13px/16px Manrope; color: var(--tx3); }
+.cx-mono .gs { min-width: 44px; text-align: right; font: 600 13px/16px Manrope; color: var(--tx2); }
+.cx-mono .row { height: 44px; gap: 8px; box-shadow: inset 0 -1px 0 var(--hair); }
+.cx-mono .row .pst { display: none; }
+.cx-mono .row .rt b { font: 500 15px/20px Manrope; }
+.cx-mono .row .rt small { display: none; }
+.cx-mono .row .pc { min-width: 40px; text-align: right; font: 600 13px/16px Manrope; color: var(--tx2); }
+.cx-mono .row .ht { min-width: 28px; padding: 0 4px; color: var(--tx3); }
+.cx-mono .row .ht.on { color: var(--ink); }
+.cx-mono .row .shr { display: block; position: absolute; left: 0; bottom: 0; height: 2px; width: calc(var(--s) * 100%); background: var(--ink); opacity: .55; }
+.cx-mono .row.out { color: var(--tx3); }
+.cx-mono .row.out .pc { color: var(--tx3); }
+/* цвет — только у фильма под стрелкой: полоска цвета его постера */
+.cx-mono .row.hot::before { content: ""; position: absolute; left: -12px; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: hsl(var(--h) 70% 58%); box-shadow: 0 0 10px hsl(var(--h) 80% 55% / .7); }
+.cx-mono .row.hot .shr { background: hsl(var(--h) 70% 62%); opacity: 1; }
+.cx-mono .np { gap: 12px; height: 48px; margin-top: auto; box-shadow: inset 0 1px 0 var(--hair); }
+.cx-mono .np .art { width: 32px; height: 32px; border-radius: 8px; background: var(--fill); color: var(--ink); }
+.cx-mono .np .art svg { width: 16px; height: 16px; }
+.cx-mono .np .nt b { font: 600 14px/20px Manrope; }
+.cx-mono .np .nt small { font: 500 12px/16px Manrope; color: var(--tx3); }
+.cx-mono .np .nb button { width: 32px; height: 32px; border-radius: 16px; box-shadow: inset 0 0 0 1px var(--hair); }
+.cx-mono .np .nb svg { width: 14px; height: 14px; }
+
+/* карточка фильма под стрелкой — как характеристики на странице продукта */
+.cx-mono .h-poster { width: var(--c2); aspect-ratio: 2 / 3; border-radius: 12px; font-size: 28px; box-shadow: 0 0 0 1px var(--hair); }
+.cx-mono .h-title { margin-top: 24px; font: 700 28px/32px Manrope; letter-spacing: -.035em; text-wrap: balance; }
+.cx-mono .h-meta { margin-top: 4px; font: 500 15px/20px Manrope; color: var(--tx2); }
+.cx-mono .h-num, .cx-mono .h-by { display: none; }
+.cx-mono .h-specs { margin-top: 24px; box-shadow: inset 0 1px 0 var(--hair); }
+.cx-mono .h-specs > div { height: 40px; box-shadow: inset 0 -1px 0 var(--hair); font: 500 14px/20px Manrope; color: var(--tx2); }
+.cx-mono .h-specs b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.cx-mono .h-actions { margin-top: 24px; }
+.cx-mono .h-actions button { height: 36px; padding: 0 16px; border-radius: 18px; font: 600 14px/20px Manrope; box-shadow: inset 0 0 0 1px var(--hair); }
+.cx-mono .h-actions button.pri { background: var(--ink); color: #000; box-shadow: none; }
+.cx-mono .h-actions svg { width: 15px; height: 15px; }
+
+/* колесо: серое, с безелем как у часов; цвет — только сектор под стрелкой */
+.cx-mono .wheel .secs { filter: grayscale(1) brightness(.78) contrast(1.05); }
+.cx-mono .hub { background: var(--ink); color: #000; box-shadow: 0 0 0 6px #000, 0 0 0 7px rgba(255,255,255,.22); }
+.cx-mono .hub span { color: #6E6E73; }
+.cx-mono .pin { top: -10px; width: 12px; height: 64px; }
+.cx-mono .pin svg { display: none; }
+.cx-mono .wheel text { font-weight: 600; fill: #F5F5F7; }
+.cx-mono .pin::before { content: ""; position: absolute; left: 50%; top: 0; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--ink); }
+.cx-mono .pin::after { content: ""; position: absolute; left: 50%; top: 8px; width: 2px; height: 56px; margin-left: -1px; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 1px #000; }
+.cx-mono .st-txt { align-items: flex-end; color: var(--tx2); }
+.cx-mono .bar { background: #3A3A3C; }
+.cx-mono .bar i { background: var(--ink); }
+.cx-mono .st-act { display: none; }
+.cx-mono .dock { height: 48px; padding: 4px; border-radius: 24px; box-shadow: inset 0 0 0 1px var(--hair); }
+.cx-mono .dock .rx { filter: grayscale(1); }
+.cx-mono .dock .dsep { background: var(--hair); }
+.cx-mono .dock .chat { background: var(--fill); color: var(--tx3); }
+
+/* ---------- «Афиша», телефон ---------- */
+.cx-mono.dv-phone { grid-template-rows: 44px 8px 44px 16px 358px 16px 28px 24px auto 24px minmax(0, 1fr); }
+.cx-mono.dv-phone .room-top { grid-column: 1 / 3; grid-row: 1; }
+.cx-mono.dv-phone .room-top .rlogo { width: 22px; height: 22px; }
+.cx-mono.dv-phone .tools { grid-column: 3 / 5; grid-row: 1; justify-self: end; gap: 8px; }
+.cx-mono.dv-phone .avs .av { width: 28px; height: 28px; }
+.cx-mono.dv-phone .avs .av:nth-child(n+3):not(.more) { display: none; }
+.cx-mono.dv-phone .ng { height: 40px; }
+.cx-mono.dv-phone .ng button { width: 32px; height: 32px; border-radius: 16px; }
+.cx-mono.dv-phone .ng button:first-child { display: none; }
+.cx-mono.dv-phone .seg { grid-column: 1 / -1; grid-row: 3; justify-self: center; height: 44px; gap: 28px; }
+.cx-mono.dv-phone .seg button { height: 44px; }
+.cx-mono.dv-phone .seg button.on::after { bottom: 6px; }
+.cx-mono.dv-phone .wheel { grid-column: 1 / -1; grid-row: 5; width: 358px; }
+.cx-mono.dv-phone .hub b { font-size: 15px; line-height: 18px; }
+.cx-mono.dv-phone .hub span { display: none; }
+.cx-mono.dv-phone .pin { top: -8px; height: 40px; }
+.cx-mono.dv-phone .pin::after { height: 32px; }
+.cx-mono.dv-phone .status { grid-column: 1 / 3; grid-row: 7; justify-self: start; }
+.cx-mono.dv-phone .st-txt { align-items: flex-start; font-size: 13px; }
+.cx-mono.dv-phone .bar { width: 120px; }
+.cx-mono.dv-phone .auto { grid-column: 3 / 5; grid-row: 7; justify-self: end; font-size: 13px; }
+.cx-mono.dv-phone .hero { grid-column: 1 / -1; grid-row: 9; }
+.cx-mono.dv-phone .h-poster, .cx-mono.dv-phone .h-actions { display: none; }
+.cx-mono.dv-phone .h-title { margin-top: 0; }
+.cx-mono.dv-phone .h-specs { margin-top: 16px; }
+.cx-mono.dv-phone .h-specs > div:nth-child(n+3) { display: none; }
+.cx-mono.dv-phone .side { grid-column: 1 / -1; grid-row: 11; }
+.cx-mono.dv-phone .side > .rate, .cx-mono.dv-phone .side > .add, .cx-mono.dv-phone .side > .votes, .cx-mono.dv-phone .side > .np { display: none; }
+.cx-mono.dv-phone .tabs .tab { font-size: 20px; line-height: 28px; }
+.cx-mono.dv-phone .side-sub { margin-bottom: 8px; }
+.cx-mono.dv-phone .dock { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); background: #000; }
+.cx-mono.dv-phone .dock .rx { width: 36px; height: 36px; font-size: 18px; }
+.cx-mono.dv-phone .dock .dsep, .cx-mono.dv-phone .dock .chat { display: none; }
+.cx-mono.dv-phone .dock .chat-ib { display: grid; }
+
+/* ---------- «Афиша»: финал — цвет появляется только у двух финалистов ---------- */
+.cx-mono .finale { background: rgba(0,0,0,.94); }
+.cx-mono .fn-in { gap: 40px; }
+.cx-mono .fn-t { font: 700 160px/144px Manrope; letter-spacing: -.065em; color: var(--ink); }
+.cx-mono .fn-s { margin-top: 12px; font: 500 17px/24px Manrope; color: var(--tx2); }
+.cx-mono .fn-pair { gap: 24px; }
+.cx-mono .fn-pair .pst { border-radius: 12px; box-shadow: 0 0 0 1px var(--hair); }
+.cx-mono .fn-pair figcaption span { color: var(--tx3); }
+.cx-mono .fn-count { font: 200 96px/96px Manrope; letter-spacing: -.04em; color: var(--ink); }
+.cx-mono.dv-phone .fn-in { gap: 28px; }
+.cx-mono.dv-phone .fn-t { font-size: 88px; line-height: 80px; }
+.cx-mono.dv-phone .fn-s { font-size: 15px; line-height: 20px; }
+.cx-mono.dv-phone .fn-count { font-size: 64px; line-height: 64px; }
+
+/* ---------- «Афиша»: победитель — постер возвращает цвет ---------- */
+.cx-mono .win { background: #000; }
+.cx-mono.dv-desk .w-poster { grid-column: 3 / 6; border-radius: 16px; font-size: 44px; box-shadow: 0 0 0 1px var(--hair), 0 40px 100px hsl(var(--h) 70% 40% / .35); }
+.cx-mono.dv-desk .w-text { grid-column: 6 / 11; }
+.cx-mono .w-k { font: 600 15px/20px Manrope; color: var(--tx2); }
+.cx-mono .w-t { margin-top: 12px; font: 700 72px/72px Manrope; letter-spacing: -.055em; text-wrap: balance; }
+.cx-mono .w-m { margin-top: 12px; font: 500 17px/24px Manrope; color: var(--tx2); }
+.cx-mono .w-d { margin-top: 24px; padding-top: 24px; max-width: 560px; box-shadow: inset 0 1px 0 var(--hair); font: 500 17px/26px Manrope; color: var(--tx2); }
+.cx-mono .w-act { margin-top: 32px; }
+.cx-mono .w-act button { height: 44px; padding: 0 20px; border-radius: 22px; font: 600 15px/20px Manrope; box-shadow: inset 0 0 0 1px var(--hair); }
+.cx-mono .w-act button.pri { background: var(--ink); color: #000; box-shadow: none; }
+.cx-mono .w-facts { margin-top: 24px; font: 500 14px/20px Manrope; color: var(--tx3); }
+.cx-mono .w-facts b { color: var(--tx2); }
+.cx-mono .w-x { box-shadow: inset 0 0 0 1px var(--hair); color: var(--ink); }
+.cx-mono.dv-phone .w-poster { border-radius: 12px; font-size: 24px; box-shadow: 0 0 0 1px var(--hair), 0 30px 70px hsl(var(--h) 70% 40% / .4); }
+.cx-mono.dv-phone .w-t { font-size: 40px; line-height: 44px; }
+.cx-mono.dv-phone .w-m { font-size: 14px; line-height: 20px; margin-top: 8px; }
+.cx-mono.dv-phone .w-d, .cx-mono.dv-phone .w-facts { display: none; }
+.cx-mono.dv-phone .w-act { margin-top: 20px; gap: 8px; }
+.cx-mono.dv-phone .w-act button:last-child { display: none; }
+
+/* =====================================================================
+   Концепт 3. «Гостиная» — светлая, как приложение на iPad.
+   Слева боковая панель фильмов (колонки 1–3), справа крупный заголовок комнаты и колесо по оси x 897 (центр колонок 4–12).
+   Колесо — единственный яркий предмет: белый обод и мягкая тень, как у вещи на столе.
+   Ряды: 56 заголовок · 16 · 36 режимы · 12 · 32 фильм под стрелкой · 12 · 584 колесо · 16 · 28 статус · гибкий · 48 док.
+   ===================================================================== */
+.cx-light { --bg: #F2F2F7; --ink: #111114; --tx2: #6E6E73; --tx3: #A1A1A6; --sep: #E5E5EA; --fill: #EEEEF0; --acc: #6A55F5; --acc-t: #EEEBFF;
+  --sh: 0 1px 2px rgba(0,0,0,.04), 0 10px 30px rgba(0,0,0,.07); }
+.cx-light .bg { display: none; }
+
+.cx-light.dv-desk { grid-template-rows: 56px 16px 36px 12px 32px 12px 584px 16px 28px minmax(0, 1fr) 48px; }
+.cx-light.dv-desk .side { grid-column: 1 / 4; grid-row: 1 / -1; }
+.cx-light.dv-desk .room-top { grid-column: 4 / 9; grid-row: 1; }
+.cx-light.dv-desk .tools { grid-column: 9 / 13; grid-row: 1; justify-self: end; }
+.cx-light.dv-desk .seg { grid-column: 4 / 13; grid-row: 3; justify-self: center; }
+.cx-light.dv-desk .auto { grid-column: 10 / 13; grid-row: 3; justify-self: start; }
+.cx-light.dv-desk .current { grid-column: 4 / 13; grid-row: 5; justify-self: center; }
+.cx-light.dv-desk .hero { display: none; }
+.cx-light.dv-desk .wheel { grid-column: 4 / 13; grid-row: 7; justify-self: center; width: 584px; }
+.cx-light.dv-desk .status { grid-column: 4 / 13; grid-row: 9; justify-self: center; }
+.cx-light.dv-desk .dock { grid-column: 4 / 13; grid-row: 11; justify-self: center; }
+
+/* крупный заголовок комнаты, как в приложениях iOS */
+.cx-light .room-top { gap: 8px; font: 800 34px/40px 'Wix Madefor Display', sans-serif; letter-spacing: -.04em; }
+.cx-light .room-top .rlogo { display: none; }
+.cx-light .room-top > svg:last-child { width: 18px; height: 18px; margin-top: 4px; color: var(--tx3); stroke-width: 2.2; }
+.cx-light .avs .av { border: 2px solid var(--bg); }
+.cx-light .avs .more { background: #D1D1D6; color: var(--ink); }
+.cx-light .ng { height: 44px; padding: 4px; border-radius: 22px; background: #E5E5EA; }
+.cx-light .ng button { width: 36px; height: 36px; border-radius: 18px; color: var(--ink); }
+/* сегменты: серая дорожка, белый выбранный с тенью */
+.cx-light .seg { height: 36px; padding: 3px; border-radius: 12px; background: #E3E3E8; }
+.cx-light .seg button { width: 112px; height: 30px; border-radius: 9px; font: 600 14px/20px Manrope; color: var(--ink); }
+.cx-light .seg button.on { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04); }
+.cx-light .auto { height: 36px; gap: 10px; font: 600 14px/20px Manrope; color: var(--ink); }
+.cx-light .tg { width: 44px; height: 28px; background: var(--acc); }
+.cx-light .tg::after { background: #fff; }
+.cx-light .current .c-t { font: 800 24px/32px 'Wix Madefor Display', sans-serif; letter-spacing: -.035em; }
+.cx-light .c-pct { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 12px; background: var(--acc-t); color: var(--acc); font: 700 13px/16px Manrope; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* боковая панель: белая карточка 28, внутри 20 → 12 → 9 */
+.cx-light .side { gap: 8px; padding: 8px; border-radius: 28px; background: #fff; box-shadow: var(--sh); }
+/* на компьютере панель начинается с поиска, как на iPad; заголовок «Фильмы» — только на телефоне, где нет вкладок */
+.cx-light .side-head { height: 48px; padding: 0 12px; }
+.cx-light.dv-phone .side-head { display: flex; }
+.cx-light .sh-room { display: none; }
+.cx-light .sh-films { font: 800 24px/32px 'Wix Madefor Display', sans-serif; letter-spacing: -.035em; }
+.cx-light .sh-films i { font-style: normal; color: var(--tx3); }
+.cx-light .side-head > svg { display: none; }
+.cx-light .rate { gap: 10px; height: 52px; padding: 0 12px 0 8px; border-radius: 20px; background: var(--acc-t); }
+.cx-light .rate .pst { width: 26px; height: 38px; border-radius: 6px; }
+.cx-light .rate .rt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cx-light .rate b { font: 600 14px/20px Manrope; }
+.cx-light .rate small { font: 500 12px/16px Manrope; color: var(--tx2); }
+.cx-light .rate > svg { width: 14px; height: 14px; color: var(--acc); }
+.cx-light .tabs { order: -1; height: 36px; padding: 3px; border-radius: 12px; background: var(--fill); }
+.cx-light .add { order: -2; }
+.cx-light .side-head { order: -3; }
+.cx-light .wheel text { paint-order: stroke; stroke: rgba(17,17,20,.22); stroke-width: 3px; stroke-linejoin: round; }
+.cx-light .tabs .tab { flex: 1; height: 30px; border-radius: 9px; font: 600 13px/16px Manrope; color: var(--ink); }
+.cx-light .tabs .tab i { font-style: normal; color: var(--tx2); }
+.cx-light .tabs .tab.on { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.cx-light .add { gap: 8px; }
+.cx-light .fld { height: 36px; padding: 0 10px; border-radius: 10px; background: var(--fill); font: 500 15px/20px Manrope; color: var(--tx3); }
+.cx-light .fld svg { width: 16px; height: 16px; }
+.cx-light .ib { width: 36px; height: 36px; border-radius: 10px; background: var(--fill); color: var(--acc); }
+.cx-light .votes { gap: 10px; height: 28px; padding: 0 12px; font: 600 13px/16px Manrope; color: var(--tx2); }
+.cx-light .votes .m { margin-left: auto; font-weight: 500; color: var(--tx3); }
+.cx-light .vd i { background: #D1D1D6; }
+.cx-light .vd i.on { background: var(--acc); }
+.cx-light .ghead { height: 36px; padding: 0 12px; }
+.cx-light .ghead > svg { width: 12px; height: 12px; color: var(--tx3); }
+.cx-light .ghead .av { width: 20px; height: 20px; font-size: 9px; }
+.cx-light .ghead b { font: 600 13px/16px Manrope; color: var(--tx2); }
+.cx-light .ghead b em { font-style: normal; font-weight: 500; color: var(--tx3); }
+.cx-light .gc { font: 600 13px/16px Manrope; color: var(--tx3); }
+.cx-light .gs { min-width: 40px; text-align: right; font: 700 13px/16px Manrope; color: var(--acc); }
+.cx-light .row { height: 56px; padding: 0 4px 0 12px; border-radius: 14px; }
+.cx-light .row .pst { width: 30px; height: 44px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.cx-light .row .rt b { font: 600 15px/20px Manrope; }
+.cx-light .row .rt small { font: 500 13px/16px Manrope; color: var(--tx2); }
+.cx-light .row .pc { font: 700 13px/16px Manrope; color: var(--tx2); }
+.cx-light .row .ht { color: var(--tx3); }
+.cx-light .row .ht.on { color: var(--acc); }
+.cx-light .row.hot { background: var(--acc-t); }
+.cx-light .row.hot .rt b, .cx-light .row.hot .pc { color: var(--acc); }
+.cx-light .row.out { opacity: .4; }
+.cx-light .np { gap: 12px; height: 56px; padding: 8px; border-radius: 20px; background: #F5F5F7; }
+.cx-light .np .art { width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #FFB347, #E8432E 60%, #3A1C71); color: #fff; }
+.cx-light .np .art svg { width: 16px; height: 16px; }
+.cx-light .np .nt b { font: 600 14px/20px Manrope; }
+.cx-light .np .nt small { font: 500 12px/16px Manrope; color: var(--tx2); }
+.cx-light .np .nb button { width: 32px; height: 32px; border-radius: 16px; color: var(--acc); }
+
+/* колесо: белый обод, мягкая тень, кнопка в цвете акцента */
+.cx-light .wheel > svg { filter: drop-shadow(0 24px 40px rgba(17,17,20,.14)) drop-shadow(0 2px 6px rgba(17,17,20,.08)); }
+.cx-light .hub { background: var(--acc); color: #fff; box-shadow: 0 0 0 6px #fff, 0 10px 30px rgba(106,85,245,.4); }
+.cx-light .hub span { opacity: .72; }
+.cx-light .pin { top: -12px; width: 6.4%; filter: drop-shadow(0 4px 8px rgba(17,17,20,.25)); }
+.cx-light .pin svg { width: 100%; height: auto; display: block; fill: var(--acc); stroke: #fff; stroke-width: 3; }
+.cx-light .st-txt { color: var(--tx2); }
+.cx-light .bar { background: var(--sep); }
+.cx-light .bar i { background: var(--acc); }
+.cx-light .st-act { background: #E5E5EA; color: var(--ink); }
+.cx-light .dock { height: 48px; padding: 4px; border-radius: 24px; background: #fff; box-shadow: var(--sh); }
+.cx-light .dock .dsep { background: var(--sep); }
+.cx-light .dock .chat { background: var(--fill); color: var(--tx3); }
+.cx-light .dock .rx svg { color: var(--ink); }
+
+/* ---------- «Гостиная», телефон: как экран iOS — крупный заголовок, ниже колесо, фильмы группой ---------- */
+.cx-light.dv-phone { grid-template-rows: 44px 40px 16px 36px 12px 28px 12px 358px 16px 28px 24px minmax(0, 1fr); }
+.cx-light.dv-phone .tools { grid-column: 1 / -1; grid-row: 1; justify-self: end; gap: 8px; }
+.cx-light.dv-phone .avs .av { width: 28px; height: 28px; font-size: 10px; }
+.cx-light.dv-phone .avs .av:nth-child(n+3):not(.more) { display: none; }
+.cx-light.dv-phone .ng { height: 40px; }
+.cx-light.dv-phone .ng button { width: 32px; height: 32px; border-radius: 16px; }
+.cx-light.dv-phone .room-top { grid-column: 1 / -1; grid-row: 2; }
+.cx-light.dv-phone .seg { grid-column: 1 / -1; grid-row: 4; justify-self: stretch; }
+.cx-light.dv-phone .seg button { flex: 1; width: auto; }
+.cx-light.dv-phone .auto { grid-column: 3 / 5; grid-row: 10; justify-self: end; height: 28px; font-size: 13px; gap: 8px; }
+.cx-light.dv-phone .tg { width: 36px; height: 22px; }
+.cx-light.dv-phone .tg::after { top: 2px; right: 2px; width: 18px; height: 18px; }
+.cx-light.dv-phone .current { grid-column: 1 / -1; grid-row: 6; justify-self: center; }
+.cx-light.dv-phone .current .c-t { font-size: 20px; line-height: 28px; }
+.cx-light.dv-phone .hero { display: none; }
+.cx-light.dv-phone .wheel { grid-column: 1 / -1; grid-row: 8; width: 358px; }
+.cx-light.dv-phone .hub b { font-size: 15px; line-height: 18px; }
+.cx-light.dv-phone .hub span { display: none; }
+.cx-light.dv-phone .hub { box-shadow: 0 0 0 4px #fff, 0 8px 20px rgba(106,85,245,.4); }
+.cx-light.dv-phone .pin { top: -8px; }
+.cx-light.dv-phone .status { grid-column: 1 / 3; grid-row: 10; justify-self: start; }
+.cx-light.dv-phone .st-txt { align-items: flex-start; font-size: 13px; }
+.cx-light.dv-phone .bar { width: 120px; }
+.cx-light.dv-phone .st-act { display: none; }
+.cx-light.dv-phone .side { grid-column: 1 / -1; grid-row: 12; border-radius: 20px; padding: 6px; }
+.cx-light.dv-phone .side > :not(.side-head):not(.list) { display: none; }
+.cx-light.dv-phone .side-head { height: 40px; }
+.cx-light.dv-phone .sh-films { font-size: 20px; line-height: 24px; }
+.cx-light.dv-phone .dock { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); }
+.cx-light.dv-phone .dock .rx { width: 36px; height: 36px; font-size: 18px; }
+.cx-light.dv-phone .dock .dsep, .cx-light.dv-phone .dock .chat { display: none; }
+.cx-light.dv-phone .dock .chat-ib { display: grid; }
+
+/* ---------- «Гостиная»: финал ---------- */
+.cx-light .finale { background: rgba(242,242,247,.86); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); }
+.cx-light .fn-in { gap: 40px; }
+.cx-light .fn-t { font: 800 120px/112px 'Wix Madefor Display', sans-serif; letter-spacing: -.055em; padding-bottom: 8px; color: var(--ink); }
+.cx-light .fn-s { margin-top: 8px; font: 500 17px/24px Manrope; color: var(--tx2); }
+.cx-light .fn-pair .pst { border-radius: 18px; box-shadow: 0 30px 60px rgba(17,17,20,.22), 0 2px 6px rgba(17,17,20,.1); }
+.cx-light .fn-pair figcaption span { color: var(--tx2); }
+.cx-light .fn-count { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 36px; background: var(--acc); color: #fff; font: 800 36px/1 Manrope; letter-spacing: -.04em; box-shadow: 0 12px 30px rgba(106,85,245,.4); }
+.cx-light.dv-phone .fn-in { gap: 28px; }
+.cx-light.dv-phone .fn-t { font-size: 72px; line-height: 72px; }
+.cx-light.dv-phone .fn-s { font-size: 15px; line-height: 20px; }
+
+/* ---------- «Гостиная»: победитель — белая карточка поверх затемнённой комнаты ---------- */
+.cx-light .win { background: rgba(17,17,20,.22); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.cx-light .w-card { display: block; grid-row: 2; background: #fff; border-radius: 28px; box-shadow: 0 40px 100px rgba(17,17,20,.25); }
+.cx-light.dv-desk .w-card { grid-column: 3 / 11; margin: -32px -24px; }
+.cx-light.dv-desk .w-poster { grid-column: 3 / 5; border-radius: 18px; font-size: 28px; box-shadow: 0 20px 40px rgba(17,17,20,.2); position: relative; }
+.cx-light.dv-desk .w-text { grid-column: 5 / 11; position: relative; }
+.cx-light .w-k { font: 700 15px/20px Manrope; color: var(--acc); }
+.cx-light .w-t { margin-top: 4px; font: 800 44px/48px 'Wix Madefor Display', sans-serif; letter-spacing: -.045em; text-wrap: balance; }
+.cx-light .w-m { margin-top: 8px; font: 500 15px/20px Manrope; color: var(--tx2); }
+.cx-light .w-d { margin-top: 16px; font: 500 15px/22px Manrope; color: var(--tx2); }
+.cx-light .w-act { margin-top: 24px; gap: 8px; }
+.cx-light .w-act button { height: 44px; padding: 0 18px; border-radius: 14px; font: 700 15px/20px Manrope; background: var(--fill); color: var(--ink); }
+.cx-light .w-act button.pri { background: var(--acc); color: #fff; }
+.cx-light .w-facts { margin-top: 20px; font: 500 13px/16px Manrope; color: var(--tx2); }
+.cx-light .w-facts b { color: var(--ink); }
+.cx-light .w-x { background: var(--fill); color: var(--tx2); }
+.cx-light.dv-desk .w-x { top: auto; right: auto; position: relative; grid-column: 10 / 11; grid-row: 2; justify-self: end; align-self: start; margin-top: -16px; }
+.cx-light.dv-phone .w-card { grid-column: 1 / -1; grid-row: 2 / 4; margin: -24px -4px; }
+.cx-light.dv-phone .w-poster { border-radius: 14px; font-size: 22px; box-shadow: 0 16px 30px rgba(17,17,20,.2); position: relative; }
+.cx-light.dv-phone .w-text { position: relative; }
+.cx-light.dv-phone .w-t { font-size: 32px; line-height: 36px; }
+.cx-light.dv-phone .w-d, .cx-light.dv-phone .w-facts { display: none; }
+.cx-light.dv-phone .w-act button:last-child { display: none; }
+</style>
+</head>
+<body>
+<header class="shell-top">
+  <div class="shell-title">Три концепта комнаты<span>Одна сетка и одно содержимое, разный характер. Клавиши: 0 все рядом, 1–3 концепт, G сетка.</span></div>
+  <div class="sw" id="swView"><button data-v="all">Все рядом<kbd>0</kbd></button><button data-v="tv">Сеанс<kbd>1</kbd></button><button data-v="mono">Афиша<kbd>2</kbd></button><button data-v="light">Гостиная<kbd>3</kbd></button></div>
+  <div class="sw" id="swState"><button data-s="room">Комната</button><button data-s="final">Финал</button><button data-s="win">Победитель</button></div>
+  <div class="sw" id="swDev"><button data-d="desk">Компьютер</button><button data-d="phone">Телефон</button></div>
+  <div class="sw" id="swGrid"><button data-g="1">Сетка<kbd>G</kbd></button></div>
+</header>
+<main class="stagearea" id="stage"></main>
+<section class="legend">
+  <div><b>Сетка</b>Компьютер 1440×900: 12 колонок по 94 px, интервал 24, поля 24, модуль 8. Шапка занимает ряд 56 px, контент идёт от 88 до 876 px. Телефон 390×844: 4 колонки, интервалы и поля 16. Каждый блок начинается и кончается на линии колонки.</div>
+  <div><b>Шрифты</b>Названия: Wix Madefor Display 800, интерфейс: Manrope. Шкала 12/16, 13/16, 14/20, 15/20, 17/24, 20/24, 24/32, 28/32, 34/40, 44/48, крупные цифры 64 и 96. Цифры везде моноширинные, чтобы проценты не прыгали.</div>
+  <div><b>Скругления и высоты</b>Концентрично: панель 28, внутри с отступом 8 элементы 20, капсулы кнопок 18–22, мелкие поля 10. Высоты контролов 48, 44, 40, 36, 32, 28: одна высота на одном ряду.</div>
+  <div><b>Содержимое</b>Одно на все концепты: 52 фильма от шести человек, серия на выбывании идёт, осталось 37, под стрелкой «Начало». В финале «Интерстеллар» и «Паразиты». Года настоящие, постеры заменены цветными заглушками: на сайте будут настоящие.</div>
+</section>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const hueOf = s => { let h = 0; for (const ch of s) h = (h * 31 + ch.codePointAt(0)) % 360; return h; };
+// как в app.js: меньше 10% — с одним знаком после запятой
+const pct = x => (x * 100).toFixed(x < 0.1 ? 1 : 0).replace('.', ',');
+
+const I = {
+  chevD: '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
+  chevR: '<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>',
+  list: '<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>',
+  heart: '<svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10.3A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3Z"/></svg>',
+  spark: '<svg viewBox="0 0 24 24"><path d="M10 3.5l1.9 5 5 1.9-5 1.9-1.9 5-1.9-5-5-1.9 5-1.9z"/><path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></svg>',
+  link: '<svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
+  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>',
+  next: '<svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg>',
+  play: '<svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor" stroke="none"/></svg>',
+  music: '<svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+  tv: '<svg viewBox="0 0 24 24"><path d="M3.5 5.5h17v11h-17zM8.5 20.5h7"/><path d="M11 9.5v3.5l3-1.75z" fill="currentColor"/></svg>',
+  chat: '<svg viewBox="0 0 24 24"><path d="M5 4.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H10l-5 4v-4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  crow: '<svg viewBox="0 0 24 24"><path d="M2.5 13.5c2.2-.9 4.4-.8 6.3.3l1.6-3.8c.9-2.1 3.5-3.4 5.8-2.6l2 .7 2.8-.4-2.4 1.6c.1 3.2-1.4 6.3-4.4 7.9l.9 3.6h-1.7l-1-3-2.7.8.9 2.2H8.9L8 17.9c-2.6-.2-4.6-2-5.5-4.4z"/></svg>',
+  logo: '<svg class="rlogo" viewBox="0 0 32 32"><circle cx="16" cy="17" r="13.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M16 17L16.00 7.00A10 10 0 0 1 23.07 9.93Z"/><path d="M16 17L26.00 17.00A10 10 0 0 1 23.07 24.07Z"/><path d="M16 17L16.00 27.00A10 10 0 0 1 8.93 24.07Z"/><path d="M16 17L6.00 17.00A10 10 0 0 1 8.93 9.93Z"/><circle cx="16" cy="17" r="3.4"/><path d="M16 9.5 13.6 3.8a2.7 2.7 0 1 1 4.8 0Z"/></svg>',
+  pinTear: '<svg viewBox="0 0 40 52"><path d="M20 50 3 14A18 18 0 1 1 37 14Z"/></svg>',
+};
+
+// ---------- содержимое: одно на все концепты ----------
+const PEOPLE = [
+  { n: 'Никита', h: 258 }, { n: 'Маша', h: 330 }, { n: 'Артём', h: 205 },
+  { n: 'Лёша', h: 145 }, { n: 'Даша', h: 28 }, { n: 'Кирилл', h: 0 },
+];
+// [название, год, кто добавил, выбыл в этой серии, голосов «хочу», мой голос]
+const RAW = [
+  ['Интерстеллар', 2014, 0, 0, 2], ['Начало', 2010, 0], ['Престиж', 2006, 0], ['Бегущий по лезвию 2049', 2017, 0], ['Прибытие', 2016, 0], ['Марсианин', 2015, 0], ['Гравитация', 2013, 0], ['Матрица', 1999, 0], ['Терминатор 2', 1991, 0, 1], ['Назад в будущее', 1985, 0], ['Чужой', 1979, 0, 1], ['Сияние', 1980, 0, 1], ['Олдбой', 2003, 0], ['Достучаться до небес', 1997, 0],
+  ['Паразиты', 2019, 1, 0, 3, 1], ['Ла-Ла Ленд', 2016, 1], ['Отель «Гранд Будапешт»', 2014, 1], ['Амели', 2001, 1], ['Её', 2013, 1, 1], ['Чёрный лебедь', 2010, 1], ['Субмарина', 2010, 1], ['Одержимость', 2014, 1], ['Достать ножи', 2019, 1], ['Жизнь Пи', 2012, 1, 1],
+  ['Брат', 1997, 2, 0, 2, 1], ['Большой куш', 2000, 2], ['Револьвер', 2005, 2, 1], ['Бойцовский клуб', 1999, 2], ['Отступники', 2006, 2], ['Джанго освобождённый', 2012, 2], ['Однажды в Голливуде', 2019, 2], ['Гладиатор', 2000, 2, 1],
+  ['Остров проклятых', 2010, 3, 0, 1], ['Джокер', 2019, 3], ['Ford против Ferrari', 2019, 3], ['Мальчишник в Вегасе', 2009, 3, 1], ['Иллюзия обмана', 2013, 3], ['Пираты Карибского моря', 2003, 3], ['Король Лев', 1994, 3, 1], ['Шрек', 2001, 3, 1], ['Нечто', 1982, 3],
+  ['Унесённые призраками', 2001, 4, 0, 2], ['Ходячий замок', 2004, 4], ['ВАЛЛ-И', 2008, 4, 1], ['Тайна Коко', 2017, 4], ['Зелёная книга', 2018, 4], ['Помни', 2000, 4, 1],
+  ['Реквием по мечте', 2000, 5], ['Пианист', 2002, 5, 1], ['Форрест Гамп', 1994, 5, 1], ['Зелёная миля', 1999, 5, 0, 1], ['Леон', 1994, 5, 1],
+];
+const film = t => { const h = hueOf(t); return { t, h, h2: (h + 48) % 360 }; };
+const FILMS = RAW.map(([t, y, p, out = 0, v = 0, mine = 0]) => ({ ...film(t), y, p, out: Boolean(out), v, mine: Boolean(mine) }));
+const ACTIVE = FILMS.filter(f => !f.out);
+// шансы — тот же расчёт, что в app.js: колесо поровну между людьми, доля человека делится между его фильмами, голос +4 пункта
+const actOf = p => ACTIVE.filter(f => f.p === p).length;
+const GROUPS = PEOPLE.filter((_, i) => actOf(i) > 0).length;
+const W = new Map(ACTIVE.map(f => [f, 100 / GROUPS / actOf(f.p) + 4 * Math.min(4, f.v)]));
+const WSUM = [...W.values()].reduce((a, b) => a + b, 0);
+const winP = f => (W.get(f) || 0) / WSUM;
+const INV = new Map(ACTIVE.map(f => [f, 1 / W.get(f)]));
+const ISUM = [...INV.values()].reduce((a, b) => a + b, 0);
+const outP = f => (INV.get(f) || 0) / ISUM; // шанс вылететь: обратен шансу победить
+const MAXWIN = Math.max(...ACTIVE.map(winP));
+const byT = t => FILMS.find(f => f.t === t);
+const HOT = byT('Начало'), FA = byT('Интерстеллар'), FB = byT('Паразиты');
+const DUNE = film('Дюна');
+const LEFT = ACTIVE.length, TOTAL = FILMS.length, OUTN = TOTAL - LEFT;
+
+const pst = (f, cls = '', big = false) => `<span class="pst ${cls}" style="--h:${f.h};--h2:${f.h2}">${big ? `<small>${f.y || ''}</small><b>${esc(f.t)}</b>` : ''}</span>`;
+const av = p => `<span class="av" style="--h:${PEOPLE[p].h}">${PEOPLE[p].n[0]}</span>`;
+const amb = f => `radial-gradient(55% 70% at 74% 42%, hsl(${f.h} 62% 44% / .95), transparent 70%), radial-gradient(50% 60% at 30% 88%, hsl(${f.h2} 64% 28% / .9), transparent 70%), radial-gradient(36% 40% at 44% 18%, hsl(${f.h} 70% 62% / .35), transparent 70%), #07060C`;
+
+// ---------- панель фильмов ----------
+function sideHTML() {
+  const order = [0, 1, 3, 2, 4, 5]; // как в app.js: сначала ваши, потом по числу фильмов
+  const row = f => `<div class="row${f === HOT ? ' hot' : ''}${f.out ? ' out' : ''}" style="--h:${f.h}">${pst(f)}<span class="rt"><b>${esc(f.t)}</b><small>${f.out ? 'выбыл' : f.y}</small></span><span class="pc">${f.out ? '—' : pct(winP(f)) + '%'}</span><span class="ht${f.mine ? ' on' : ''}">${I.heart}${f.v ? `<em>${f.v}</em>` : ''}</span>${f.out ? '' : `<i class="shr" style="--s:${(winP(f) / MAXWIN).toFixed(3)}"></i>`}</div>`;
+  const groups = order.map(p => {
+    const fs = FILMS.filter(f => f.p === p);
+    const on = fs.filter(f => !f.out), off = fs.filter(f => f.out);
+    const share = on.reduce((a, f) => a + winP(f), 0);
+    return `<div class="grp"><div class="ghead">${I.chevD}${av(p)}<b>${PEOPLE[p].n}${p === 0 ? ' <em>(вы)</em>' : ''}</b><span class="gc">${on.length} из ${fs.length}</span><span class="gs">${pct(share)}%</span></div>${[...on, ...off].map(row).join('')}</div>`;
+  }).join('');
+  return `<aside class="side">
+    <div class="side-head"><b class="sh-room">Пятница</b><b class="sh-films">Фильмы <i>${TOTAL}</i></b>${I.chevD}</div>
+    <div class="peek-head"><i class="grab"></i><div class="ph"><b>Фильмы</b><span>${LEFT} на колесе из ${TOTAL}</span><span class="ib">${I.search}</span></div></div>
+    <div class="rate">${pst(DUNE)}<span class="rt"><b>«Дюна»</b><small>ваша 9, средняя 8,6</small></span>${I.chevD}</div>
+    <div class="tabs"><span class="tab on">Фильмы <i>${TOTAL}</i></span><span class="tab">Выпадало <i>7</i></span></div>
+    <div class="side-sub">${LEFT} на колесе из ${TOTAL}</div>
+    <div class="add"><span class="fld">${I.search}Добавить фильм</span><span class="ib">${I.list}</span></div>
+    <div class="votes">Ваши голоса<span class="vd"><i class="on"></i><i></i><i></i></span><span class="m">осталось 1</span></div>
+    <div class="list">${groups}</div>
+    <div class="np"><span class="art">${I.music}</span><span class="nt"><b>Звезда по имени Солнце</b><small>Кино, включил Артём</small></span><span class="nb"><button>${I.pause}</button><button>${I.next}</button></span></div>
+  </aside>`;
+}
+
+// ---------- колесо: SVG, сектор = шанс вылететь, под стрелкой «Начало» ----------
+function wheelSVG(c, dv) {
+  const uid = `${c}-${dv}`;
+  const size = dv === 'phone' ? 358 : c === 'light' ? 584 : 640;
+  const k = size / 1000;
+  const R = 476, HUB = 119;
+  const segs = [];
+  let acc = 0;
+  for (const f of ACTIVE) { const a0 = acc * 360; acc += outP(f); segs.push({ f, a0, a1: acc * 360 }); }
+  const hot = segs.find(s => s.f === HOT);
+  const rot = -(hot.a0 + hot.a1) / 2; // середина сектора под стрелкой — вверху
+  const P = (deg, r) => { const a = deg * Math.PI / 180; return [(r * Math.sin(a)).toFixed(2), (-r * Math.cos(a)).toFixed(2)]; };
+  const sector = (a0, a1, r) => { const [x0, y0] = P(a0, r), [x1, y1] = P(a1, r); return `M0 0L${x0} ${y0}A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}Z`; };
+  const arcLine = (a0, a1, r) => { const [x0, y0] = P(a0, r), [x1, y1] = P(a1, r); return `M${x0} ${y0}A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`; };
+  const grad = (s, i) => {
+    const { h, h2 } = s.f, d = i % 2 ? 3 : -2;
+    const stops = c === 'light'
+      ? `<stop offset=".2" stop-color="hsl(${h2} 50% ${40 + d}%)"/><stop offset="1" stop-color="hsl(${h} 62% ${57 + d}%)"/>`
+      : `<stop offset=".22" stop-color="hsl(${h2} 45% ${10 + d}%)"/><stop offset=".72" stop-color="hsl(${h} 48% ${30 + d}%)"/><stop offset="1" stop-color="hsl(${h} 55% ${42 + d}%)"/>`;
+    return `<radialGradient id="${uid}g${i}" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="${R}">${stops}</radialGradient>`;
+  };
+  const sepColor = c === 'light' ? '#fff' : c === 'mono' ? 'rgba(255,255,255,.14)' : 'rgba(0,0,0,.42)';
+  const sepW = c === 'light' ? 3 : c === 'mono' ? 1.5 : 2;
+  const fills = segs.map((s, i) => `<path d="${sector(s.a0, s.a1, R)}" fill="url(#${uid}g${i})"/>`).join('');
+  const seps = segs.map(s => { const [x, y] = P(s.a0, R); return `<path d="M0 0L${x} ${y}" stroke="${sepColor}" stroke-width="${sepW}"/>`; }).join('');
+  const hi = segs.indexOf(hot);
+  const hotMark = c === 'tv'
+    ? `<path d="${sector(hot.a0, hot.a1, R)}" fill="rgba(255,255,255,.1)"/><path d="${arcLine(hot.a0, hot.a1, R - 6)}" stroke="#B8ADFF" stroke-width="14" opacity=".55" filter="url(#${uid}soft)"/><path d="${arcLine(hot.a0, hot.a1, R - 6)}" stroke="#B8ADFF" stroke-width="7"/>`
+    : c === 'mono'
+      ? `<path d="${arcLine(hot.a0, hot.a1, R - 2)}" stroke="#F5F5F7" stroke-width="3"/>`
+      : `<path d="${arcLine(hot.a0, hot.a1, R - 5)}" stroke="#6A55F5" stroke-width="9"/>`;
+  // подписи: как в wheel.js — на узких секторах не рисуем, а читаемые разворачиваем к зрителю
+  const labels = segs.map(s => {
+    const span = (s.a1 - s.a0) * Math.PI / 180;
+    const fs = Math.min(R * 0.072, span * R * 0.62 * 0.62);
+    if (fs * k < 10.5) return '';
+    const mid = (s.a0 + s.a1) / 2;
+    const screen = ((mid + rot) % 360 + 360) % 360;
+    const flip = screen > 180;
+    const maxW = R * 0.93 - HUB * 1.3, cw = fs * 0.56;
+    let t = s.f.t;
+    if (t.length * cw > maxW) t = t.slice(0, Math.max(1, Math.floor(maxW / cw) - 1)).trimEnd() + '…';
+    return `<text transform="rotate(${(mid - 90).toFixed(2)})${flip ? ' rotate(180)' : ''}" x="${flip ? -R * 0.93 : R * 0.93}" text-anchor="${flip ? 'start' : 'end'}" dominant-baseline="central" font-size="${fs.toFixed(1)}">${esc(t)}</text>`;
+  }).join('');
+  let under = '', over = '';
+  if (c === 'tv') {
+    under = `<circle r="490" stroke="#7C6BFF" stroke-width="28" opacity=".5" filter="url(#${uid}blur)"/>`;
+    over = `<circle r="482" stroke="#07060C" stroke-width="14"/><circle r="491" stroke="url(#${uid}rim)" stroke-width="5"/>`;
+  } else if (c === 'mono') {
+    // безель как у часов: 120 делений, каждое десятое длиннее
+    const ticks = Array.from({ length: 120 }, (_, i) => {
+      const major = i % 10 === 0, [x0, y0] = P(i * 3, major ? 481 : 485), [x1, y1] = P(i * 3, major ? 497 : 494);
+      return `<path d="M${x0} ${y0}L${x1} ${y1}" stroke="${major ? '#F5F5F7' : 'rgba(255,255,255,.32)'}" stroke-width="${major ? 3 : 1.6}"/>`;
+    }).join('');
+    over = `<circle r="488" stroke="#0B0B0C" stroke-width="24"/>${ticks}<circle r="476.5" stroke="rgba(255,255,255,.28)" stroke-width="1"/><circle r="499.5" stroke="rgba(255,255,255,.12)" stroke-width="1"/>`;
+  } else {
+    over = `<circle r="488" stroke="#fff" stroke-width="24"/><circle r="476.5" stroke="rgba(17,17,20,.08)" stroke-width="1"/>`;
+  }
+  const defs = `<defs>${segs.map(grad).join('')}
+    <filter id="${uid}blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="${uid}soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="${uid}gray"><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncR type="linear" slope=".82"/><feFuncG type="linear" slope=".82"/><feFuncB type="linear" slope=".82"/></feComponentTransfer></filter>
+    <linearGradient id="${uid}rim" gradientUnits="userSpaceOnUse" x1="0" y1="-500" x2="0" y2="500"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#B8ADFF"/></linearGradient></defs>`;
+  return `<svg viewBox="-500 -500 1000 1000">${defs}${under}
+    <g transform="rotate(${rot.toFixed(3)})"${c === 'mono' ? ` filter="url(#${uid}gray)"` : ''}>${fills}${seps}</g>
+    <g transform="rotate(${rot.toFixed(3)})"><path d="${sector(hot.a0, hot.a1, R)}" fill="url(#${uid}g${hi})"/>${hotMark}</g>
+    ${over}
+    <g transform="rotate(${rot.toFixed(3)})">${labels}</g>
+  </svg>`;
+}
+
+// ---------- комната: одна разметка, вид задаёт концепт ----------
+function roomHTML(c, dv) {
+  const cols = dv === 'phone' ? 4 : 12;
+  const gridLabel = dv === 'phone' ? '4 колонки по 77,5 px, интервал 16, поля 16, модуль 8' : '12 колонок по 94 px, интервал 24, поля 24, модуль 8';
+  return `
+  <div class="bg" style="--amb:${amb(HOT)}"><i class="amb"></i><i class="scrim"></i></div>
+  ${sideHTML()}
+  <div class="room-top">${I.logo}<span>Пятница</span>${I.chevD}</div>
+  <div class="seg"><button>Обычный</button><button class="on">Выбывание</button><button>Дуэль</button></div>
+  <div class="auto">До победителя<span class="tg"></span></div>
+  <div class="tools"><span class="avs">${[0, 1, 2, 3].map(av).join('')}<span class="av more"><span class="md">+2</span><span class="mp">+4</span></span></span><span class="ng"><button title="Развлечения">${I.spark}</button><button title="Пригласить">${I.link}</button><button title="Настройки">${I.gear}</button></span></div>
+  <section class="hero">
+    ${pst(HOT, 'h-poster', true)}
+    <h2 class="h-title">${esc(HOT.t)}</h2>
+    <p class="h-meta">2010, 2 ч 28 мин, фантастика, боевик</p>
+    <div class="h-num"><b>${pct(outP(HOT))}<small>%</small></b><span>шанс вылететь следующим</span><em>шанс победить ${pct(winP(HOT))}%</em></div>
+    <div class="h-by">${av(HOT.p)}<span>Добавил <b>${PEOPLE[HOT.p].n}</b>, голосов нет</span></div>
+    <div class="h-specs"><div><span>Шанс победить</span><b>${pct(winP(HOT))}%</b></div><div><span>Шанс вылететь</span><b>${pct(outP(HOT))}%</b></div><div><span>Голоса</span><b>нет</b></div><div><span>Добавил</span><b>${PEOPLE[HOT.p].n}</b></div></div>
+    <div class="h-actions"><button class="pri">${I.tv}Смотреть</button><button>${I.play}Трейлер</button></div>
+  </section>
+  <div class="current"><b class="c-t">${esc(HOT.t)}</b><span class="c-m">${HOT.y}, шанс вылететь ${pct(outP(HOT))}%</span><span class="c-pct">вылетит с шансом ${pct(outP(HOT))}%</span></div>
+  <div class="wheel">${wheelSVG(c, dv)}<button class="hub"><b>Дальше</b><span>${LEFT} фильмов</span></button><span class="pin">${I.pinTear}</span></div>
+  <div class="status"><span class="st-txt">Осталось ${LEFT} из ${TOTAL}<i class="bar"><i style="width:${(OUTN / (TOTAL - 1) * 100).toFixed(1)}%"></i></i></span><button class="st-act">Вернуть выбывших</button></div>
+  <div class="dock">${['👏', '🔥', '😂', '😍', '😮', '💀', '🎉'].map(e => `<button class="rx">${e}</button>`).join('')}<button class="rx">${I.crow}</button><span class="dsep"></span><span class="chat">Написать всем…</span><button class="rx chat-ib">${I.chat}</button></div>
+  <div class="finale grid" style="--fa:${FA.h};--fb:${FB.h}"><div class="fn-in">
+    <h2 class="fn-h"><span class="fn-t">Финал</span><span class="fn-s">Колесо выбьет один из двух</span></h2>
+    <div class="fn-pair">${[FA, FB].map(f => `<figure style="--h:${f.h}">${pst(f, '', true)}<figcaption><b>${esc(f.t)}</b><span>${PEOPLE[f.p].n}</span></figcaption></figure>`).join('')}</div>
+    <b class="fn-count">3</b>
+  </div></div>
+  <div class="win grid" style="--h:${FA.h};--wamb:${amb(FA)}">
+    <i class="w-amb"></i><i class="w-card"></i>
+    ${pst(FA, 'w-poster', true)}
+    <div class="w-text">
+      <span class="w-k">Сегодня смотрим</span>
+      <h2 class="w-t">${esc(FA.t)}</h2>
+      <p class="w-m">2014, 2 ч 49 мин, фантастика, драма</p>
+      <p class="w-d">Земля задыхается от пыльных бурь, и бывший пилот ведёт экспедицию через червоточину, чтобы найти людям новый дом.</p>
+      <div class="w-act"><button class="pri">${I.play}Смотреть</button><button>Трейлер</button><button>Включить всем</button></div>
+      <div class="w-facts"><span>Добавил <b>Никита</b></span><span>Хотели посмотреть <b>Маша и Лёша</b></span><span>Остался последним из <b>${TOTAL}</b></span></div>
+    </div>
+    <button class="w-x">${I.x}</button>
+  </div>
+  <div class="gridlines grid">${'<i></i>'.repeat(cols)}<b>${gridLabel}</b></div>`;
+}
+
+// ---------- оболочка: все рядом или один концепт, состояние, устройство, сетка ----------
+const NAMES = {
+  tv: ['«Сеанс»', 'Колесо в кинозале: фон из размытого постера фильма под стрелкой, поверх стеклянные панели. Текст держит левую ось по колонке 4, колесо со статусом и реакциями свою.'],
+  mono: ['«Афиша»', 'Чёрно-белая программа сеанса, симметрично вокруг центра экрана. Цвет есть только у фильма под стрелкой и у победителя, вместо подложек тонкие линии.'],
+  light: ['«Гостиная»', 'Светлая, как приложение на iPad: боковая панель, крупный заголовок, сегменты. Колесо с белым ободом единственный яркий предмет на экране.'],
+};
+const S = { v: 'all', s: 'room', d: 'desk', g: false };
+try { Object.assign(S, JSON.parse(localStorage.getItem('rc_state') || '{}')); } catch {}
+function render() {
+  const list = S.v === 'all' ? ['tv', 'mono', 'light'] : [S.v];
+  const st = $('#stage');
+  st.className = 'stagearea' + (S.v === 'all' ? ' all' : '');
+  st.innerHTML = list.map(c => `<div class="fcol" data-c="${c}"><div class="fw"><div class="frame cx-${c} dv-${S.d} st-${S.s}${S.g ? ' show-grid' : ''}">${roomHTML(c, S.d)}</div></div><div class="cap"><b>${NAMES[c][0]}</b><span>${NAMES[c][1]}</span></div></div>`).join('');
+  $$('#swView button').forEach(b => b.classList.toggle('on', b.dataset.v === S.v));
+  $$('#swState button').forEach(b => b.classList.toggle('on', b.dataset.s === S.s));
+  $$('#swDev button').forEach(b => b.classList.toggle('on', b.dataset.d === S.d));
+  $('#swGrid button').classList.toggle('on', S.g);
+  try { localStorage.setItem('rc_state', JSON.stringify(S)); } catch {}
+  fit();
+}
+function fit() {
+  const Wf = S.d === 'desk' ? 1440 : 390, Hf = S.d === 'desk' ? 900 : 844;
+  const n = S.v === 'all' ? 3 : 1;
+  const availW = (document.documentElement.clientWidth - 48 - (n - 1) * 24) / n;
+  const availH = innerHeight - $('.shell-top').offsetHeight - 24 - 72;
+  const k = Math.min(1, availW / Wf, n === 1 ? availH / Hf : Infinity);
+  for (const col of $$('.fcol')) {
+    col.style.width = `${Wf * k}px`;
+    const fw = col.querySelector('.fw');
+    fw.style.width = `${Wf * k}px`;
+    fw.style.height = `${Hf * k}px`;
+    fw.querySelector('.frame').style.transform = `scale(${k})`;
+  }
+}
+$('#swView').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) { S.v = b.dataset.v; render(); } });
+$('#swState').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (b) { S.s = b.dataset.s; render(); } });
+$('#swDev').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (b) { S.d = b.dataset.d; render(); } });
+$('#swGrid').addEventListener('click', () => { S.g = !S.g; render(); });
+$('#stage').addEventListener('click', e => { const col = e.target.closest('.fcol'); if (col && S.v === 'all' && e.target.closest('.fw')) { S.v = col.dataset.c; render(); scrollTo(0, 0); } });
+addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const map = { 0: 'all', 1: 'tv', 2: 'mono', 3: 'light' };
+  if (map[e.key]) { S.v = map[e.key]; render(); }
+  else if (e.key === 'g' || e.key === 'G' || e.key === 'п' || e.key === 'П') { S.g = !S.g; render(); }
+});
+addEventListener('resize', fit);
+document.fonts?.ready.then(fit);
+render();
+</script>
+</body>
+</html>

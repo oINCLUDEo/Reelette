@@ -139,12 +139,6 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') $$('.modal.open').forEach(m => { if (m.id !== 'nameModal' && !m.hasAttribute('data-fixed')) closeModal(m); });
 });
 
-// Высота шапки комнаты в CSS-переменной: от неё считается высота колонок.
-if (window.ResizeObserver) {
-  const roomNav = document.querySelector('#room .nav');
-  if (roomNav) new ResizeObserver(() => { if (roomNav.offsetHeight) document.documentElement.style.setProperty('--nav-h', roomNav.offsetHeight + 'px'); }).observe(roomNav);
-}
-
 // Индикатор в переключателях подстраивается под ширину выбранной кнопки.
 function placeSeg(seg) {
   const on = seg.querySelector('button.on');
@@ -308,10 +302,47 @@ function initRoom(roomId) {
     hubButton: true,
     onTick: tick,
     onCurrent: it => {
-      if (!outShown) setCurrent(it ? it.title : ' ');
+      if (!outShown) { setCurrent(it ? it.title : ' '); updateNow(it); }
       $$('.film').forEach(el => el.classList.toggle('hot', el.dataset.id === it?.id));
+      // фон перекрашивается под фильм у стрелки, когда колесо уже медленное: на быстром ходу смена мельтешила бы
+      if (!wheel.anim || wheel.speed < 1.2) setAmbient(it);
     },
   });
+
+  // ---- «под стрелкой»: год, длительность, жанры, шанс и кто добавил ----
+  let winShare = new Map(); // шанс победить по id, считается в renderNow
+  const fmtPct = x => (x * 100).toFixed(x < 0.1 ? 1 : 0).replace('.', ',');
+  function updateNow(it) {
+    const f = it && state ? state.films.find(x => x.id === it.id) : null;
+    if (!f) { setHTML($('#nowBy'), ''); $('#nowMeta').textContent = ''; $('#nowPct').textContent = ''; $('#nowLabel').textContent = ''; $('#nowWin').textContent = ''; return; }
+    $('#nowMeta').textContent = [f.year, f.runtime && fmtRuntime(f.runtime), (f.genres || []).slice(0, 2).join(', ')].filter(Boolean).join(', ');
+    // сектор под стрелкой: на выбывании это шанс вылететь, в обычном режиме — шанс выпасть
+    const total = wheel.items.reduce((a, i) => a + i.target, 0);
+    if (it.target > 0 && total) {
+      $('#nowPct').innerHTML = `${fmtPct(it.target / total)}<small>%</small>`;
+      $('#nowLabel').textContent = elimView() ? 'шанс вылететь следующим' : 'шанс выпасть';
+      $('#nowWin').textContent = elimView() && winShare.has(f.id) ? `шанс победить ${fmtPct(winShare.get(f.id))}%` : '';
+    }
+    const pid = personOf(f), name = f.addedBy || 'Без имени', nv = (f.votes || []).length;
+    const ava = people.find(p => p.pid === pid)?.avatar;
+    setHTML($('#nowBy'), `<span class="ava${frameCls(pid)}" style="background:hsl(${hue(name)} 55% 42%);${frameVars(pid)}">${ava ? `<img src="${esc(ava)}" alt="">` : initial(name)}</span><span>Добавил(а) <button class="person" data-person="${esc(pid)}" data-name="${esc(name)}">${esc(name)}</button>${nv ? `, ${nv} ${plural(nv, 'голос', 'голоса', 'голосов')}` : ''}</span>`);
+  }
+
+  // ---- фон комнаты: размытый постер фильма под стрелкой, два слоя сменяют друг друга плавно ----
+  let ambId = null, ambAt = 0, ambTimer = null;
+  function setAmbient(it) {
+    if (!it || it.id === ambId) return;
+    clearTimeout(ambTimer);
+    ambTimer = setTimeout(() => {
+      ambId = it.id; ambAt = performance.now();
+      const [a, b] = $$('#roomBg .amb');
+      const next = a.classList.contains('on') ? b : a, cur = next === a ? b : a;
+      next.style.backgroundImage = it.poster ? `url("${it.poster}")` : '';
+      next.style.setProperty('--h', hue(it.title || ''));
+      next.classList.add('on');
+      cur.classList.remove('on');
+    }, Math.max(60, 500 - (performance.now() - ambAt)));
+  }
 
   // заголовок над колесом: фильм под стрелкой, а сразу после выбывания — зачёркнутое название
   let outShown = false, outTimer = null;
@@ -331,6 +362,7 @@ function initRoom(roomId) {
     outShown = false;
     const it = wheel.items[wheel.currentIndex()];
     setCurrent(it ? it.title : ' ');
+    updateNow(it);
   }
 
   // короткий сигнал отсчёта, на старте выше
@@ -362,8 +394,10 @@ function initRoom(roomId) {
   function showFinale(spin) {
     const byId = new Map(state.films.map(f => [f.id, f]));
     const pair = spin.snapshot.map(s => byId.get(s.id)).filter(Boolean);
-    setHTML($('#finalePair'), pair.map(f => `<figure><span class="finale-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</span><figcaption>${esc(f.title)}</figcaption></figure>`).join(''));
+    setHTML($('#finalePair'), pair.map(f => `<figure style="--h:${hue(f.title)}"><span class="fn-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</span><figcaption><b>${esc(f.title)}</b><span>${esc(f.addedBy || '')}</span></figcaption></figure>`).join(''));
     const el = $('#finale');
+    // фон заставки — свечение цветов двух финалистов
+    pair.forEach((f, i) => el.style.setProperty(i ? '--fb' : '--fa', hue(f.title)));
     clearTimeout(el._t);
     el.hidden = false;
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
@@ -599,6 +633,7 @@ function initRoom(roomId) {
       }
       // после финала фокус держится до окна победителя
       setTimeout(() => { if (!spinningSid) setStage(null); }, spin.stage === 'final' ? 1700 : 0);
+      setAmbient(wheel.items[wheel.currentIndex()]);
       render();
     });
     render();
@@ -658,6 +693,8 @@ function initRoom(roomId) {
   function showWin(f, kind, left, title) {
     const card = $('#winModal .win-card');
     card.classList.toggle('out', kind === 'out');
+    // победитель — на весь экран, как страница фильма; выбывший — небольшой карточкой
+    $('#winModal').classList.toggle('full', kind === 'win');
     $('#winDetail').dataset.id = f.id;
     const label = title || (kind === 'out' ? `Выбывает${left > 1 ? `, осталось ${left}` : ''}` : 'Сегодня смотрим');
     $('#winDetail').innerHTML = `
@@ -777,12 +814,14 @@ function initRoom(roomId) {
   let seenFilms = null;
   function renderNow() {
     if (!state) return;
-    $('#roomTitle').textContent = state.name;
+    $('#roomTitle').textContent = $('#roomTitleM').textContent = state.name;
     syncProvider();
     const spinning = Boolean(spinningSid || state.spin);
     const active = activeFilms();
     const W = chanceWeights(active);
     const total = active.reduce((s, f) => s + W.get(f.id), 0);
+    winShare = new Map(active.map(f => [f.id, total ? W.get(f.id) / total : 0]));
+    $('#peekSub').textContent = active.length === state.films.length ? `${state.films.length} ${plural(state.films.length, 'фильм', 'фильма', 'фильмов')}` : `${active.length} на колесе из ${state.films.length}`;
     const amOwner = Boolean(state.owner) && state.owner === myPid();
     const out = new Set(state.eliminated);
     const watched = watchedIds();
@@ -895,6 +934,8 @@ function initRoom(roomId) {
     const empty = !spinning && !duel && active.length === 0;
     $('#wheelEmpty').hidden = !empty;
     $('#spinBtn').hidden = empty;
+    $('#now').hidden = empty;
+    if (!outShown) updateNow(wheel.items[wheel.currentIndex()]);
     if (empty) $('#wheelEmptyText').textContent = state.films.length ? 'Все фильмы уже выпали или не подходят под фильтры' : 'Колесо пустое';
     $('#hubSub').textContent = counting || spinning ? '' : locked ? 'крутит создатель' : active.length < 2 ? 'нужно 2 фильма' : `${active.length} ${plural(active.length, 'фильм', 'фильма', 'фильмов')}`;
 
@@ -1025,6 +1066,7 @@ function initRoom(roomId) {
     $('#ytPanel').hidden = !ytChanging && !playerHere;
     $('#ytPanel').classList.toggle('open', ytChanging);
     $('#ytPanel').classList.toggle('docked', !ytChanging && playerHere);
+    placeYtPanel();
     $('#ytPlayer').hidden = !playerHere;
     renderQueue();
     $('#musicBtn').hidden = Boolean(m);
@@ -1640,6 +1682,19 @@ function initRoom(roomId) {
   $('#ytNext').addEventListener('click', () => api(`/rooms/${roomId}/music/next`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
   $('#ytToggle').addEventListener('click', () => api(`/rooms/${roomId}/music/toggle`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
   $('#ytStop').addEventListener('click', () => confirm('Выключить музыку у всех и очистить очередь?') && api(`/rooms/${roomId}/music/stop`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true)));
+  // панель музыки открывается у строки «сейчас играет»: над ней, если сверху хватает места, иначе под ней
+  function placeYtPanel() {
+    const p = $('#ytPanel');
+    if (!p.classList.contains('open')) { p.style.left = p.style.top = p.style.bottom = p.style.width = ''; return; }
+    const r = $('#navMusic').getBoundingClientRect();
+    const w = Math.min(380, innerWidth - 16);
+    const above = r.top > 340;
+    p.style.width = `${w}px`;
+    p.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, r.left))}px`;
+    p.style.top = above ? 'auto' : `${r.bottom + 8}px`;
+    p.style.bottom = above ? `${innerHeight - r.top + 8}px` : 'auto';
+  }
+  addEventListener('resize', placeYtPanel);
   const openMusicForm = () => { ytChanging = !ytChanging; syncMusic(); if (ytChanging) setTimeout(() => $('#ytUrl').focus(), 30); };
   $('#ytChange').addEventListener('click', openMusicForm);
   $('#ytThumb').addEventListener('click', openMusicForm);
@@ -2183,8 +2238,18 @@ function initRoom(roomId) {
       if (!e.target.closest(m) || e.target.closest('#funMenu button')) setMenu($(b), $(m), false);
     }
   });
+  // телефон: фильмы — шторкой снизу, в свёрнутом виде видны заголовок и музыка
+  const sheetMode = () => getComputedStyle($('#peekHead')).display !== 'none';
+  function setSheet(open) {
+    $('#filmsPanel').classList.toggle('open', open);
+    $('#peekHead').setAttribute('aria-expanded', String(open));
+    $('#sheetScrim').hidden = !open;
+  }
+  $('#peekHead').addEventListener('click', () => setSheet(!$('#filmsPanel').classList.contains('open')));
+  $('#sheetScrim').addEventListener('click', () => setSheet(false));
   $('#wheelAddBtn').addEventListener('click', () => {
     setLp('films');
+    if (sheetMode()) setSheet(true);
     $('#quickSearch').scrollIntoView({ block: 'center', behavior: 'smooth' });
     $('#quickSearch').focus({ preventScroll: true });
   });
@@ -2513,6 +2578,7 @@ function initRoom(roomId) {
     catch { toast('Не получилось загрузить список изменений', true); }
   });
   $('#roomTitle').addEventListener('click', openSettings);
+  $('#roomTitleM').addEventListener('click', openSettings);
   $('#pals').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) applyPalette(b.dataset.p); });
   $('#saveSettings').addEventListener('click', async () => {
     const body = { name: $('#setName').value };

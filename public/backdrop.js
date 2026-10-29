@@ -20,8 +20,9 @@
 
   function init(cv) {
     const ctx = cv.getContext('2d');
-    const anchor = cv.closest('.sheet')?.querySelector('.wheel-box');
-    const s = { cv, ctx, anchor, dust: [], waves: [], kick: 0, w: 0, h: 0, dpr: 1, boost: 0, vis: true };
+    const anchor = cv.closest('.sheet, .stage')?.querySelector('.wheel-box');
+    // data-clear: холст прозрачный и лежит поверх фона из постера (комната), иначе заливает свой фон (главная)
+    const s = { cv, ctx, anchor, clear: cv.hasAttribute('data-clear'), dust: [], waves: [], kick: 0, w: 0, h: 0, dpr: 1, boost: 0, vis: true };
     const resize = () => {
       s.dpr = Math.min(1.5, devicePixelRatio || 1);
       s.w = cv.clientWidth; s.h = cv.clientHeight;
@@ -70,7 +71,8 @@
     const k = (1 + 0.06 * Math.sin(t * 0.9)) * (1 + b * 0.7) * (1 + fx.level * 1.1);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, w, h);
+    if (s.clear) ctx.clearRect(0, 0, w, h);
+    else { ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, w, h); }
 
     // широкое свечение
     let g = ctx.createRadialGradient(cx, cy, r0 * 0.5, cx, cy, r0 * 2.6);

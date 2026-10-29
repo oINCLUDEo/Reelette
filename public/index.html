@@ -55,60 +55,9 @@
 </div>
 
 <!-- ===== Комната ===== -->
+<!-- «Сеанс»: фон — размытый постер фильма под стрелкой; поверх стеклянная панель фильмов (колонки 1–3) и сцена (4–12). -->
 <div id="room" hidden>
-  <header class="nav"><div class="bar">
-    <a class="brand" href="/" aria-label="Reelette, на главную"><svg aria-hidden="true"><use href="#logo"/></svg><span class="brand-name">Reelette</span></a>
-    <button id="roomTitle" class="room-title" title="Настройки комнаты"></button>
-    <div class="nav-music" id="navMusic">
-      <button class="ghost sm icon" id="ytReplay" hidden aria-label="Сыграть ещё раз"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
-      <button class="ghost sm music-btn" id="musicBtn" aria-label="Общая музыка" title="Общая музыка из YouTube, её слышат все в комнате"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Музыка</span></button>
-      <div class="yt-card" id="ytCard" hidden>
-        <button class="yt-unmute nav-unmute" id="ytUnmute" type="button" hidden title="Браузер ждёт клика, чтобы включить звук">Слушать</button>
-        <button class="yt-thumb" id="ytThumb" type="button" title="Плеер, очередь и добавить трек" aria-label="Показать плеер и очередь"></button>
-        <div class="yt-info"><b id="ytTitle"></b><span id="ytBy"></span></div>
-        <div class="yt-ctrl">
-          <button class="nav-icon" id="ytToggle"></button>
-          <button class="nav-icon" id="ytNext" title="Следующий трек у всех" aria-label="Следующий трек у всех"><svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg></button>
-          <button class="nav-icon q-btn" id="ytChange" title="Очередь и добавить трек" aria-label="Очередь и добавить трек"><svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h8"/><path d="M19 15v6M16 18h6"/></svg><i id="ytQCount" hidden></i></button>
-        </div>
-        <input type="range" id="ytVol" min="0" max="100" value="50" title="Громкость у вас" aria-label="Громкость общей музыки у вас">
-      </div>
-    </div>
-    <div class="nav-karaoke" id="navKaraoke" hidden>
-      <span class="eq" id="kEq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
-      <div class="nk-who">
-        <span class="nk-label" id="kLabel">Сейчас поёт</span>
-        <b id="kSinger"></b>
-      </div>
-      <span class="nk-song" id="kSong"></span>
-      <div class="k-upnext" id="kUpNext"></div>
-      <span class="eq right" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
-    </div>
-    <div class="act">
-      <div id="people" class="people"></div>
-      <div class="menu-wrap people-wrap">
-        <button class="ghost sm people-count" id="peopleBtn" aria-haspopup="true" aria-expanded="false" aria-controls="peopleMenu" title="Кто в комнате"><span class="pc-num"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg><b id="peopleNum">0</b></span></button>
-        <div class="pop-menu people-menu" id="peopleMenu" aria-label="Кто в комнате" hidden></div>
-      </div>
-      <div class="menu-wrap">
-        <button class="ghost sm fun-btn" id="funBtn" aria-haspopup="true" aria-expanded="false" aria-controls="funMenu" title="Ворона, «Угадай мелодию», караоке и броски"><svg viewBox="0 0 24 24"><path d="M10 3.5l1.9 5 5 1.9-5 1.9-1.9 5-1.9-5-5-1.9 5-1.9z"/><path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></svg><span>Развлечения</span><i class="fun-dot" aria-hidden="true"></i></button>
-        <div class="pop-menu fun-menu" id="funMenu" role="menu" aria-label="Развлечения" hidden>
-          <button class="menu-item" id="crowBtn" role="menuitem" title="Включить ворону у всех"><svg viewBox="0 0 24 24"><path d="M2.5 13.5c2.2-.9 4.4-.8 6.3.3l1.6-3.8c.9-2.1 3.5-3.4 5.8-2.6l2 .7 2.8-.4-2.4 1.6c.1 3.2-1.4 6.3-4.4 7.9l.9 3.6h-1.7l-1-3-2.7.8.9 2.2H8.9L8 17.9c-2.6-.2-4.6-2-5.5-4.4z" fill="currentColor" stroke="none"/></svg><span>Ворона<small>трек у всех в комнате</small></span></button>
-          <button class="menu-item" id="quizBtn" role="menuitem" title="Угадываем треки, которые играли в комнате"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v8"/><circle cx="6" cy="18" r="3"/><path d="M15.5 15.2a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.3M18 21.5v.01"/></svg><span>Угадай мелодию<small>треки, что играли в комнате</small></span></button>
-          <button class="menu-item" id="karaokeBtn" role="menuitem" title="Большой плеер, очередь певцов, тексты и оценки"><svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0"/><path d="M12 17v4M8.5 21h7"/></svg><span>Караоке<small>сцена для всей комнаты</small></span></button>
-          <div class="menu-sep"></div>
-          <div class="menu-label">Бросить в сцену</div>
-          <div class="throw-row" id="throwRow">
-            <button data-throw="tomato" role="menuitem" aria-label="Бросить помидор" title="Помидор">🍅</button><button data-throw="egg" role="menuitem" aria-label="Бросить яйцо" title="Яйцо">🥚</button><button data-throw="pie" role="menuitem" aria-label="Бросить торт" title="Торт">🥧</button><button data-throw="rose" role="menuitem" aria-label="Бросить розу" title="Роза">🌹</button>
-          </div>
-        </div>
-      </div>
-      <div class="nav-group">
-        <button id="inviteBtn" class="nav-btn" aria-label="Пригласить: скопировать ссылку на комнату" title="Пригласить: скопировать ссылку на комнату"><svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
-        <button id="settingsBtn" class="nav-btn" title="Настройки" aria-label="Настройки комнаты"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
-      </div>
-    </div>
-  </div></header>
+  <div class="room-bg" id="roomBg" aria-hidden="true"><i class="amb on"></i><i class="amb"></i><i class="scrim"></i></div>
 
   <div class="yt-panel" id="ytPanel" hidden>
     <div class="yt-player" id="ytPlayer">
@@ -123,6 +72,7 @@
           <button type="button" class="nav-icon" id="ytStop" title="Выключить у всех" aria-label="Выключить у всех"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
         </div>
       </div>
+      <label class="yt-vol" title="Громкость у вас"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg><input type="range" id="ytVol" min="0" max="100" value="50" aria-label="Громкость общей музыки у вас"></label>
       <input id="ytUrl" placeholder="Ссылка на трек на YouTube" autocomplete="off">
       <div class="yt-add-row">
         <button class="btn btn-primary" type="submit" data-mode="queue" id="ytQueueBtn">В очередь</button>
@@ -133,13 +83,18 @@
   </div>
 
   <div class="layout">
-    <aside class="sheet b films-panel">
+    <aside class="films-panel" id="filmsPanel">
+      <button class="peek-head" id="peekHead" type="button" aria-expanded="false" aria-controls="filmsPanel"><i class="grab" aria-hidden="true"></i><span class="ph"><b>Фильмы</b><span id="peekSub"></span><svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></span></button>
+      <div class="side-head">
+        <a class="brand" href="/" aria-label="Reelette, на главную"><svg aria-hidden="true"><use href="#logo"/></svg></a>
+        <button id="roomTitle" class="room-title" title="Настройки комнаты"></button>
+      </div>
       <div class="rate-box" id="rateBox" hidden></div>
       <div class="panel-head">
         <div class="tabs lp-tabs" id="lpTabs" role="tablist">
           <span class="tabs-ind"></span>
           <button class="on" data-lp="films" role="tab" aria-selected="true">Фильмы <span class="m" id="filmCount"></span></button>
-          <button data-lp="history" role="tab" aria-selected="false">Уже выпадало <span class="m" id="histCount"></span></button>
+          <button data-lp="history" role="tab" aria-selected="false">Выпадало <span class="m" id="histCount"></span></button>
         </div>
       </div>
       <div class="lp-pane" data-lpp="films">
@@ -159,29 +114,74 @@
       <div class="lp-pane" data-lpp="history" hidden>
         <div id="historyList" class="history-list"></div>
       </div>
+      <div class="np" id="navMusic">
+        <button class="np-empty" id="musicBtn" type="button" title="Общая музыка из YouTube, её слышат все в комнате"><span class="art"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span><span class="nt"><b>Музыка</b><small>Включите трек для всей комнаты</small></span></button>
+        <button class="nav-icon np-replay" id="ytReplay" type="button" hidden aria-label="Сыграть ещё раз"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
+        <div class="yt-card" id="ytCard" hidden>
+          <button class="yt-thumb" id="ytThumb" type="button" title="Очередь, громкость и добавить трек" aria-label="Открыть музыку: очередь и громкость"></button>
+          <div class="yt-info"><b id="ytTitle"></b><span id="ytBy"></span></div>
+          <button class="yt-unmute nav-unmute" id="ytUnmute" type="button" hidden title="Браузер ждёт клика, чтобы включить звук">Слушать</button>
+          <div class="yt-ctrl">
+            <button class="nav-icon" id="ytToggle"></button>
+            <button class="nav-icon" id="ytNext" title="Следующий трек у всех" aria-label="Следующий трек у всех"><svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg></button>
+            <button class="nav-icon q-btn" id="ytChange" title="Очередь и добавить трек" aria-label="Очередь и добавить трек"><svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h8"/><path d="M19 15v6M16 18h6"/></svg><i id="ytQCount" hidden></i></button>
+          </div>
+        </div>
+      </div>
     </aside>
 
-    <section class="sheet stage grainy">
-      <canvas class="backdrop" aria-hidden="true"></canvas>
-      <span class="shade"></span>
+    <section class="stage" id="stage">
+      <canvas class="backdrop" data-clear aria-hidden="true"></canvas>
       <div class="react-layer" id="reactLayer" aria-hidden="true"></div>
       <div class="throw-layer" id="throwLayer" hidden></div>
-      <div class="react-bar" id="reactBar" aria-label="Реакции">
-        <button data-rx="clap" title="Аплодисменты">👏</button><button data-rx="fire" title="Огонь">🔥</button><button data-rx="laugh" title="Смешно">😂</button><button data-rx="love" title="Люблю">😍</button><button data-rx="wow" title="Вау">😮</button><button data-rx="skull" title="Это конец">💀</button><button data-rx="party" title="Праздник">🎉</button><button data-rx="crow" class="rx-crow" title="Ворона: КАР!"><svg viewBox="0 0 24 24"><path d="M2.5 13.5c2.2-.9 4.4-.8 6.3.3l1.6-3.8c.9-2.1 3.5-3.4 5.8-2.6l2 .7 2.8-.4-2.4 1.6c.1 3.2-1.4 6.3-4.4 7.9l.9 3.6h-1.7l-1-3-2.7.8.9 2.2H8.9L8 17.9c-2.6-.2-4.6-2-5.5-4.4z" fill="currentColor" stroke="none"/></svg></button>
-        <button type="button" class="armed-chip" id="armedChip" hidden></button>
-
-        <form class="chat-form" id="chatForm"><input id="chatInput" maxlength="200" placeholder="Написать всем…" autocomplete="off"></form>
+      <div class="m-top">
+        <a class="brand" href="/" aria-label="Reelette, на главную"><svg aria-hidden="true"><use href="#logo"/></svg></a>
+        <button id="roomTitleM" class="room-title" title="Настройки комнаты"></button>
+      </div>
+      <div class="stage-top" id="stageTop">
+        <div class="seg glass" id="modeSeg" role="group" aria-label="Режим">
+          <span class="seg-ind"></span>
+          <button data-mode="normal" title="Один прокрут выбирает один фильм. Шанс фильма равен его доле в колесе.">Обычный</button>
+          <button data-mode="elimination" title="Каждый прокрут выбивает один фильм, последний побеждает. Шанс победить тот же, что в обычном режиме, а колесо показывает шанс вылететь: у фаворитов сектор уже.">Выбывание</button>
+          <button data-mode="duel" title="Фильмы выходят парами, все голосуют, проигравший вылетает. При ничьей решает жребий с учётом веса.">Дуэль</button>
+        </div>
+        <label class="check glass auto-check" id="autoWrap" title="Прокруты идут подряд без остановок, пока не останется один фильм"><input type="checkbox" role="switch" id="autoSpin"><span class="box"></span><span class="check-text">До победителя</span></label>
+      </div>
+    <div class="nav-karaoke" id="navKaraoke" hidden>
+      <span class="eq" id="kEq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      <div class="nk-who">
+        <span class="nk-label" id="kLabel">Сейчас поёт</span>
+        <b id="kSinger"></b>
+      </div>
+      <span class="nk-song" id="kSong"></span>
+      <div class="k-upnext" id="kUpNext"></div>
+      <span class="eq right" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    </div>
+      <div class="tools">
+        <div id="people" class="people"></div>
+        <div class="menu-wrap people-wrap">
+          <button class="ghost sm people-count glass" id="peopleBtn" aria-haspopup="true" aria-expanded="false" aria-controls="peopleMenu" title="Кто в комнате"><span class="pc-num"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg><b id="peopleNum">0</b></span></button>
+          <div class="pop-menu people-menu" id="peopleMenu" aria-label="Кто в комнате" hidden></div>
+        </div>
+        <div class="nav-group glass">
+          <div class="menu-wrap">
+            <button class="nav-btn fun-btn" id="funBtn" aria-haspopup="true" aria-expanded="false" aria-controls="funMenu" aria-label="Развлечения" title="Развлечения: ворона, «Угадай мелодию», караоке и броски"><svg viewBox="0 0 24 24"><path d="M10 3.5l1.9 5 5 1.9-5 1.9-1.9 5-1.9-5-5-1.9 5-1.9z"/><path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></svg><i class="fun-dot" aria-hidden="true"></i></button>
+        <div class="pop-menu fun-menu" id="funMenu" role="menu" aria-label="Развлечения" hidden>
+          <button class="menu-item" id="crowBtn" role="menuitem" title="Включить ворону у всех"><svg viewBox="0 0 24 24"><path d="M2.5 13.5c2.2-.9 4.4-.8 6.3.3l1.6-3.8c.9-2.1 3.5-3.4 5.8-2.6l2 .7 2.8-.4-2.4 1.6c.1 3.2-1.4 6.3-4.4 7.9l.9 3.6h-1.7l-1-3-2.7.8.9 2.2H8.9L8 17.9c-2.6-.2-4.6-2-5.5-4.4z" fill="currentColor" stroke="none"/></svg><span>Ворона<small>трек у всех в комнате</small></span></button>
+          <button class="menu-item" id="quizBtn" role="menuitem" title="Угадываем треки, которые играли в комнате"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v8"/><circle cx="6" cy="18" r="3"/><path d="M15.5 15.2a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.3M18 21.5v.01"/></svg><span>Угадай мелодию<small>треки, что играли в комнате</small></span></button>
+          <button class="menu-item" id="karaokeBtn" role="menuitem" title="Большой плеер, очередь певцов, тексты и оценки"><svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0"/><path d="M12 17v4M8.5 21h7"/></svg><span>Караоке<small>сцена для всей комнаты</small></span></button>
+          <div class="menu-sep"></div>
+          <div class="menu-label">Бросить в сцену</div>
+          <div class="throw-row" id="throwRow">
+            <button data-throw="tomato" role="menuitem" aria-label="Бросить помидор" title="Помидор">🍅</button><button data-throw="egg" role="menuitem" aria-label="Бросить яйцо" title="Яйцо">🥚</button><button data-throw="pie" role="menuitem" aria-label="Бросить торт" title="Торт">🥧</button><button data-throw="rose" role="menuitem" aria-label="Бросить розу" title="Роза">🌹</button>
+          </div>
+        </div>
+          </div>
+          <button id="inviteBtn" class="nav-btn" aria-label="Пригласить: скопировать ссылку на комнату" title="Пригласить: скопировать ссылку на комнату"><svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+          <button id="settingsBtn" class="nav-btn" title="Настройки" aria-label="Настройки комнаты"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
+        </div>
       </div>
       <div class="stage-in">
-        <div class="stage-top" id="stageTop">
-          <div class="seg glass" id="modeSeg" role="group" aria-label="Режим">
-            <span class="seg-ind"></span>
-            <button data-mode="normal" title="Один прокрут выбирает один фильм. Шанс фильма равен его доле в колесе.">Обычный</button>
-            <button data-mode="elimination" title="Каждый прокрут выбивает один фильм, последний побеждает. Шанс победить тот же, что в обычном режиме, а колесо показывает шанс вылететь: у фаворитов сектор уже.">Выбывание</button>
-            <button data-mode="duel" title="Фильмы выходят парами, все голосуют, проигравший вылетает. При ничьей решает жребий с учётом веса.">Дуэль</button>
-          </div>
-          <label class="check glass auto-check" id="autoWrap" title="Прокруты идут подряд без остановок, пока не останется один фильм"><input type="checkbox" role="switch" id="autoSpin"><span class="box"></span><span class="check-text">До победителя</span></label>
-        </div>
         <div class="quiz" id="quizBox" hidden>
           <div class="qz-top">
             <div class="qz-round"><span>Раунд</span><b id="qzRound"></b></div>
@@ -269,7 +269,13 @@
             </div>
           </div>
         </div>
-        <div class="current" id="current" aria-live="off"><span id="currentTitle">&nbsp;</span></div>
+        <!-- фильм под стрелкой: на прокруте меняется вместе с ней -->
+        <section class="now" id="now">
+          <h2 class="current" id="current"><span id="currentTitle">&nbsp;</span></h2>
+          <p class="now-meta" id="nowMeta"></p>
+          <div class="now-num"><b id="nowPct"></b><span id="nowLabel"></span><em id="nowWin"></em></div>
+          <div class="now-by" id="nowBy"></div>
+        </section>
         <div class="wheel-area">
         <div class="wheel-box" id="wheelBox">
           <canvas id="wheel"></canvas>
@@ -295,13 +301,22 @@
           </div>
         </div>
       </div>
-      <div class="finale" id="finale" hidden aria-live="polite">
-        <h2 class="finale-h"><span class="finale-t">Финал</span><span class="m">Колесо выбьет один из двух</span></h2>
-        <div class="finale-pair" id="finalePair"></div>
-        <b class="finale-count" id="finaleCount"></b>
+      <div class="react-bar" id="reactBar" aria-label="Реакции">
+        <button data-rx="clap" title="Аплодисменты">👏</button><button data-rx="fire" title="Огонь">🔥</button><button data-rx="laugh" title="Смешно">😂</button><button data-rx="love" title="Люблю">😍</button><button data-rx="wow" title="Вау">😮</button><button data-rx="skull" title="Это конец">💀</button><button data-rx="party" title="Праздник">🎉</button><button data-rx="crow" class="rx-crow" title="Ворона: КАР!"><svg viewBox="0 0 24 24"><path d="M2.5 13.5c2.2-.9 4.4-.8 6.3.3l1.6-3.8c.9-2.1 3.5-3.4 5.8-2.6l2 .7 2.8-.4-2.4 1.6c.1 3.2-1.4 6.3-4.4 7.9l.9 3.6h-1.7l-1-3-2.7.8.9 2.2H8.9L8 17.9c-2.6-.2-4.6-2-5.5-4.4z" fill="currentColor" stroke="none"/></svg></button>
+        <button type="button" class="armed-chip" id="armedChip" hidden></button>
+
+        <form class="chat-form" id="chatForm"><input id="chatInput" maxlength="200" placeholder="Написать всем…" autocomplete="off"></form>
       </div>
     </section>
+  </div>
 
+  <button class="sheet-scrim" id="sheetScrim" type="button" hidden aria-label="Свернуть список фильмов"></button>
+  <div class="finale" id="finale" hidden aria-live="polite">
+    <div class="fn-in">
+      <h2 class="fn-h"><span class="fn-t">Финал</span><span class="fn-s">Колесо выбьет один из двух</span></h2>
+      <div class="fn-pair" id="finalePair"></div>
+      <b class="fn-count" id="finaleCount"></b>
+    </div>
   </div>
 </div>
 
