@@ -10,9 +10,12 @@
     if (hex.length === 3) hex = [...hex].map(c => c + c).join('');
     return [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16));
   };
-  const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+  const rgba = (c, a) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+  const hsl = (h, s, l) => [0, 8, 4].map(n => { const k = (n + h / 30) % 12; return 255 * (l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1))); });
 
   let colors;
+  // комната: свет вокруг колеса в тон постера под стрелкой (app.js setAmbient); null — цвета темы
+  let tint = null;
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
     colors = { ring: rgb(cs.getPropertyValue('--acc-hi')), glow: rgb(cs.getPropertyValue('--acc')), bg: cs.getPropertyValue('--hero').trim() };
@@ -69,6 +72,12 @@
     const r0 = R * 1.04;
     // под музыку кольцо дышит басом
     const k = (1 + 0.06 * Math.sin(t * 0.9)) * (1 + b * 0.7) * (1 + fx.level * 1.1);
+    // цвет света перетекает к тону постера за ~1 с, а не прыгает
+    const want = s.clear && tint ? tint : colors;
+    if (!s.col) s.col = { ring: [...want.ring], glow: [...want.glow] };
+    const ce = reduce ? 1 : Math.min(1, dt * 2.5);
+    for (const key of ['ring', 'glow']) for (let i = 0; i < 3; i++) s.col[key][i] += (want[key][i] - s.col[key][i]) * ce;
+    const col = s.col;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (s.clear) ctx.clearRect(0, 0, w, h);
@@ -76,20 +85,20 @@
 
     // широкое свечение
     let g = ctx.createRadialGradient(cx, cy, r0 * 0.5, cx, cy, r0 * 2.6);
-    g.addColorStop(0, rgba(colors.glow, 0));
-    g.addColorStop(0.3, rgba(colors.glow, 0.24 * k));
-    g.addColorStop(1, rgba(colors.glow, 0));
+    g.addColorStop(0, rgba(col.glow, 0));
+    g.addColorStop(0.3, rgba(col.glow, 0.24 * k));
+    g.addColorStop(1, rgba(col.glow, 0));
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
 
     // кольцо
     if (s.ring > 0.01) {
     ctx.globalAlpha = Math.min(1, s.ring);
     g = ctx.createRadialGradient(cx, cy, r0 * 0.97, cx, cy, r0 * 1.6);
-    g.addColorStop(0, rgba(colors.ring, 0));
-    g.addColorStop(0.035, rgba(colors.ring, 0.85 * k));
-    g.addColorStop(0.12, rgba(colors.ring, 0.32 * k));
-    g.addColorStop(0.4, rgba(colors.glow, 0.1 * k));
-    g.addColorStop(1, rgba(colors.glow, 0));
+    g.addColorStop(0, rgba(col.ring, 0));
+    g.addColorStop(0.035, rgba(col.ring, 0.85 * k));
+    g.addColorStop(0.12, rgba(col.ring, 0.32 * k));
+    g.addColorStop(0.4, rgba(col.glow, 0.1 * k));
+    g.addColorStop(1, rgba(col.glow, 0));
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
     ctx.globalAlpha = 1;
     }
@@ -101,8 +110,8 @@
       if (e <= 0) continue;
       const rr = r0 * (1.02 + (1 - e * e) * 0.95);
       ctx.beginPath(); ctx.arc(cx, cy, rr, 0, 6.283);
-      ctx.strokeStyle = rgba(colors.glow, 0.22 * e * wv.s); ctx.lineWidth = 18 * e + 4; ctx.stroke();
-      ctx.strokeStyle = rgba(colors.ring, 0.7 * e * e * wv.s); ctx.lineWidth = 2.2 * e + 0.6; ctx.stroke();
+      ctx.strokeStyle = rgba(col.glow, 0.22 * e * wv.s); ctx.lineWidth = 18 * e + 4; ctx.stroke();
+      ctx.strokeStyle = rgba(col.ring, 0.7 * e * e * wv.s); ctx.lineWidth = 2.2 * e + 0.6; ctx.stroke();
     }
     s.waves = s.waves.filter(wv => wv.age < 1);
     const kick = s.kick;
@@ -123,7 +132,7 @@
       if (p.y > h + 4) p.y = -4;
       const near = Math.exp(-((d - r0) ** 2) / (2 * (r0 * 0.35) ** 2));
       const a = (0.2 + 0.8 * near) * (0.55 + 0.45 * Math.sin(t * p.sp + p.ph)) * (1 + b * 0.5);
-      ctx.fillStyle = rgba(near > 0.4 ? colors.ring : [255, 255, 255], a);
+      ctx.fillStyle = rgba(near > 0.4 ? col.ring : [255, 255, 255], a);
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1 + fx.mid * 0.9), 0, 6.283); ctx.fill();
     }
   }
@@ -132,6 +141,8 @@
   document.querySelectorAll('canvas.backdrop').forEach(init);
   window.setBackdropColors = readColors;
   window.setBackdropActive = on => { target = typeof on === 'number' ? on : on ? 1 : 0; }; // число — сила, в финале ярче
+  // оттенок 0–360 или null; кольцо светлее и насыщеннее самого постера, иначе тёмные постеры гасят свет
+  window.setBackdropTint = h => { tint = h == null ? null : { ring: hsl(h, 0.75, 0.76), glow: hsl(h, 0.7, 0.56) }; };
   window.setBackdropFx = v => {
     fx = v;
     if (v.beat && !reduce) for (const s of scenes) { s.waves.push({ age: 0, s: v.beat }); s.kick = Math.max(s.kick, v.beat); }

@@ -1,6 +1,7 @@
 // Эффекты под музыку прокрута: бас, середина и сильные доли из нашего Web Audio (audio.js).
 (() => {
-  const level = { bass: 0, mid: 0 };
+  const level = { bass: 0, mid: 0, beatAt: 0 };
+  window.Fx = level; // лампы колеса (wheel.js) мигают по сильным долям
   const hist = [];
   let lastBeat = 0;
   let buf = null;
@@ -29,6 +30,7 @@
     let beat = 0;
     if (bass > 0.22 && bass > avg * 1.3 + 0.02 && now - lastBeat > 230) {
       lastBeat = now;
+      level.beatAt = now;
       beat = Math.min(1, 0.45 + (bass - avg) * 3);
     }
     level.bass += (bass - level.bass) * (bass > level.bass ? 0.5 : 0.12);

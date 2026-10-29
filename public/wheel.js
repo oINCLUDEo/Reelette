@@ -14,6 +14,7 @@ class Wheel {
     this.images = new Map();
     this.dirty = true;
     this.curId = null;
+    this.calm = matchMedia('(prefers-reduced-motion: reduce)').matches; // без вспышек ламп
     this.readColors();
     new ResizeObserver(() => this.resize()).observe(canvas);
     this.resize();
@@ -252,10 +253,18 @@ class Wheel {
       g.shadowColor = 'rgba(0,0,0,.8)'; g.shadowBlur = fs * 0.5;
       g.textBaseline = 'middle';
       const maxW = R * 0.93 - hub * 1.25 - R * 0.05;
+      // на постере название целиком или никак: обрезанное «Мартовские…» только шумит. Длинное можно чуть ужать.
+      // Сектору без постера подпись нужна, чтобы его различать, — там остаётся многоточие
       let text = it.title;
-      if (g.measureText(text).width > maxW) {
-        while (text.length > 1 && g.measureText(text + '…').width > maxW) text = text.slice(0, -1);
-        text = text.trimEnd() + '…';
+      const tw = g.measureText(text).width;
+      if (tw > maxW) {
+        const f2 = fs * maxW / tw;
+        if (f2 >= fs * 0.75 && f2 / dpr >= 10.5 && f2 >= 9) g.font = `700 ${f2}px Manrope, sans-serif`;
+        else if (img?.ok) { g.restore(); return; }
+        else {
+          while (text.length > 1 && g.measureText(text + '…').width > maxW) text = text.slice(0, -1);
+          text = text.trimEnd() + '…';
+        }
       }
       g.textAlign = flip ? 'left' : 'right';
       g.fillText(text, flip ? -R * 0.93 : R * 0.93, 0);
@@ -304,18 +313,21 @@ class Wheel {
     x.beginPath(); x.arc(c, c, R, 0, Math.PI * 2);
     x.lineWidth = S / 160; x.strokeStyle = 'rgba(0,0,0,.55)'; x.stroke();
 
-    // лампочки: в покое ровные и тусклые, при прокруте бегут; в финале на доползании горят все и дышат
+    // лампочки: в покое ровные и тусклые, при прокруте бегут; в финале на доползании горят все и дышат.
+    // Если играет музыка прокрута, на каждой сильной доле (fx.js) вспыхивают все
     const n = 36;
     const lr = (c * 0.995 + R) / 2;
     const chase = Math.floor(now / 1000 * 14);
+    const fx = window.Fx;
+    const flash = this.anim && fx && !this.calm ? Math.max(0, 1 - (now - fx.beatAt) / 220) : 0;
     const crawl = this.anim && this.mood === 'final' && this.speed < 0.6;
     const breath = 0.5 + 0.5 * Math.sin(now / 1000 * 7.4);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
-      const on = crawl || (this.anim && (chase + i) % 3 === 0);
+      const on = crawl || (this.anim && ((chase + i) % 3 === 0 || flash > 0.4));
       x.beginPath(); x.arc(c + Math.cos(a) * lr, c + Math.sin(a) * lr, S / 170, 0, Math.PI * 2);
       x.fillStyle = on ? this.colors.light : 'rgba(255,255,255,.16)';
-      x.shadowColor = this.colors.accent; x.shadowBlur = on ? S / (crawl ? 40 + breath * 60 : 50) : 0;
+      x.shadowColor = this.colors.accent; x.shadowBlur = on ? S / (crawl ? 40 + breath * 60 : 50 - flash * 25) : 0;
       x.fill();
     }
     x.shadowBlur = 0;
