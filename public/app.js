@@ -1216,6 +1216,7 @@ function initRoom(roomId) {
     placeYtPanel();
     $('#ytPlayer').hidden = !playerHere;
     renderQueue();
+    $$('.our-track').forEach(b => b.classList.toggle('on', b.dataset.our === m?.vid));
     $('#musicBtn').hidden = Boolean(m);
     const last = state?.lastTrack;
     $('#ytReplay').hidden = Boolean(m) || !last;
@@ -1817,6 +1818,17 @@ function initRoom(roomId) {
       Sfx.unlock();
       if (r.queued) toast('Трек добавлен в очередь');
       else { ytChanging = false; syncMusic(); }
+    } catch (err) { toast(err.message, true); }
+  });
+  // наши треки в панели музыки: включаются у всех сразу; на вороне сервер ещё и пускает ворону по экрану
+  $('#ytAdd').addEventListener('click', async e => {
+    const b = e.target.closest('[data-our]');
+    if (!b) return;
+    if (state?.music?.vid === b.dataset.our) return toast(b.dataset.our === 'RnMVb0lJ8LI' ? 'Ворона уже летит' : 'Уже играет');
+    Sfx.unlock();
+    try {
+      await api(`/rooms/${roomId}/music`, { method: 'POST', body: { url: b.dataset.our, now: true, by: me.name, cid: me.cid } });
+      ytChanging = false; syncMusic();
     } catch (err) { toast(err.message, true); }
   });
   $('#ytQueue').addEventListener('click', e => {
@@ -2651,13 +2663,6 @@ function initRoom(roomId) {
   $('#flyChatOn').checked = settings.flyChat;
   $('#flyChatOn').addEventListener('change', e => { settings.flyChat = e.target.checked; ls.set('flyChat', settings.flyChat); });
   $('#showOutOn').addEventListener('change', e => { settings.showOut = e.target.checked; ls.set('showOut', settings.showOut); });
-  // ворона: наш трек, включается у всех сразу
-  $('#crowBtn').addEventListener('click', async () => {
-    if (state?.music?.vid === 'RnMVb0lJ8LI') return toast('Ворона уже летит');
-    Sfx.unlock();
-    try { await api(`/rooms/${roomId}/music`, { method: 'POST', body: { url: 'RnMVb0lJ8LI', now: true, by: me.name, cid: me.cid } }); toast('Включаю ворону'); }
-    catch (err) { toast(err.message, true); }
-  });
   $('#spinLockOn').addEventListener('change', e => {
     api(`/rooms/${roomId}`, { method: 'PATCH', body: { spinLock: e.target.checked, cid: me.cid } })
       .then(() => toast(e.target.checked ? 'Теперь крутить можете только вы' : 'Крутить снова могут все'))

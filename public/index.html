@@ -72,6 +72,11 @@
           <button type="button" class="nav-icon" id="ytStop" title="Выключить у всех" aria-label="Выключить у всех"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
         </div>
       </div>
+      <div class="our-tracks">
+        <span class="label">Наши треки</span>
+        <button type="button" class="our-track" data-our="RnMVb0lJ8LI" title="Включить у всех сейчас, по экрану пролетит ворона"><i style="background-image:url('https://i.ytimg.com/vi/RnMVb0lJ8LI/mqdefault.jpg')"></i><span><b>Ворона</b><small>с вороной на экране</small></span></button>
+        <button type="button" class="our-track" data-our="cYIf9_bdx-w" title="Включить у всех сейчас"><i style="background-image:url('https://i.ytimg.com/vi/cYIf9_bdx-w/mqdefault.jpg')"></i><span><b>andy warhol</b><small>Kai Angel</small></span></button>
+      </div>
       <label class="yt-vol" title="Громкость у вас"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg><input type="range" id="ytVol" min="0" max="100" value="50" aria-label="Громкость общей музыки у вас"></label>
       <input id="ytUrl" placeholder="Ссылка на трек на YouTube" autocomplete="off">
       <div class="yt-add-row">
@@ -115,7 +120,7 @@
         <div id="historyList" class="history-list"></div>
       </div>
       <div class="np" id="navMusic">
-        <button class="np-empty" id="musicBtn" type="button" title="Общая музыка из YouTube, её слышат все в комнате"><span class="art"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span><span class="nt"><b>Музыка</b><small>Включите трек для всей комнаты</small></span></button>
+        <button class="np-empty" id="musicBtn" type="button" title="Общая музыка из YouTube, её слышат все в комнате"><span class="art"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span><span class="nt"><b>Музыка</b><small>Ворона, andy warhol или ссылка</small></span></button>
         <button class="nav-icon np-replay" id="ytReplay" type="button" hidden aria-label="Сыграть ещё раз"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
         <div class="yt-card" id="ytCard" hidden>
           <button class="yt-thumb" id="ytThumb" type="button" title="Очередь, громкость и добавить трек" aria-label="Открыть музыку: очередь и громкость"></button>
@@ -165,9 +170,8 @@
         </div>
         <div class="nav-group glass">
           <div class="menu-wrap">
-            <button class="nav-btn fun-btn" id="funBtn" aria-haspopup="true" aria-expanded="false" aria-controls="funMenu" aria-label="Развлечения" title="Развлечения: ворона, «Угадай мелодию», караоке и броски"><svg viewBox="0 0 24 24"><path d="M10 3.5l1.9 5 5 1.9-5 1.9-1.9 5-1.9-5-5-1.9 5-1.9z"/><path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></svg><i class="fun-dot" aria-hidden="true"></i></button>
+            <button class="nav-btn fun-btn" id="funBtn" aria-haspopup="true" aria-expanded="false" aria-controls="funMenu" aria-label="Развлечения" title="Развлечения: «Угадай мелодию», караоке и броски"><svg viewBox="0 0 24 24"><path d="M10 3.5l1.9 5 5 1.9-5 1.9-1.9 5-1.9-5-5-1.9 5-1.9z"/><path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></svg><i class="fun-dot" aria-hidden="true"></i></button>
         <div class="pop-menu fun-menu" id="funMenu" role="menu" aria-label="Развлечения" hidden>
-          <button class="menu-item" id="crowBtn" role="menuitem" title="Включить ворону у всех"><svg viewBox="0 0 24 24"><path d="M2.5 13.5c2.2-.9 4.4-.8 6.3.3l1.6-3.8c.9-2.1 3.5-3.4 5.8-2.6l2 .7 2.8-.4-2.4 1.6c.1 3.2-1.4 6.3-4.4 7.9l.9 3.6h-1.7l-1-3-2.7.8.9 2.2H8.9L8 17.9c-2.6-.2-4.6-2-5.5-4.4z" fill="currentColor" stroke="none"/></svg><span>Ворона<small>трек у всех в комнате</small></span></button>
           <button class="menu-item" id="quizBtn" role="menuitem" title="Угадываем треки, которые играли в комнате"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v8"/><circle cx="6" cy="18" r="3"/><path d="M15.5 15.2a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.3M18 21.5v.01"/></svg><span>Угадай мелодию<small>треки, что играли в комнате</small></span></button>
           <button class="menu-item" id="karaokeBtn" role="menuitem" title="Большой плеер, очередь певцов, тексты и оценки"><svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0"/><path d="M12 17v4M8.5 21h7"/></svg><span>Караоке<small>сцена для всей комнаты</small></span></button>
           <div class="menu-sep"></div>

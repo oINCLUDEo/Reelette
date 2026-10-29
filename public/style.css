@@ -356,6 +356,17 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 .yt-head .label { display: block; }
 .yt-head-btns { display: flex; gap: 2px; }
 .yt-head-btns .nav-icon { width: 36px; height: 36px; border-radius: 18px; }
+/* наши треки: одно нажатие — играет у всех; тот, что играет сейчас, подсвечен */
+.our-tracks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.our-tracks .label { grid-column: 1 / -1; }
+.our-track { display: flex; align-items: center; gap: 10px; min-width: 0; height: 56px; padding: 6px 12px 6px 6px; border-radius: 16px; background: var(--s1); text-align: left; transition: background .2s, box-shadow .2s, transform .3s var(--spring); }
+.our-track:hover { background: var(--s2); }
+.our-track:active { transform: scale(.97); }
+.our-track i { width: 44px; height: 44px; flex: none; border-radius: 10px; background: var(--s3) center/cover; }
+.our-track span { display: flex; flex-direction: column; min-width: 0; }
+.our-track b { font: 600 14px/20px var(--f-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.our-track small { font: 500 12px/16px var(--f-ui); color: var(--tx2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.our-track.on { background: color-mix(in srgb, var(--acc) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc-hi) 45%, transparent); }
 .yt-vol { display: flex; align-items: center; gap: 12px; height: 32px; color: var(--tx2); }
 .yt-vol svg { width: 18px; height: 18px; }
 .yt-vol input { flex: 1; }
