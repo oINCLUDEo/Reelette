@@ -562,6 +562,16 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 
 /* ---------- «под стрелкой»: фильм, на котором стрелка; на прокруте меняется вместе с ней ---------- */
 .now { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+/* Широкий экран. Блок — один текстовый столбец без значков, три уровня: название, подзаголовок, прогресс.
+   Ось — горизонталь центра колеса: подзаголовок стоит на ней, название растёт вверх, прогресс вниз,
+   поэтому при смене названия на прокруте ничего не прыгает.
+   Отступ 22px: текст на одной вертикали с подписью «Обычный» в переключателе и не жмётся к панели */
+@media (min-width: 1280px) {
+  .now { align-self: stretch; display: grid; grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr); justify-items: start; padding-left: 22px; }
+  .current { align-self: end; }
+  .now .current span { -webkit-line-clamp: 3; }
+  .now-left { align-self: start; justify-self: stretch; }
+}
 .current { position: relative; margin: 0; max-width: 100%; font: 800 clamp(34px, 3.1vw, 48px)/1.08 var(--f-head); letter-spacing: -.045em; text-shadow: 0 2px 30px rgba(0,0,0,.25); }
 .current span { position: relative; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; transition: color .3s; }
 /* сразу после выбывания название зачёркивается */
@@ -572,17 +582,18 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 /* барабан: старое значение уходит вверх, новое поднимается снизу (app.js roll). Копия старого лежит поверх на время ухода */
 #room .roll-old { position: absolute; margin: 0; pointer-events: none; }
 #current .was-out::after { transform: scaleX(1); transition: none; }
-/* мелкий текст стоит на цветном размытом постере: крупнее и с тенью, иначе тонет */
-.now-meta { margin-top: 8px; min-height: 24px; font: 500 17px/24px var(--f-ui); color: var(--tx2); text-shadow: 0 1px 16px rgba(0,0,0,.5); }
-.now-by { margin-top: 24px; display: flex; align-items: center; gap: 8px; min-height: 28px; font: 500 15px/20px var(--f-ui); color: var(--tx2); text-shadow: 0 1px 16px rgba(0,0,0,.5); transition: opacity .8s var(--ease), filter .8s var(--ease); }
-.now-by .ava { width: 28px; height: 28px; margin: 0; border: 0; font-size: 11px; flex: none; }
-/* выбывание: сколько осталось — крупная цифра со свечением, под ней путь к финалу. Градиент на самой цифре: так он едет вместе с ней в барабане */
-.now-left { margin-top: 40px; display: flex; flex-direction: column; align-items: flex-start; transition: opacity .8s var(--ease), filter .8s var(--ease); }
-/* overflow: clip — окно барабана: цифра выезжает из маски и не наезжает на подпись; свечение (filter) маской не режется */
-.now-left b { position: relative; display: block; overflow: clip; font: 800 72px/76px var(--f-ui); letter-spacing: -.06em; font-variant-numeric: tabular-nums; filter: drop-shadow(0 0 24px var(--glow)); }
-.now-left b span { display: inline-block; padding-right: .06em; background: linear-gradient(180deg, var(--h1a) 30%, var(--acc-hi) 130%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.now-left > span { font: 600 15px/20px var(--f-ui); color: var(--tx2); text-shadow: 0 1px 16px rgba(0,0,0,.5); }
-#nowLeft::after { width: 160px; margin-top: 12px; } /* сама полоска — общее правило со строкой под колесом (ниже по файлу) */
+/* подзаголовок: мета и «Добавил(а)» — две строки одного стиля; на цветном постере крупнее и с тенью, иначе тонет */
+.now-meta, .now-by, .now-left > span { font: 500 17px/24px var(--f-ui); color: var(--tx2); text-shadow: 0 1px 16px rgba(0,0,0,.5); }
+.now-meta { margin-top: 12px; min-height: 24px; }
+.now-by { min-height: 24px; transition: opacity .8s var(--ease), filter .8s var(--ease); }
+.now-by .person { font-weight: 600; text-decoration-color: transparent; }
+.now-by .person:hover { text-decoration-color: var(--tx3); }
+/* выбывание: «Осталось 37 из 52» тем же шрифтом, числа белые, под строкой путь к финалу. Число катится барабаном (app.js roll) */
+.now-left { margin-top: 32px; display: flex; flex-direction: column; align-items: flex-start; transition: opacity .8s var(--ease), filter .8s var(--ease); }
+.now-left b { position: relative; display: inline-block; color: var(--tx); font-weight: 700; font-variant-numeric: tabular-nums; }
+.now-left b span { display: inline-block; } /* строчный элемент не сдвигается transform-ом */
+#nowLeft::after { width: min(100%, 240px); margin-top: 12px; } /* сама полоска — общее правило со строкой под колесом (ниже по файлу) */
+@media (prefers-reduced-motion: no-preference) { .now-left:not([hidden]) { animation: riseIn .6s var(--ease); } }
 
 /* колесо вписывается в свободное место своих колонок, но не больше 960px */
 .wheel-area { min-width: 0; min-height: 0; container-type: size; display: grid; place-items: center; }
@@ -595,7 +606,12 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 .chapter.on { animation: chapter 2.1s var(--ease) both; }
 @keyframes chapter { 0% { opacity: 0; transform: scale(1.08); filter: blur(16px); } 22%, 70% { opacity: 1; transform: none; filter: blur(0); } 100% { opacity: 0; transform: scale(.97); filter: blur(10px); } }
 /* выбывший постер выскакивает из-под стрелки и падает за край экрана (app.js hitWheel) */
-.toss { position: fixed; z-index: 40; aspect-ratio: 2 / 3; border-radius: 10px; background: var(--c, var(--s3)) center/cover; box-shadow: 0 20px 50px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.12); pointer-events: none; will-change: transform; }
+/* карточка в 3D: лицо — постер с бликом глянца, оборот — тёмный картон; у каждой стороны своя тень */
+.toss { position: fixed; z-index: 40; aspect-ratio: 2 / 3; pointer-events: none; transform-style: preserve-3d; will-change: transform; }
+.toss i { position: absolute; inset: 0; border-radius: 9px; -webkit-backface-visibility: hidden; backface-visibility: hidden; box-shadow: 0 18px 44px rgba(0,0,0,.5); }
+.toss .f { background: var(--c, var(--s3)) center/cover; }
+.toss .f::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(135deg, rgba(255,255,255,.26), transparent 45%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.toss .b { transform: rotateY(180deg); background: linear-gradient(160deg, #2C2A36, #121118); box-shadow: 0 18px 44px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.08); }
 .pointer { position: absolute; top: -2.4%; left: 50%; width: 6.5%; min-width: 26px; transform: translateX(-50%); transform-origin: 50% 30%; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)) drop-shadow(0 0 14px var(--glow)); z-index: 2; }
 .pointer svg { width: 100%; height: auto; display: block; fill: var(--btn); stroke: none; }
 .pointer.tick { animation: tick .14s ease-out; }
@@ -636,7 +652,7 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 /* выбывание: тонкая полоска прогресса под «осталось N из M» */
 .stage-status.prog { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
 .stage-status.prog::after, .now-left::after { content: ""; width: 200px; height: 3px; border-radius: 3px; background: linear-gradient(var(--acc-hi), var(--acc-hi)) 0 0 / calc(var(--p, 0) * 100%) 100% no-repeat, rgba(255,255,255,.14); box-shadow: 0 0 10px color-mix(in srgb, var(--acc) 35%, transparent); transition: background-size .6s var(--ease); }
-/* на широком экране «осталось» стоит слева крупной цифрой, под колесом остаются кнопки и кто крутит */
+/* на широком экране «осталось» стоит слева под фильмом, под колесом остаются кнопки и кто крутит */
 @media (min-width: 1280px) { .stage-status.prog { display: none; } }
 .stage-actions { display: flex; gap: 8px; }
 .stage-actions:not(:has(> :not([hidden]))) { display: none; }

@@ -314,9 +314,9 @@ function initRoom(roomId) {
     const f = it && state ? state.films.find(x => x.id === it.id) : null;
     if (!f) { setHTML($('#nowBy'), ''); $('#nowMeta').textContent = ''; return; }
     $('#nowMeta').textContent = [f.year, f.runtime && fmtRuntime(f.runtime), (f.genres || []).slice(0, 2).join(', ')].filter(Boolean).join(', ');
+    // без аватарки: цветное кольцо рамки выпирало за левый край текста и спорило с названием
     const pid = personOf(f), name = f.addedBy || 'Без имени', nv = (f.votes || []).length;
-    const ava = people.find(p => p.pid === pid)?.avatar;
-    setHTML($('#nowBy'), `<span class="ava${frameCls(pid)}" style="background:hsl(${hue(name)} 55% 42%);${frameVars(pid)}">${ava ? `<img src="${esc(ava)}" alt="">` : initial(name)}</span><span>Добавил(а) <button class="person" data-person="${esc(pid)}" data-name="${esc(name)}">${esc(name)}</button>${nv ? `, ${nv} ${plural(nv, 'голос', 'голоса', 'голосов')}` : ''}</span>`);
+    setHTML($('#nowBy'), `Добавил(а) <button class="person" data-person="${esc(pid)}" data-name="${esc(name)}">${esc(name)}</button>${nv ? `, ${nv} ${plural(nv, 'голос', 'голоса', 'голосов')}` : ''}`);
   }
 
   // ---- фон комнаты: размытый постер фильма под стрелкой, два слоя сменяют друг друга плавно ----
@@ -479,17 +479,28 @@ function initRoom(roomId) {
     box.animate([{ scale: '1' }, { scale: '.985', offset: 0.25 }, { scale: '1' }], { duration: 420, easing: 'cubic-bezier(.34, 1.56, .64, 1)' });
     const p = f && wheelPoint();
     if (!p) return;
-    const w = Math.max(44, p.w * 0.11), side = Math.random() < 0.5 ? -1 : 1;
+    // карточка с лицом и оборотом (style.css .toss), размером с крупный сектор
+    const w = Math.max(64, p.w * 0.15), side = Math.random() < 0.5 ? -1 : 1, rnd = Math.random();
     const el = document.createElement('div');
     el.className = 'toss';
-    el.style.cssText = `${posterStyle(f)};width:${w}px;left:${p.x - w / 2}px;top:${p.y - w * 0.75}px`;
+    el.style.cssText = `width:${w}px;left:${p.x - w / 2}px;top:${p.y - w * 0.75}px`;
+    el.innerHTML = `<i class="f" style="${posterStyle(f)}"></i><i class="b"></i>`;
     document.body.append(el);
-    const fall = innerHeight - p.y + w * 2;
-    el.animate([
-      { transform: 'scale(.6)', opacity: 0, filter: 'none', easing: 'cubic-bezier(.2, .8, .2, 1)' },
-      { transform: `translate(${side * 24}px, -70px) rotate(${side * -10}deg)`, opacity: 1, filter: 'none', offset: 0.24, easing: 'cubic-bezier(.55, 0, 1, .45)' },
-      { transform: `translate(${side * 140}px, ${fall}px) rotate(${side * 75}deg) scale(.9)`, opacity: 1, filter: 'grayscale(1) brightness(.7)' },
-    ], { duration: 1300 }).onfinish = () => el.remove();
+    // бросок по физике: подлёт вверх и падение с ускорением g, сопротивление воздуха гасит снос вбок.
+    // Карточка кувыркается через край (rotateX) и показывает оборот, по пути выходит к зрителю (z)
+    const g = 2600, vy = -620 - rnd * 120, vx = side * (150 + rnd * 90), drag = 1.4;
+    const fall = innerHeight - p.y + w * 1.8;
+    const T = (-vy + Math.sqrt(vy * vy + 2 * g * fall)) / g; // время до низа экрана, с
+    const rx = 230 + rnd * 120, ry = side * (40 + rnd * 50), rz = side * (35 + rnd * 40); // градусы в секунду
+    const frames = [];
+    for (let i = 0; i <= 30; i++) {
+      const t = T * i / 30, pop = 1 - (1 - Math.min(1, t / 0.16)) ** 3; // вылет из сектора: из его размера в полный
+      const x = vx * (1 - Math.exp(-drag * t)) / drag, y = vy * t + g * t * t / 2, z = 160 * Math.min(1, t / 0.45);
+      frames.push({ transform: `perspective(1100px) translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z.toFixed(1)}px) rotateZ(${(rz * t).toFixed(1)}deg) rotateY(${(ry * t).toFixed(1)}deg) rotateX(${(rx * t).toFixed(1)}deg) scale(${(0.55 + 0.45 * pop).toFixed(3)})`, opacity: Math.min(1, t / 0.06) });
+    }
+    el.animate(frames, { duration: T * 1000 }).onfinish = () => el.remove();
+    // выбывший постер гаснет на лету
+    el.firstChild.animate([{ filter: 'none' }, { filter: 'grayscale(1) brightness(.7)' }], { duration: T * 1000, easing: 'ease-in' });
   }
   function showFinale(spin) {
     const byId = new Map(state.films.map(f => [f.id, f]));
@@ -1061,18 +1072,19 @@ function initRoom(roomId) {
 
     $('#stopBtn').hidden = !counting && !state.series;
     $('#stopBtn').textContent = counting ? 'Отменить прокрут' : 'Остановить серию';
-    // выбывание: «осталось N из M». На широком экране — крупной цифрой слева, на узком — строкой с полоской под колесом
+    // выбывание: «осталось N из M». На широком экране — строкой слева под фильмом, на узком — строкой с полоской под колесом
     const elimTotal = active.length + state.eliminated.length;
     const elimOn = !duel && (state.eliminated.length > 0 || (spinning && (state.spin || curSpin)?.mode === 'elimination'));
     const progP = elimTotal > 1 ? (state.eliminated.length / (elimTotal - 1)).toFixed(3) : 0;
-    // блок виден весь режим выбывания, а не с первого прокрута: иначе название над ним прыгает посреди действия
-    const showLeft = !duel && elimTotal > 1 && (elimOn || elimView());
+    // строка появляется, когда выбывание пошло: «осталось 50 из 50» до старта ничего не говорит.
+    // Название над ней не прыгает — блок держится на оси центра колеса (style.css, «под стрелкой»)
+    const showLeft = elimOn && elimTotal > 1;
     $('#nowLeft').hidden = !showLeft;
     $('#nowLeft').style.setProperty('--p', progP);
     if (showLeft) {
       const n = $('#nowLeftN');
       roll(n, String(active.length), Number(n.textContent) > active.length ? 'down' : 'up');
-      $('#nowLeftOf').textContent = `осталось из ${elimTotal}`;
+      $('#nowLeftOf').textContent = String(elimTotal);
     }
     $('#stageStatus').style.setProperty('--p', progP);
     // серию остановили между прокрутами: этап выбывания больше не держим (после финала его снимает таймер окна победителя)
