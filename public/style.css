@@ -201,7 +201,15 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px va
    ===================================================================== */
 #room { --m: 24px; --g: 24px; --fill: rgba(255,255,255,.08); --glass: color-mix(in srgb, var(--sheetB) 42%, transparent); --glass-bd: rgba(255,255,255,.14);
   /* вторичный текст над постером и стеклом: прозрачный белый, как подписи у Apple, а не серый из темы — иначе тонет в цветном фоне */
-  --tx2: color-mix(in srgb, var(--tx) 78%, transparent); --tx3: color-mix(in srgb, var(--tx) 55%, transparent); }
+  --tx2: color-mix(in srgb, var(--tx) 78%, transparent); --tx3: color-mix(in srgb, var(--tx) 55%, transparent);
+  transition: --fa .7s var(--ease), --fa-hi .7s var(--ease), --fa-glow .7s var(--ease); }
+/* цвет фильма под стрелкой красит комнату (как у CIRO): акцент интерфейса — тон его постера (app.js paintHue).
+   Кнопка в центре колеса, свечение стрелки, строка в списке, прогресс, переключатели — всё в его цвете.
+   Цвет перетекает за 0,7 с; в монохромной теме акцент остаётся серым */
+@property --fa { syntax: "<color>"; inherits: false; initial-value: #7C6BFF; }
+@property --fa-hi { syntax: "<color>"; inherits: false; initial-value: #B8ADFF; }
+@property --fa-glow { syntax: "<color>"; inherits: false; initial-value: rgba(124, 107, 255, .45); }
+html:not([data-pal="mono"]) #room.fc { --acc: var(--fa); --acc-hi: var(--fa-hi); --glow: var(--fa-glow); --on-acc: var(--fa-on, #fff); }
 /* фон: два слоя постера сменяют друг друга плавно, поверх затемнение для читаемости текста */
 /* z-index −1 вместо слоя у сетки: у сетки нет своего контекста наложения, и шторка с затемнением на телефоне ложатся правильно */
 /* --vx — центр колеса по горизонтали (колонки 7–12), к нему стягивается виньетка этапов */
@@ -216,6 +224,11 @@ body[data-stage="top"] .room-bg::after { opacity: .6; }
 body[data-stage="semi"] .room-bg::after { opacity: .8; }
 body[data-stage="final"] .room-bg::after { opacity: 1; }
 .room-bg .scrim { inset: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--hero) 66%, transparent), color-mix(in srgb, var(--hero) 34%, transparent) 40%, color-mix(in srgb, var(--hero) 12%, transparent) 70%, color-mix(in srgb, var(--hero) 34%, transparent)), linear-gradient(180deg, color-mix(in srgb, var(--hero) 15%, transparent), color-mix(in srgb, var(--hero) 62%, transparent)); }
+/* перетягивание в полуфинале и финале: свет вокруг колеса — цвет фильма под стрелкой, с каждым ударом сердца вспыхивает (app.js heartFx) */
+@property --tug { syntax: "<color>"; inherits: false; initial-value: transparent; }
+.room-bg .tug { inset: 0; background: radial-gradient(42% 62% at var(--vx) 50%, var(--tug), transparent 72%); opacity: 0; transition: opacity 1.2s var(--ease), --tug .8s var(--ease); }
+body[data-stage="semi"] .room-bg .tug { opacity: .5; }
+body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .layout { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: 56px minmax(0, 1fr) 44px 52px; column-gap: var(--g); row-gap: 16px; height: 100dvh; max-width: 2200px; margin-inline: auto; padding: 16px var(--m) var(--m); }
 /* стекло — у панели фильмов и у управления сцены: только над цветным фоном */
 .films-panel, #room .glass { background: var(--glass); border: 1px solid var(--glass-bd); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.1); }
@@ -492,7 +505,8 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 /* строка фильма: постер, название, шанс и сердечко; вес у создателя — по наведению */
 .film { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 56px; padding: 4px 4px 4px 12px; border-radius: 20px; cursor: pointer; transition: background .2s, opacity .4s; }
 .film:hover { background: var(--fill); }
-.film.hot { background: rgba(255,255,255,.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+/* фильм под стрелкой — в его цвете (акцент комнаты) */
+.film.hot { background: color-mix(in srgb, var(--acc) 20%, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc-hi) 38%, transparent); }
 .film.out { opacity: .38; }
 .film.out .film-title { text-decoration: line-through; }
 .film.filtered { opacity: .38; }
@@ -609,7 +623,8 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
   .now .current span { -webkit-line-clamp: 3; }
   .now-left { align-self: start; justify-self: stretch; }
 }
-.current { position: relative; margin: 0; max-width: 100%; font: 800 clamp(34px, 3.1vw, 48px)/1.08 var(--f-head); letter-spacing: -.045em; text-shadow: 0 2px 30px rgba(0,0,0,.25); }
+/* за названием — ореол цвета фильма */
+.current { position: relative; margin: 0; max-width: 100%; font: 800 clamp(34px, 3.1vw, 48px)/1.08 var(--f-head); letter-spacing: -.045em; text-shadow: 0 2px 30px rgba(0,0,0,.25), 0 0 46px color-mix(in srgb, var(--acc) 34%, transparent); }
 .current span { position: relative; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; transition: color .3s; }
 /* сразу после выбывания название зачёркивается */
 .current span::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: max(3px, .07em); border-radius: 2px; background: var(--bad); transform: scaleX(0); transform-origin: left; transition: transform .45s var(--ease); }
@@ -634,8 +649,7 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 
 /* колесо вписывается в свободное место своих колонок, но не больше 960px */
 .wheel-area { min-width: 0; min-height: 0; container-type: size; display: grid; place-items: center; }
-/* --tilt задаёт wheel.js: на скорости колесо чуть запрокидывается, к остановке выпрямляется */
-.wheel-box { position: relative; width: min(100cqw, 100cqh, 960px); aspect-ratio: 1; container-type: inline-size; transform: perspective(1800px) rotateX(var(--tilt, 0deg)); }
+.wheel-box { position: relative; width: min(100cqw, 100cqh, 960px); aspect-ratio: 1; container-type: inline-size; }
 .wheel-box canvas { width: 100%; height: 100%; display: block; }
 /* выбывший постер выскакивает из-под стрелки и падает за край экрана (app.js hitWheel) */
 /* карточка в 3D: лицо — постер с бликом глянца, оборот — тёмный картон; у каждой стороны своя тень */
@@ -649,6 +663,16 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 .pointer svg { width: 100%; height: auto; display: block; fill: var(--btn); stroke: none; }
 .pointer.tick { animation: tick .14s ease-out; }
 @keyframes tick { 40% { transform: translateX(-50%) rotate(-14deg); } }
+/* остановка: стрелка подпрыгивает и вспыхивает цветом (app.js landFx) */
+.pointer.flare { animation: flare .9s cubic-bezier(.2, .8, .2, 1); }
+@keyframes flare { 22% { transform: translateX(-50%) translateY(-12%) scale(1.22); filter: drop-shadow(0 6px 12px rgba(0,0,0,.6)) drop-shadow(0 0 36px var(--pg, var(--glow))) brightness(1.3); } }
+/* старт: от центра по колесу проходит кольцо-волна (app.js launchFx) */
+.wheel-box .shock { position: absolute; inset: 5%; z-index: 1; border-radius: 50%; border: .6cqw solid var(--acc-hi); box-shadow: 0 0 5cqw var(--glow), inset 0 0 5cqw var(--glow); pointer-events: none; }
+/* осколки из точки: у острия стрелки на остановке, на стыке в финале (app.js burst) */
+.burst { position: fixed; z-index: 30; }
+.burst .tk-shard { animation: tkBurst 1.1s cubic-bezier(.16, 1, .3, 1) both; }
+.burst .tk-shard:nth-child(odd) { background: var(--acc-hi); }
+.finale .burst .tk-shard { background: #fff; }
 
 /* кнопка «Крутить» в центре колеса — главное действие страницы */
 .hub-btn { position: absolute; left: 50%; top: 50%; width: 24.3%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; z-index: 3;
@@ -711,14 +735,13 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 .chat-form input { width: 220px; height: 44px; padding: 0 18px; font-size: 14px; border-radius: 22px; background: var(--fill); border-color: transparent; transition: width .3s var(--ease), border-color .2s, box-shadow .2s; }
 .chat-form input:focus { width: 280px; }
 
-/* ---------- заставки на весь экран: этап выбывания и финал (по мотивам сайта Notturno, app.js showChapter / showFinale) ----------
+/* ---------- заставки на весь экран: этапы выбывания и финал (по мотивам сайта Notturno, app.js showChapter / showFinale) ----------
    Плоская заливка поднимается снизу рваным краем из «щетины» (маска inkEdge), заголовок собирается из шести полос
    со смазом, на сборке разлетаются белые осколки, на уходе всё уезжает вверх и открывает колесо.
-   Цвет заливки с каждым этапом краснее и темнее: топ-10 → топ-5 → полуфинал → финал */
-.takeover, .finale { --tk-c: #E8501C; }
+   Цвет заливки этапа: топ-15 оранжево-красный, топ-5 краснее */
+.takeover { --tk-c: #E8501C; }
 .takeover[data-tone="top"] { --tk-c: #E3261C; }
 .takeover[data-tone="semi"] { --tk-c: #C1121F; }
-.finale { --tk-c: #A50E1C; }
 /* заливка выше и ниже экрана на 24vh: там её рваные края, середина сплошная (слои маски чуть заходят друг на друга, без швов) */
 .tk-flood { position: absolute; left: 0; right: 0; top: -24vh; height: calc(100% + 48vh); background: var(--tk-c);
   -webkit-mask: var(--edge-t) top / 100% 24vh no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - 47vh) no-repeat, var(--edge-b) bottom / 100% 24vh no-repeat;
@@ -760,37 +783,65 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
   100% { opacity: 1; transform: translateY(-84vh); }
 }
 
-/* ---------- финал: заставка на весь экран перед последним прокрутом ---------- */
-/* на уходе (.out) заливка уезжает вверх и открывает колесо, надписи гаснут, постеры улетают в колесо (app.js hideFinale) */
+/* ---------- финал: дуэль двух финалистов перед последним прокрутом (app.js showFinale, clash, hideFinale) ----------
+   Экран раскалывается по диагонали на два цвета — тона постеров финалистов (как у CIRO: фон заливает цвет фильма).
+   Стык — рваный шов: щетина одной половины врезается в щетину другой (маска inkEdge). Постеры смотрят друг на друга в 3D,
+   под каждым — фильм и ник автора. Между ними огромный отсчёт: на каждой секунде карточки бросаются друг на друга,
+   на стыке вспышка и осколки, экран вздрагивает, и с каждой секундой сильнее.
+   На нуле половины разъезжаются, как двери, открывают колесо, а постеры улетают в свои сектора */
 .finale { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; text-align: center; pointer-events: none; overflow: hidden; }
-.finale .tk-flood { transform: translateY(100%); transition: transform .8s cubic-bezier(.16, 1, .3, 1); }
-.finale.on .tk-flood { transform: none; }
-.finale.out .tk-flood { transform: translateY(-112%); transition: transform .65s cubic-bezier(.65, 0, .85, .3); }
-.finale.out .fn-h, .finale.out .fn-count { opacity: 0; transition: opacity .3s var(--ease); }
-.fn-in { position: relative; display: flex; flex-direction: column; align-items: center; gap: clamp(20px, 3.6vh, 36px); }
-.fn-h { display: flex; flex-direction: column; align-items: center; }
-.fn-t { font: 800 clamp(80px, 12vw, 176px)/.9 var(--f-head); filter: drop-shadow(0 12px 40px rgba(0,0,0,.3)); }
+/* половины в повёрнутом на 10° слое, который больше экрана: углы не открываются. --e — ширина шва */
+.fn-split { position: absolute; inset: -30vmax; transform: rotate(10deg); --e: 12vmin; }
+.fn-split i { position: absolute; top: 0; bottom: 0; }
+/* шов: тёмная полоса под щетиной, видна в просветах между волосками */
+.fn-seam { left: calc(50% - var(--e) / 2); width: var(--e); background: #0B0A10; opacity: 0; transition: opacity .4s var(--ease); }
+.fn-side { transition: transform .8s cubic-bezier(.16, 1, .3, 1), background-color .6s var(--ease); }
+.fn-side.a { left: 0; right: calc(50% - var(--e) / 2); background-color: var(--ca, #A50E1C); transform: translateX(-100%);
+  -webkit-mask: linear-gradient(#000 0 0) left / calc(100% - var(--e) + 1px) 100% no-repeat, var(--seam-a) right / var(--e) 100% no-repeat;
+  mask: linear-gradient(#000 0 0) left / calc(100% - var(--e) + 1px) 100% no-repeat, var(--seam-a) right / var(--e) 100% no-repeat; }
+.fn-side.b { right: 0; left: calc(50% - var(--e) / 2); background-color: var(--cb, #1D3FB8); transform: translateX(100%);
+  -webkit-mask: var(--seam-b) left / var(--e) 100% no-repeat, linear-gradient(#000 0 0) right / calc(100% - var(--e) + 1px) 100% no-repeat;
+  mask: var(--seam-b) left / var(--e) 100% no-repeat, linear-gradient(#000 0 0) right / calc(100% - var(--e) + 1px) 100% no-repeat; }
+.finale.on .fn-side { transform: none; }
+.finale.on .fn-seam { opacity: 1; transition-delay: .35s; }
+/* двери: разгон с места и уход за край */
+.finale.out .fn-side { transition: transform .75s cubic-bezier(.7, 0, .2, 1); }
+.finale.out .fn-side.a { transform: translateX(-100%); }
+.finale.out .fn-side.b { transform: translateX(100%); }
+.finale.out .fn-seam { opacity: 0; transition: opacity .2s; }
+.finale.out .fn-h, .finale.out .fn-count, .finale.out figcaption { opacity: 0; transition: opacity .3s var(--ease); }
+.fn-in { position: relative; display: flex; flex-direction: column; align-items: center; gap: clamp(20px, 4.4vh, 48px); }
+.fn-h { position: relative; display: flex; flex-direction: column; align-items: center; } /* осколки заголовка разлетаются от него */
+.fn-t { font: 800 clamp(64px, 9vw, 150px)/.9 var(--f-head); filter: drop-shadow(0 12px 40px rgba(0,0,0,.3)); }
 /* до сборки полосы невидимы (иначе на пару кадров мелькает готовое слово); после — держатся видимыми */
 .fn-t .tk-slice { opacity: 0; }
 .finale.on .fn-t .tk-slice { animation: tkSliceIn .8s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(.25s + var(--i) * 35ms); }
 @keyframes tkSliceIn { from { opacity: 0; transform: translateX(var(--dx)) scaleX(1.12); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
-.fn-h { position: relative; } /* осколки финала разлетаются от заголовка */
-.finale.on .tk-shard { animation: tkBurst 1.2s .55s cubic-bezier(.16, 1, .3, 1) both; }
-.fn-s { margin-top: 8px; font: 600 17px/24px var(--f-ui); color: rgba(255,255,255,.82); opacity: 0; transition: opacity .5s var(--ease) .6s; }
+.finale.on .fn-h .tk-shard { animation: tkBurst 1.2s .55s cubic-bezier(.16, 1, .3, 1) both; }
+.fn-s { margin-top: 8px; font: 600 17px/24px var(--f-ui); color: rgba(255,255,255,.86); text-shadow: 0 1px 14px rgba(0,0,0,.3); opacity: 0; transition: opacity .5s var(--ease) .6s; }
 .finale.on .fn-s { opacity: 1; }
-.fn-pair { display: flex; justify-content: center; gap: 24px; }
-/* постеры финалистов поднимаются со своих секторов колеса (app.js showFinale) */
-.fn-pair figure { margin: 0; width: clamp(140px, 14.7vw, 212px); display: flex; flex-direction: column; align-items: center; gap: 12px; rotate: -3deg; }
-.fn-pair figure:last-child { rotate: 3deg; }
-.fn-poster { width: 100%; aspect-ratio: 2 / 3; border-radius: 18px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 40px var(--f-head); color: rgba(255,255,255,.7); box-shadow: 0 30px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.1), 0 0 60px hsl(var(--h, 258) 70% 50% / .35); }
-.fn-pair figcaption { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
-.fn-pair figcaption b { max-width: 100%; font: 700 15px/20px var(--f-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fn-pair figcaption span { font: 500 13px/16px var(--f-ui); color: var(--tx3); }
-.fn-count { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 36px; font: 800 36px/1 var(--f-ui); letter-spacing: -.04em; font-variant-numeric: tabular-nums; background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 0 40px var(--glow); }
+/* --cw — ширина карточки; отсчёт и вспышка стоят на высоте середины постеров */
+.fn-duel { --cw: min(30vh, 33vw); position: relative; }
+.fn-pair { position: relative; display: flex; justify-content: center; gap: clamp(72px, 20vw, 400px); }
+.fn-pair figure { margin: 0; width: var(--cw); display: flex; flex-direction: column; align-items: center; gap: 16px; }
+/* постеры развёрнуты друг к другу; рывки на отсчёте — app.js clash (те же углы в ключевых кадрах) */
+.fn-poster { position: relative; width: 100%; aspect-ratio: 2 / 3; border-radius: 18px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 40px var(--f-head); color: rgba(255,255,255,.7);
+  transform: perspective(900px) rotateY(20deg); box-shadow: 0 40px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.16); }
+.fn-pair figure:last-child .fn-poster { transform: perspective(900px) rotateY(-20deg); }
+/* глянец по диагонали, как у падающей карточки */
+.fn-poster::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(135deg, rgba(255,255,255,.3), transparent 42%); }
+.fn-pair figcaption { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; }
+.fn-pair figcaption b { max-width: 100%; font: 800 clamp(16px, 1.5vw, 24px)/1.15 var(--f-head); letter-spacing: -.02em; text-wrap: balance; text-shadow: 0 2px 16px rgba(0,0,0,.35); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.fn-by { display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 100%; font: 600 15px/20px var(--f-ui); color: rgba(255,255,255,.92); }
+.fn-ava { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; object-fit: cover; font: 800 12px var(--f-head); color: #fff; }
+.fn-count { position: absolute; left: 50%; top: calc(var(--cw) * .75); translate: -50% -50%; font: 800 min(26vh, 19vw)/1 var(--f-head); letter-spacing: -.06em; color: #fff; font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 50px rgba(255,255,255,.5), 0 14px 40px rgba(0,0,0,.35); }
 .fn-count:empty { visibility: hidden; }
-/* отсчёт бьётся, как сердце: каждая секунда — толчок со вспышкой */
-.fn-count.beat { animation: fnBeat .8s var(--spring); }
-@keyframes fnBeat { from { transform: scale(1.28); box-shadow: inset 0 0 0 1px rgba(255,255,255,.35), 0 0 90px var(--glow); } }
+/* цифра врезается в экран: из большой размытой в чёткую */
+.fn-count.beat { animation: fnSlam .6s cubic-bezier(.16, 1, .3, 1); }
+@keyframes fnSlam { from { transform: scale(1.9); opacity: 0; filter: blur(14px); } 45% { opacity: 1; } to { transform: none; filter: blur(0); } }
+/* вспышка на стыке в момент удара — под карточками */
+.fn-flash { position: absolute; left: 50%; top: calc(var(--cw) * .75); width: 80vmin; height: 80vmin; translate: -50% -50%; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,255,255,.9), rgba(255,255,255,.22) 45%, transparent); opacity: 0; pointer-events: none; }
 /* выбывание: с каждым этапом всё, кроме колеса, отступает сильнее; наведённая панель возвращается */
 body[data-stage="mid"] .films-panel { opacity: .85; }
 body[data-stage="top"] .films-panel, body[data-stage="top"] .tools > *, body[data-stage="top"] .stage-top > * { opacity: .7; }
@@ -802,8 +853,9 @@ body[data-stage="final"] .react-bar { opacity: .5; }
 @media (hover: hover) {
   body[data-stage] .films-panel:hover, body[data-stage] .tools:hover > *, body[data-stage] .stage-top > :hover { opacity: 1; filter: none; }
 }
-/* без #room: зачёркивание выбывшего (#current.out) должно перебивать финальный градиент */
-body[data-stage="final"] .current span { background: linear-gradient(180deg, var(--h1a) 30%, var(--h1b) 125%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 22px var(--glow)); }
+/* без #room: зачёркивание выбывшего (#current.out) должно перебивать финальный градиент.
+   Градиент и свечение — цветом финалиста под стрелкой: название перекрашивается вместе с комнатой. Тень текста легла бы поверх букв — без неё */
+body[data-stage="final"] .current span { background: linear-gradient(180deg, var(--h1a) 30%, var(--acc-hi) 125%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 22px var(--glow)); text-shadow: none; }
 
 /* ---------- окна ---------- */
 /* Окно: фон проявляется, карточка всплывает. Без backdrop-filter: размытие поверх анимированного фона дёргало кадры. */
@@ -906,8 +958,24 @@ body[data-stage="final"] .current span { background: linear-gradient(180deg, var
 /* страница не всплывает карточкой: постер прилетает из колеса (app.js showWin → wheelFlight), текст проявляется следом */
 .modal.winner.full > .win-card { width: 100%; height: 100%; max-height: none; border-radius: 0; border: 0; box-shadow: none; background: transparent; overflow-y: auto; transform: none; opacity: 1; transition: none; }
 .winner.full .win-inner > img, .winner.full .win-inner > .noposter { animation: none; }
+/* фон победителя — цвет его постера (app.js showWin, --wc): заливка поднимается снизу рваным краем, как на заставках,
+   и остаётся; поверх размытый постер и затемнение слева под текст. Обёртка обрезает всё, что выходит за экран, — страница не скроллится лишним */
+.win-flood { position: absolute; inset: 0; overflow: hidden; }
+.win-flood > i { position: absolute; left: 0; right: 0; top: -24vh; bottom: 0; background-color: var(--wc, #24232E); transition: background-color .6s var(--ease);
+  -webkit-mask: var(--edge-t) top / 100% 24vh no-repeat, linear-gradient(#000 0 0) bottom / 100% calc(100% - 24vh + 1px) no-repeat;
+  mask: var(--edge-t) top / 100% 24vh no-repeat, linear-gradient(#000 0 0) bottom / 100% calc(100% - 24vh + 1px) no-repeat; }
+.win-flood::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.5), rgba(0,0,0,.16) 52%, transparent 80%), linear-gradient(180deg, transparent 55%, rgba(0,0,0,.35)); }
+@keyframes winFlood { from { transform: translateY(100%); } }
+/* постер парит в 3D: медленно покачивается и чуть поднимается, начиная с покоя — сразу после прилёта из колеса */
+@keyframes winFloat {
+  0%, 100% { transform: perspective(1400px) translateY(0) rotateY(0deg) rotateX(0deg); }
+  30% { transform: perspective(1400px) translateY(-12px) rotateY(-7deg) rotateX(3deg); }
+  70% { transform: perspective(1400px) translateY(6px) rotateY(5deg) rotateX(-2deg); }
+}
 @media (prefers-reduced-motion: no-preference) {
-  /* фон вспыхивает цветом постера и успокаивается */
+  .winner.full.open .win-flood > i { animation: winFlood 1s cubic-bezier(.22, 1, .36, 1) both; }
+  .winner.full.open .win-inner > img, .winner.full.open .win-inner > .noposter { animation: winFloat 9s 1s ease-in-out infinite; }
+  /* фон вспыхивает постером и успокаивается */
   .winner.full.open .win-bg { animation: winBloom 1.6s var(--ease) both; }
   .winner.full.open .win-inner > div > * { animation: winRise .8s var(--ease) both; }
   .winner.full.open .win-inner > div > :nth-child(1) { animation-delay: .35s; }
@@ -917,11 +985,10 @@ body[data-stage="final"] .current span { background: linear-gradient(180deg, var
   .winner.full.open .win-inner > div > :nth-child(n+5) { animation-delay: .67s; }
 }
 /* вспышка — только прозрачностью и масштабом: анимировать blur(70px) на слое во весь экран дорого */
-@keyframes winBloom { 0% { opacity: 0; transform: scale(1.12); } 35% { opacity: 1; } 100% { opacity: .8; transform: none; } }
+@keyframes winBloom { 0% { opacity: 0; transform: scale(1.12); } 35% { opacity: .65; } 100% { opacity: .4; transform: none; } }
 @keyframes winRise { from { opacity: 0; transform: translateY(20px); } }
 .winner.full .win-card::before { display: none; }
-.winner.full .win-bg { inset: -10%; filter: blur(70px) saturate(140%); opacity: .8; transform: none; }
-.winner.full .win-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--hero) 85%, transparent), color-mix(in srgb, var(--hero) 50%, transparent) 48%, color-mix(in srgb, var(--hero) 15%, transparent)), linear-gradient(180deg, transparent 60%, color-mix(in srgb, var(--hero) 60%, transparent)); }
+.winner.full .win-bg { inset: -10%; filter: blur(70px) saturate(140%); opacity: .4; transform: none; }
 .winner.full .win-inner { min-height: 100%; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 24px; align-items: center; align-content: center; padding: 48px 24px; }
 .winner.full .win-inner > div { grid-column: 2 / 7; grid-row: 1; }
 .winner.full .win-inner > img, .winner.full .win-inner > .noposter { grid-column: 8 / 12; grid-row: 1; justify-self: center; width: min(100%, calc((100dvh - 96px) * 2 / 3)); border-radius: 24px; box-shadow: 0 40px 90px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.12), 0 0 90px var(--glow); }
@@ -1470,8 +1537,7 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
   .quiz:not([hidden]) .qz-video { animation: riseIn .7s .22s var(--ease) both; }
   .quiz:not([hidden]) .qz-guess { animation: riseIn .7s .32s var(--ease) both; }
   .quiz:not([hidden]) .qz-side { animation: riseIn .7s .28s var(--ease) both; }
-  /* без заливки после конца: иначе анимация держала бы transform и перебивала наклон колеса (--tilt) */
-  .stage:not(.karaoke-on) .wheel-box { animation: riseIn .8s .1s var(--ease) backwards; }
+  .stage:not(.karaoke-on) .wheel-box { animation: riseIn .8s .1s var(--ease) both; }
 
   /* новый фильм в списке */
   .film.fresh { animation: filmIn .7s var(--spring) both; }
@@ -1774,7 +1840,7 @@ body.karaoke-on #room .quiz { align-self: center; }
   .tk-shard { display: none; }
   .finale { opacity: 0; transition: opacity .3s; }
   .finale.on { opacity: 1; }
-  .finale .tk-flood, .finale.on .tk-flood, .finale.out .tk-flood { transform: none; transition: none; }
+  .finale .fn-side.a, .finale .fn-side.b { transform: none; transition: none; }
   #autoWrap:not([hidden]), .fn-count.beat { animation: none; }
 }
 @keyframes tkFade { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }

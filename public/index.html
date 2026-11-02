@@ -57,7 +57,7 @@
 <!-- ===== Комната ===== -->
 <!-- «Сеанс»: фон — размытый постер фильма под стрелкой; поверх стеклянная панель фильмов (колонки 1–3) и сцена (4–12). -->
 <div id="room" hidden>
-  <div class="room-bg" id="roomBg" aria-hidden="true"><i class="amb on"></i><i class="amb"></i><i class="scrim"></i></div>
+  <div class="room-bg" id="roomBg" aria-hidden="true"><i class="amb on"></i><i class="amb"></i><i class="scrim"></i><i class="tug"></i></div>
 
   <div class="yt-panel" id="ytPanel" hidden>
     <div class="yt-player" id="ytPlayer">
@@ -313,12 +313,16 @@
     <div class="tk-in"><div class="tk-title" id="tkTitle"></div><div class="tk-sub" id="tkSub"></div></div>
     <div class="tk-shards" id="tkShards"></div>
   </div>
+  <!-- финал — дуэль: экран по диагонали в цветах двух финалистов, отсчёт на стыке (app.js showFinale, clash) -->
   <div class="finale" id="finale" hidden aria-live="polite">
-    <i class="tk-flood"></i>
+    <div class="fn-split" aria-hidden="true"><i class="fn-seam"></i><i class="fn-side a"></i><i class="fn-side b"></i></div>
     <div class="fn-in">
       <h2 class="fn-h"><span class="fn-t"></span><span class="fn-s">Колесо выбьет один из двух</span><span class="tk-shards" id="fnShards"></span></h2>
-      <div class="fn-pair" id="finalePair"></div>
-      <b class="fn-count" id="finaleCount"></b>
+      <div class="fn-duel">
+        <i class="fn-flash" aria-hidden="true"></i>
+        <div class="fn-pair" id="finalePair"></div>
+        <b class="fn-count" id="finaleCount"></b>
+      </div>
     </div>
   </div>
 </div>

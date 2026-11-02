@@ -143,9 +143,13 @@
   window.setBackdropActive = on => { target = typeof on === 'number' ? on : on ? 1 : 0; }; // число — сила, в финале ярче
   // оттенок 0–360 или null; кольцо светлее и насыщеннее самого постера, иначе тёмные постеры гасят свет
   window.setBackdropTint = h => { tint = h == null ? null : { ring: hsl(h, 0.75, 0.76), glow: hsl(h, 0.7, 0.56) }; };
+  // толчок света: волна от колеса и разлёт пыли. Сильные доли музыки, а ещё старт и остановка прокрута, сердцебиение финала (app.js)
+  window.setBackdropPulse = v => {
+    if (!reduce) for (const s of scenes) { s.waves.push({ age: 0, s: v }); s.kick = Math.max(s.kick, v); }
+  };
   window.setBackdropFx = v => {
     fx = v;
-    if (v.beat && !reduce) for (const s of scenes) { s.waves.push({ age: 0, s: v.beat }); s.kick = Math.max(s.kick, v.beat); }
+    if (v.beat) window.setBackdropPulse(v.beat);
   };
 
   let last = performance.now();

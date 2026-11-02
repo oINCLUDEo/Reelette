@@ -1,16 +1,10 @@
 // Колесо на canvas. Угол хранится в оборотах: rot ≡ −(позиция под стрелкой).
-// Стиль (по мотивам CIRO и ALCHE): колесо монохромное, в цвете только сектор под стрелкой — цвет бежит под ней,
-// как свет. Вместо обода с лампочками тонкое кольцо с бегущим бликом. На скорости колесо смазывается
-// и чуть запрокидывается в 3D, к остановке выпрямляется и становится резким.
 class Wheel {
   constructor(canvas, { onTick, onCurrent, idleSpeed = 0, hubButton = false } = {}) {
     this.hubButton = hubButton; // центр закрыт DOM-кнопкой, рисовать его не нужно
     this.cv = canvas;
     this.ctx = canvas.getContext('2d');
-    this.cache = document.createElement('canvas'); // монохромное колесо
-    this.cacheColor = document.createElement('canvas'); // цветное: из него рисуется сектор под стрелкой
-    this.box = canvas.parentElement; // наклон в 3D — CSS-переменной --tilt у него
-    this.tilt = 0; this.hotAt = 0; this.stopAt = 0;
+    this.cache = document.createElement('canvas');
     this.items = [];           // {id, title, poster, w, target}
     this.rot = 0;
     this.anim = null;
@@ -20,7 +14,8 @@ class Wheel {
     this.images = new Map();
     this.dirty = true;
     this.curId = null;
-    this.calm = matchMedia('(prefers-reduced-motion: reduce)').matches; // без вспышек, смаза и наклона
+    this.tint = null; // цвет постера под стрелкой (app.js): подсветка сектора и свечение ламп
+    this.calm = matchMedia('(prefers-reduced-motion: reduce)').matches; // без вспышек ламп
     this.readColors();
     new ResizeObserver(() => this.resize()).observe(canvas);
     this.resize();
@@ -34,8 +29,11 @@ class Wheel {
       seg: cs.getPropertyValue('--seg').split(',').map(s => s.trim()).filter(Boolean),
       accent: cs.getPropertyValue('--acc').trim(),
       accentL: cs.getPropertyValue('--acc-hi').trim(),
+      light: cs.getPropertyValue('--btn').trim(),
       bg: cs.getPropertyValue('--sheetA').trim(),
       bg2: cs.getPropertyValue('--s2').trim(),
+      rimA: cs.getPropertyValue('--s3').trim(),
+      rimB: cs.getPropertyValue('--sheetA').trim(),
       ink: cs.getPropertyValue('--tx').trim(),
       muted: cs.getPropertyValue('--tx3').trim(),
     };
@@ -47,18 +45,18 @@ class Wheel {
     const s = Math.round(this.cv.clientWidth * dpr);
     if (!s) return;
     this.cv.width = this.cv.height = s;
-    this.cache.width = this.cache.height = this.cacheColor.width = this.cacheColor.height = s;
+    this.cache.width = this.cache.height = s;
     this.dirty = true;
   }
 
-  // items: [{id, title, poster, weight}] в нужном порядке. Пропавшие плавно сжимаются.
+  // items: [{id, title, poster, weight, color}] в нужном порядке; color — цвет ника автора (кромка сектора). Пропавшие плавно сжимаются.
   setItems(list, { snap = false } = {}) {
     const byId = new Map(this.items.map(i => [i.id, i]));
     const next = [];
     const seen = new Set();
     for (const f of list) {
       const old = byId.get(f.id);
-      next.push({ id: f.id, title: f.title, poster: f.poster, w: old ? old.w : (snap ? f.weight : 0), target: f.weight });
+      next.push({ id: f.id, title: f.title, poster: f.poster, color: f.color, w: old ? old.w : (snap ? f.weight : 0), target: f.weight });
       seen.add(f.id);
       if (f.poster) this.loadImage(f.poster);
     }
@@ -126,6 +124,9 @@ class Wheel {
 
   setAngle(a) { if (!this.anim) this.rot = a; }
 
+  // остановка: сектор под стрелкой на миг приподнимается над колесом (app.js landFx)
+  land() { this.landAt = performance.now(); }
+
   static ease(t, k = 3.4) { return 1 - Math.pow(1 - t, k); }
 
   currentIndex() {
@@ -167,23 +168,16 @@ class Wheel {
       } else {
         const t = Math.min(1, Math.max(0, (el - a.wind) / (a.dur - a.wind)));
         this.rot = a.from - a.back + (a.to - a.from + a.back) * Wheel.ease(t, a.k);
-        if (t >= 1) { this.anim = null; this.mood = null; this.rot %= 1; this.stopAt = now; a.done?.(); }
+        if (t >= 1) { this.anim = null; this.mood = null; this.rot %= 1; a.done?.(); }
       }
     } else if (this.idleSpeed) this.rot += this.idleSpeed * dt;
     this.speed = this.anim && dt > 0 ? Math.abs(this.rot - prevRot) / dt : 0;
-
-    // глубина: на скорости колесо чуть запрокидывается (до 12°), к остановке плавно выпрямляется
-    if (!this.calm && this.box) {
-      this.tilt += ((this.anim ? Math.min(12, this.speed * 9) : 0) - this.tilt) * Math.min(1, dt * 4);
-      if (Math.abs(this.tilt - (this.tiltSet ?? -1)) > 0.05) { this.box.style.setProperty('--tilt', `${this.tilt.toFixed(2)}deg`); this.tiltSet = this.tilt; }
-    }
 
     const idx = this.currentIndex();
     const id = this.items[idx]?.id ?? null;
     if (id !== this.curId) {
       const prev = this.curId;
       this.curId = id;
-      this.hotAt = now;
       if (prev !== null && this.anim) this.onTick();
       this.onCurrent(this.items[idx] || null);
     }
@@ -201,14 +195,11 @@ class Wheel {
 
   buildCache() {
     const { S, c, R, hub } = this.geom();
-    const g = this.cacheColor.getContext('2d');
+    const g = this.cache.getContext('2d');
     g.clearRect(0, 0, S, S);
-    const m = this.cache.getContext('2d');
-    m.clearRect(0, 0, S, S);
     const total = this.total;
     if (!total) return;
     const segs = this.colors.seg;
-    const arcs = []; // углы секторов — для цветных деталей поверх монохрома
     let acc = 0;
     this.items.forEach((it, i) => {
       const a0 = -Math.PI / 2 + (acc / total) * Math.PI * 2;
@@ -216,7 +207,6 @@ class Wheel {
       const a1 = -Math.PI / 2 + (acc / total) * Math.PI * 2;
       const span = a1 - a0;
       if (span <= 0.0005) return;
-      arcs.push({ it, a0, a1 });
       const mid = (a0 + a1) / 2;
 
       g.save();
@@ -296,27 +286,6 @@ class Wheel {
       g.fillText(text, flip ? -R * 0.93 : R * 0.93, 0);
       g.restore();
     });
-
-    // монохромная копия: то же колесо в серой гамме и чуть темнее (наложение «saturation» серым убирает цвет,
-    // попиксельной обработки и копий постеров не нужно). Обрезаем кругом, иначе серым зальётся и угол холста
-    m.drawImage(this.cacheColor, 0, 0);
-    m.save();
-    m.beginPath(); m.arc(c, c, R, 0, Math.PI * 2); m.clip();
-    m.globalCompositeOperation = 'saturation'; m.fillStyle = '#808080'; m.fillRect(0, 0, S, S);
-    m.globalCompositeOperation = 'source-atop'; m.fillStyle = 'rgba(0,0,0,.22)'; m.fillRect(0, 0, S, S);
-    m.restore();
-    // в монохроме остаются цветными вспышка выбывшего и кромка цвета автора
-    for (const { it, a0, a1 } of arcs) {
-      if (it.dying) {
-        m.save(); m.beginPath(); m.moveTo(c, c); m.arc(c, c, R, a0, a1); m.closePath();
-        m.fillStyle = 'rgba(255, 60, 90, .45)'; m.fill(); m.restore();
-      }
-      if (it.color) {
-        m.save(); m.beginPath(); m.moveTo(c, c); m.arc(c, c, R, a0, a1); m.closePath(); m.clip();
-        m.beginPath(); m.arc(c, c, R - S / 160, a0, a1);
-        m.strokeStyle = it.color; m.lineWidth = S / 80; m.globalAlpha = 0.9; m.stroke(); m.restore();
-      }
-    }
   }
 
   draw(now, idx) {
@@ -324,76 +293,72 @@ class Wheel {
     const x = this.ctx;
     x.clearRect(0, 0, S, S);
 
+    // обод с лампочками
+    x.save();
+    x.beginPath(); x.arc(c, c, c * 0.995, 0, Math.PI * 2);
+    const rim = x.createLinearGradient(0, 0, 0, S);
+    rim.addColorStop(0, this.colors.rimA); rim.addColorStop(1, this.colors.rimB);
+    x.fillStyle = rim; x.fill();
+    x.lineWidth = Math.max(1, S / 400); x.strokeStyle = 'rgba(255,255,255,.12)'; x.stroke();
+    x.restore();
+
     const total = this.total;
     if (!total) {
       x.beginPath(); x.arc(c, c, R, 0, Math.PI * 2);
-      x.fillStyle = 'rgba(255,255,255,.06)'; x.fill();
+      x.fillStyle = this.colors.seg[0] || '#222'; x.fill();
     } else {
-      const ang = this.rot * Math.PI * 2;
       x.save();
-      x.translate(c, c);
-      // смаз на скорости: три полупрозрачные копии чуть позади по ходу вращения, на замедлении исчезают
-      const blur = this.anim && !this.calm ? Math.min(1, Math.max(0, (this.speed - 0.5) / 1.5)) : 0;
-      if (blur > 0) {
-        const step = this.speed * Math.PI * 2 / 180; // треть кадра при 60 к/с
-        x.globalAlpha = 0.22 * blur;
-        for (let i = 3; i >= 1; i--) { x.save(); x.rotate(ang - step * i); x.drawImage(this.cache, -c, -c); x.restore(); }
-        x.globalAlpha = 1;
-      }
-      x.rotate(ang);
+      x.translate(c, c); x.rotate(this.rot * Math.PI * 2);
       x.drawImage(this.cache, -c, -c);
+      // подсветка сегмента под стрелкой
       if (idx >= 0) {
         let acc = 0;
         for (let i = 0; i < idx; i++) acc += this.items[i].w;
         const a0 = -Math.PI / 2 + (acc / total) * Math.PI * 2;
         const a1 = a0 + (this.items[idx].w / total) * Math.PI * 2;
-        // цвет — только у сектора под стрелкой; на медленном ходу он проявляется мягко, на быстром бежит без задержки
-        x.save();
-        x.beginPath(); x.moveTo(0, 0); x.arc(0, 0, R, a0, a1); x.closePath(); x.clip();
-        x.globalAlpha = this.anim && this.speed > 1 ? 1 : Math.min(1, (now - this.hotAt) / 180);
-        x.drawImage(this.cacheColor, -c, -c);
-        x.restore();
-        // световая кромка по ободу — цветом автора фильма, если он его выбрал, иначе акцентом темы
-        const hc = this.items[idx].color || this.colors.accent;
+        // приподнятый сектор: за 0,14 с выходит наружу с тенью, потом плавно садится на место
+        const lt = this.landAt && !this.calm ? (now - this.landAt) / 1000 : 1;
+        const lift = lt >= 1 ? 0 : lt < 0.14 ? 1 - (1 - lt / 0.14) ** 3 : (1 - (lt - 0.14) / 0.86) ** 2;
+        if (lift > 0) {
+          const mid = (a0 + a1) / 2, off = R * 0.04 * lift;
+          x.translate(Math.cos(mid) * off, Math.sin(mid) * off);
+          x.beginPath(); x.moveTo(0, 0); x.arc(0, 0, R, a0, a1); x.closePath();
+          x.save(); x.shadowColor = 'rgba(0,0,0,.6)'; x.shadowBlur = S / 22 * lift; x.fillStyle = '#000'; x.fill(); x.restore();
+          x.save(); x.clip(); x.drawImage(this.cache, -c, -c); x.restore();
+        }
+        x.beginPath(); x.moveTo(0, 0); x.arc(0, 0, R, a0, a1); x.closePath();
+        x.fillStyle = `rgba(255,255,255,${(0.07 + lift * 0.1).toFixed(3)})`; x.fill();
+        // подсветка — цветом автора фильма, если он его выбрал, иначе цветом постера (tint из app.js) или акцентом темы
+        const hc = this.items[idx].color || this.tint || this.colors.accent;
         x.beginPath(); x.arc(0, 0, R - S / 300, a0, a1);
-        x.strokeStyle = hc; x.lineWidth = S / 160;
-        x.shadowColor = hc; x.shadowBlur = S / 45; x.stroke();
-        x.shadowBlur = 0;
+        x.strokeStyle = hc; x.lineWidth = S / 120;
+        x.shadowColor = hc; x.shadowBlur = S / 40; x.stroke();
       }
       x.restore();
     }
 
-    // край диска
+    // кольцо по краю колеса
     x.beginPath(); x.arc(c, c, R, 0, Math.PI * 2);
-    x.lineWidth = S / 320; x.strokeStyle = 'rgba(0,0,0,.5)'; x.stroke();
+    x.lineWidth = S / 160; x.strokeStyle = 'rgba(0,0,0,.55)'; x.stroke();
 
-    // тонкое кольцо вместо обода с лампочками. На прокруте по нему бежит блик (вдвое быстрее колеса, гаснет к остановке),
-    // на сильных долях музыки (fx.js) кольцо вспыхивает, в финале на доползании дышит, на остановке коротко загорается
-    const rr = c * 0.955;
+    // лампочки: в покое ровные и тусклые, при прокруте бегут; в финале на доползании горят все и дышат.
+    // Если играет музыка прокрута, на каждой сильной доле (fx.js) вспыхивают все
+    const n = 36;
+    const lr = (c * 0.995 + R) / 2;
+    const chase = Math.floor(now / 1000 * 14);
     const fx = window.Fx;
-    const flash = this.anim && fx && !this.calm ? Math.max(0, 1 - (now - fx.beatAt) / 260) : 0;
+    const flash = this.anim && fx && !this.calm ? Math.max(0, 1 - (now - fx.beatAt) / 220) : 0;
     const crawl = this.anim && this.mood === 'final' && this.speed < 0.6;
-    const breath = crawl ? 0.5 + 0.5 * Math.sin(now / 1000 * 7.4) : 0;
-    const stop = this.calm ? 0 : Math.max(0, 1 - (now - this.stopAt) / 700);
-    x.beginPath(); x.arc(c, c, rr, 0, Math.PI * 2);
-    x.lineWidth = Math.max(1, S / 420);
-    x.strokeStyle = `rgba(255,255,255,${Math.min(0.9, 0.14 + flash * 0.35 + breath * 0.4 + stop * 0.55).toFixed(3)})`;
-    x.stroke();
-    const comet = this.anim && !this.calm ? Math.min(1, this.speed / 0.8) : 0;
-    if (comet > 0.02) {
-      const head = this.rot * Math.PI * 4 - Math.PI / 2, len = 1.1, n = 14;
-      x.lineCap = 'round';
-      for (let i = 0; i < n; i++) {
-        const k = 1 - i / n;
-        x.beginPath(); x.arc(c, c, rr, head - ((i + 1) / n) * len, head - (i / n) * len);
-        x.strokeStyle = `rgba(255,255,255,${(comet * k * k * 0.95).toFixed(3)})`;
-        x.lineWidth = (S / 200) * (0.4 + 0.6 * k);
-        if (!i) { x.shadowColor = this.colors.accent; x.shadowBlur = S / 50; }
-        x.stroke();
-        x.shadowBlur = 0;
-      }
-      x.lineCap = 'butt';
+    const breath = 0.5 + 0.5 * Math.sin(now / 1000 * 7.4);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const on = crawl || (this.anim && ((chase + i) % 3 === 0 || flash > 0.4));
+      x.beginPath(); x.arc(c + Math.cos(a) * lr, c + Math.sin(a) * lr, S / 170, 0, Math.PI * 2);
+      x.fillStyle = on ? this.colors.light : 'rgba(255,255,255,.16)';
+      x.shadowColor = this.tint || this.colors.accent; x.shadowBlur = on ? S / (crawl ? 40 + breath * 60 : 50 - flash * 25) : 0;
+      x.fill();
     }
+    x.shadowBlur = 0;
 
     if (this.hubButton) return;
 

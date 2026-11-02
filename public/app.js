@@ -309,7 +309,7 @@ function initRoom(roomId) {
   // ---- звук щелчка ----
   function tick() {
     const p = $('#pointer');
-    p.classList.remove('tick'); void p.offsetWidth; p.classList.add('tick');
+    p.classList.remove('tick', 'flare'); void p.offsetWidth; p.classList.add('tick');
     if (settings.sound) Sfx.tick();
   }
 
@@ -321,8 +321,11 @@ function initRoom(roomId) {
       $$('.film').forEach(el => el.classList.toggle('hot', el.dataset.id === it?.id));
       // стрелка светится цветом автора фильма под ней (style.css .pointer)
       if (it?.color) $('#pointer').style.setProperty('--pg', it.color); else $('#pointer').style.removeProperty('--pg');
-      // фон перекрашивается под фильм у стрелки, когда колесо уже медленное: на быстром ходу смена мельтешила бы
-      if (!wheel.anim || wheel.speed < 1.2) setAmbient(it);
+      // фон и акцент интерфейса перекрашиваются под фильм у стрелки, когда колесо уже медленное: на быстром ходу смена мельтешила бы.
+      // Свет вокруг колеса и подсветка сектора следуют за стрелкой всегда — на скорости цвета смешиваются в переливы
+      const slow = !wheel.anim || wheel.speed < 1.2;
+      paintFilm(it, slow);
+      if (slow) setAmbient(it);
     },
   });
 
@@ -349,9 +352,40 @@ function initRoom(roomId) {
       next.style.setProperty('--h', hue(it.title || ''));
       next.classList.add('on');
       cur.classList.remove('on');
-      // свет вокруг колеса — в тон того же постера: колесо и комната одного цвета
-      (it.poster ? posterHue(it.poster) : Promise.resolve(hue(it.title || ''))).then(h => { if (ambId === it.id) window.setBackdropTint?.(h); });
     }, Math.max(60, 500 - (performance.now() - ambAt)));
+  }
+  // ---- цвет фильма под стрелкой красит комнату (как у CIRO): свет вокруг колеса, подсветка сектора и лампы,
+  // а на медленном ходу и акцент интерфейса (style.css #room.fc). Колесо, комната и постер — одного тона ----
+  let paintId, paintTimer = null, paintAt = 0;
+  function paintFilm(it, ui) {
+    const id = it?.id ?? null;
+    if (id === paintId && !ui) return;
+    paintId = id;
+    clearTimeout(paintTimer);
+    // на быстром ходу сектора сменяются чаще, чем успевает перетечь цвет: красим не чаще раза в 90 мс
+    paintTimer = setTimeout(() => {
+      paintAt = performance.now();
+      (it?.poster ? posterHue(it.poster) : Promise.resolve(it ? hue(it.title || '') : null)).then(h => { if (paintId === id) paintHue(h, ui); });
+    }, Math.max(0, 90 - (performance.now() - paintAt)));
+  }
+  function paintHue(h, ui) {
+    window.setBackdropTint?.(h);
+    wheel.tint = h == null ? null : `hsl(${h} 85% 62%)`;
+    if (h != null) $('#roomBg .tug').style.setProperty('--tug', `hsl(${h} 85% 52% / .6)`);
+    if (!ui) return;
+    const room = $('#room');
+    if (h == null) { room.classList.remove('fc'); return; } // серый постер: акцент темы
+    room.style.setProperty('--fa', `hsl(${h} 80% 58%)`);
+    room.style.setProperty('--fa-hi', `hsl(${h} 90% 76%)`);
+    room.style.setProperty('--fa-glow', `hsl(${h} 85% 55% / .45)`);
+    // текст на акценте: на светлом цвете (жёлтый, салатовый) тёмный, на тёмном белый — что контрастнее
+    room.style.setProperty('--fa-on', hslLum(h, 0.8, 0.58) > 0.18 ? '#0A0A0F' : '#FFFFFF');
+    room.classList.add('fc');
+  }
+  // относительная яркость цвета hsl (0–1) по WCAG
+  function hslLum(h, s, l) {
+    const ch = n => { const k = (n + h / 30) % 12, c = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1)); return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * ch(0) + 0.7152 * ch(8) + 0.0722 * ch(4);
   }
   // тон постера: средний оттенок насыщенных пикселей (вектором по кругу оттенков); серый постер — без тона, свет из темы
   const hueCache = new Map();
@@ -386,9 +420,19 @@ function initRoom(roomId) {
   // заголовок над колесом: фильм под стрелкой, а сразу после выбывания — зачёркнутое название
   let outShown = false, outTimer = null;
   function setCurrent(text, out = false) {
-    const h = $('#current'), wasOut = h.classList.contains('out');
+    const h = $('#current'), el = $('#currentTitle'), wasOut = h.classList.contains('out');
+    // смены чаще, чем раз в 190 мс, барабан не успевает (roll ставит текст сразу)
+    const fast = el.textContent !== text && performance.now() - (el._rollAt || 0) < 190;
     h.classList.toggle('out', out);
-    roll($('#currentTitle'), text, wasOut && !out ? 'drop' : 'up');
+    roll(el, text, wasOut && !out ? 'drop' : 'up');
+    // на скорости название вспыхивает RGB-сдвигом с наклоном (как глитч у ALCHE). В финале название градиентом — там тень легла бы поверх букв
+    if (fast && wheel.anim && !reduceMotion && document.body.dataset.stage !== 'final') {
+      el.animate([
+        { textShadow: '-.07em 0 0 rgba(255, 40, 100, .85), .07em 0 0 rgba(0, 225, 255, .85)', transform: 'translateX(.04em) skewX(-6deg)' },
+        { textShadow: '.03em 0 0 rgba(255, 40, 100, .5), -.03em 0 0 rgba(0, 225, 255, .5)', transform: 'translateX(-.02em) skewX(3deg)', offset: 0.35 },
+        { textShadow: '0 0 0 rgba(255, 40, 100, 0), 0 0 0 rgba(0, 225, 255, 0)', transform: 'none' },
+      ], { duration: 200, easing: 'ease-out' });
+    }
   }
   // барабан: up — старое уходит вверх, новое поднимается снизу; down — наоборот (счёт вниз);
   // drop — зачёркнутое выбывшее падает, новое опускается сверху.
@@ -457,20 +501,24 @@ function initRoom(roomId) {
   // ---- заставки на весь экран: этап выбывания и финал (по мотивам сайта Notturno) ----
   // Заливка поднимается снизу рваным чернильным краем, заголовок собирается из полос со смазом,
   // на сборке разлетаются осколки, потом всё уезжает вверх и открывает колесо.
-  // Край заливки — щетина разной длины, как мазок сухой кистью; каждый раз новый
-  function inkEdge(top) {
+  // Край заливки — щетина разной длины, как мазок сухой кистью; каждый раз новый.
+  // from — сторона, от которой растут волоски: bottom (верхний край заливки), top (нижний), left и right (шов дуэли в финале)
+  function inkEdge(from) {
     const ph = [Math.random() * 6, Math.random() * 6, Math.random() * 6];
     let d = '';
     for (let x = 0; x < 1000;) {
       const w = 2 + Math.random() * 5;
       const n = 0.5 + 0.22 * Math.sin(x / 90 + ph[0]) + 0.14 * Math.sin(x / 31 + ph[1]) + 0.08 * Math.sin(x / 11 + ph[2]);
       const h = Math.min(200, Math.max(6, 200 * n * (0.55 + Math.random() * 0.6))).toFixed(1);
-      d += top ? `M${x.toFixed(1)} 200h${w.toFixed(1)}v-${h}h-${w.toFixed(1)}z` : `M${x.toFixed(1)} 0h${w.toFixed(1)}v${h}h-${w.toFixed(1)}z`;
+      const a = x.toFixed(1), b = w.toFixed(1);
+      d += from === 'bottom' ? `M${a} 200h${b}v-${h}h-${b}z` : from === 'top' ? `M${a} 0h${b}v${h}h-${b}z`
+        : from === 'left' ? `M0 ${a}v${b}h${h}v-${b}z` : `M200 ${a}v${b}h-${h}v-${b}z`;
       x += w;
     }
-    return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 200" preserveAspectRatio="none"><path d="${d}"/></svg>`)}")`;
+    const box = from === 'left' || from === 'right' ? '0 0 200 1000' : '0 0 1000 200';
+    return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box}" preserveAspectRatio="none"><path d="${d}"/></svg>`)}")`;
   }
-  const inkMask = el => { el.style.setProperty('--edge-t', inkEdge(true)); el.style.setProperty('--edge-b', inkEdge(false)); };
+  const inkMask = el => { el.style.setProperty('--edge-t', inkEdge('bottom')); el.style.setProperty('--edge-b', inkEdge('top')); };
   // заголовок из шести горизонтальных полос: каждая влетает со своей стороны; длинное слово ужимаем в ширину экрана
   function sliceTitle(box, text) {
     box.style.fontSize = '';
@@ -478,10 +526,10 @@ function initRoom(roomId) {
     const w = box.firstChild.offsetWidth, max = innerWidth * 0.9;
     if (w > max) box.style.fontSize = `${parseFloat(getComputedStyle(box).fontSize) * max / w}px`;
   }
-  // белые осколки разлетаются от заголовка, когда он собрался
-  function shards(box) {
+  // белые осколки разлетаются от заголовка, когда он собрался; m — масштаб размера и разлёта
+  function shards(box, m = 1) {
     box.innerHTML = Array.from({ length: 12 }, () => {
-      const a = Math.random() * Math.PI * 2, d = 26 + Math.random() * 36, s = 0.8 + Math.random() * 2.8;
+      const a = Math.random() * Math.PI * 2, d = (26 + Math.random() * 36) * m, s = (0.8 + Math.random() * 2.8) * m;
       const pts = Array.from({ length: 4 }, (_, k) => { const t = k * Math.PI / 2 + Math.random() * 0.9, rr = 30 + Math.random() * 20; return `${(50 + Math.cos(t) * rr).toFixed(0)}% ${(50 + Math.sin(t) * rr).toFixed(0)}%`; }).join(',');
       return `<i class="tk-shard" style="--s:${s.toFixed(2)}vw;--sx:${(Math.cos(a) * d).toFixed(1)}vmin;--sy:${(Math.sin(a) * d).toFixed(1)}vmin;--sr:${(Math.random() * 540 - 270).toFixed(0)}deg;clip-path:polygon(${pts})"></i>`;
     }).join('');
@@ -568,32 +616,132 @@ function initRoom(roomId) {
     // выбывший постер гаснет на лету
     el.firstChild.animate([{ filter: 'none' }, { filter: 'grayscale(1) brightness(.7)' }], { duration: T * 1000, easing: 'ease-in' });
   }
+  // осколки из точки экрана: у острия стрелки на остановке, на стыке в финале (style.css .burst)
+  function burst(host, x, y, k) {
+    const box = document.createElement('div');
+    box.className = 'tk-shards burst';
+    box.style.left = `${x}px`; box.style.top = `${y}px`;
+    shards(box, k);
+    host.append(box);
+    setTimeout(() => box.remove(), 1400);
+  }
+  // заголовок собирается из шести полос, как на заставках: копии поверх оригинала, каждая обрезана своей полосой
+  // и влетает с боков со смазом. Сам заголовок спрятан, пока полосы летят; новый roll() убирает их сразу (класс roll-old)
+  function sliceIn(el, { delay = 0, dur = 700, cls = '' } = {}) {
+    if (reduceMotion || !el?.offsetParent || !el.textContent.trim()) return;
+    const host = el.offsetParent, w = el.offsetWidth, base = getComputedStyle(el).filter;
+    const glow = base === 'none' ? '' : ` ${base}`; // своё свечение (drop-shadow) у заголовка победителя сохраняем
+    const copies = Array.from({ length: 6 }, (_, i) => {
+      const c = el.cloneNode(true);
+      c.removeAttribute('id');
+      c.setAttribute('aria-hidden', 'true');
+      if (cls) c.classList.add(cls);
+      Object.assign(c.style, { position: 'absolute', margin: '0', gridArea: 'auto', pointerEvents: 'none', left: `${el.offsetLeft}px`, top: `${el.offsetTop}px`, width: `${w}px`,
+        clipPath: `inset(calc(${(i * 100 / 6).toFixed(3)}% - 1px) 0 calc(${(100 - (i + 1) * 100 / 6).toFixed(3)}% - 1px) 0)` });
+      host.append(c);
+      const dx = (i % 2 ? 1 : -1) * (0.06 + Math.random() * 0.1) * w;
+      c.animate([{ transform: `translateX(${dx.toFixed(1)}px) scaleX(1.1)`, opacity: 0, filter: `blur(7px)${glow}` }, { transform: 'none', opacity: 1, filter: `blur(0px)${glow}` }],
+        { duration: dur, delay: delay + i * 30, easing: 'cubic-bezier(.16, 1, .3, 1)', fill: 'both' });
+      return c;
+    });
+    const hide = el.animate([{ opacity: 0 }, { opacity: 0 }], { duration: delay + dur + 150 });
+    hide.onfinish = hide.oncancel = () => copies.forEach(c => c.remove());
+  }
+  // старт прокрута: от центра по колесу проходит кольцо-волна, колесо подаётся к зрителю, свет вокруг вспыхивает
+  function launchFx(stage) {
+    const box = $('#wheelBox');
+    if (reduceMotion || !box?.offsetParent) return;
+    const ring = document.createElement('i');
+    ring.className = 'shock';
+    box.append(ring);
+    ring.animate([{ transform: 'scale(.26)', opacity: 0.95 }, { transform: 'scale(1.22)', opacity: 0 }], { duration: 950, easing: 'cubic-bezier(.16, 1, .3, 1)' }).onfinish = () => ring.remove();
+    box.animate([{ scale: '1' }, { scale: '1.03', offset: 0.28 }, { scale: '1' }], { duration: 1000, easing: 'cubic-bezier(.22, 1, .36, 1)' });
+    window.setBackdropPulse?.(stage === 'final' ? 1.6 : 1.2);
+  }
+  // с замахом (полуфинал, финал) волна идёт, когда колесо срывается вперёд, а не когда оттягивается
+  function launchAt(spin, elapsed = 0) {
+    const d = Math.min(Wheel.feel(spin.stage).wind, spin.duration * 250) - elapsed;
+    if (d > -250) setTimeout(() => { if (curSpin?.sid === spin.sid) launchFx(spin.stage); }, Math.max(0, d));
+  }
+  // остановка: стрелка вспыхивает, сектор под ней приподнимается, от острия разлетаются осколки, название встаёт из полос
+  function landFx() {
+    const p = $('#pointer');
+    if (reduceMotion || !p?.offsetParent) return;
+    p.classList.remove('tick', 'flare'); void p.offsetWidth; p.classList.add('flare');
+    wheel.land();
+    const r = p.getBoundingClientRect();
+    burst($('#room'), r.left + r.width / 2, r.bottom, 0.45);
+    window.setBackdropPulse?.(0.9);
+    sliceIn($('#currentTitle'), { dur: 560, cls: 'roll-old' });
+  }
+  // сердцебиение доползания в полуфинале и финале: свет вокруг колеса вспыхивает цветом фильма под стрелкой
+  function heartFx() {
+    if (reduceMotion) return;
+    window.setBackdropPulse?.(0.55);
+    $('#roomBg .tug').animate([{ opacity: 1, scale: '1.08' }, { scale: '1' }], { duration: 800, easing: 'cubic-bezier(.2, .8, .2, 1)' });
+  }
+  // ---- финал — дуэль (style.css .finale): экран по диагонали в цветах двух финалистов, постеры друг напротив друга ----
+  let fnAt = 0;
   function showFinale(spin) {
     const byId = new Map(state.films.map(f => [f.id, f]));
     const pair = spin.snapshot.map(s => byId.get(s.id)).filter(Boolean);
-    setHTML($('#finalePair'), pair.map(f => `<figure data-id="${esc(f.id)}" style="--h:${hue(f.title)}"><span class="fn-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</span><figcaption><b>${esc(f.title)}</b><span>${esc(f.addedBy || '')}</span></figcaption></figure>`).join(''));
+    // под постером — фильм и автор с его аватаркой и ником в его оформлении
+    setHTML($('#finalePair'), pair.map(f => {
+      const pid = personOf(f), name = f.addedBy || 'Без имени', p = prof(pid);
+      return `<figure data-id="${esc(f.id)}"><span class="fn-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</span><figcaption><b>${esc(f.title)}</b><span class="fn-by">${avaHtml(pid, name, p, avatarFor(pid), 'fn-ava')}${nick(pid, name, p)}</span></figcaption></figure>`;
+    }).join(''));
     const el = $('#finale');
     clearTimeout(el._t);
     el.classList.remove('on', 'out');
     el.hidden = false;
-    // тем же языком, что заставки этапов: красная заливка рваным краем, «Финал» из полос, осколки
-    inkMask(el);
+    fnAt = performance.now();
+    // половины — тон постера своего финалиста; пока тон считается, цвет по названию (как у сектора без постера)
+    pair.forEach((f, i) => {
+      const set = h => el.style.setProperty(i ? '--cb' : '--ca', `hsl(${h} 72% 42%)`);
+      set(hue(f.title));
+      if (f.poster) posterHue(pimg(f.poster)).then(h => { if (h != null) set(h); });
+    });
+    // шов: щетина левой половины растёт вправо, правой — влево, и они врезаются друг в друга
+    el.style.setProperty('--seam-a', inkEdge('left'));
+    el.style.setProperty('--seam-b', inkEdge('right'));
     sliceTitle($('#finale .fn-t'), 'Финал');
     shards($('#fnShards'));
-    // постеры финалистов поднимаются со своих секторов колеса, пока заливка накрывает комнату
+    // постеры финалистов поднимаются со своих секторов колеса, пока половины съезжаются
     if (!reduceMotion) $$('#finalePair figure').forEach((fig, i) => wheelFlight(fig, wheelPoint(fig.dataset.id), { duration: 1100, delay: 250 + i * 120, easing: 'cubic-bezier(.34, 1.3, .64, 1)', fill: 'backwards' }));
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  }
+  // удар на секунде отсчёта: карточки бросаются друг на друга и отскакивают, в момент удара на стыке вспышка и осколки,
+  // экран вздрагивает. С каждой секундой сильнее; пока постеры летят из колеса (первая секунда), удара нет
+  function clash(sec) {
+    const el = $('#finale');
+    if (reduceMotion || el.hidden || el.classList.contains('out') || performance.now() - fnAt < 900) return;
+    const k = Math.min(1, 0.55 + (4 - sec) * 0.15);
+    $$('#finalePair .fn-poster').forEach((p, i) => {
+      const s = i ? -1 : 1, rest = `perspective(900px) translateX(0) rotateY(${s * 20}deg) scale(1)`;
+      p.animate([
+        { transform: rest, easing: 'cubic-bezier(.55, 0, .9, .45)' },
+        { transform: `perspective(900px) translateX(${(s * 5.5 * k).toFixed(2)}vw) rotateY(${s * 8}deg) scale(${(1 + 0.07 * k).toFixed(3)})`, offset: 0.2, easing: 'cubic-bezier(.16, 1, .3, 1)' },
+        { transform: rest },
+      ], { duration: 780 });
+    });
+    setTimeout(() => {
+      if (el.hidden || el.classList.contains('out')) return;
+      const c = $('#finaleCount').getBoundingClientRect(), a = 10 * k;
+      burst(el, c.left + c.width / 2, c.top + c.height / 2, 0.55 + 0.4 * k);
+      $('#finale .fn-flash').animate([{ opacity: 0.9 * k }, { opacity: 0 }], { duration: 520, easing: 'ease-out' });
+      el.animate([{ transform: 'none' }, { transform: `translate(${-a}px, ${a * 0.6}px)` }, { transform: `translate(${a * 0.8}px, ${-a * 0.5}px)` }, { transform: `translate(${-a * 0.4}px, ${a * 0.3}px)` }, { transform: 'none' }], { duration: 320 });
+    }, 156);
   }
   function hideFinale() {
     const el = $('#finale');
     if (el.hidden) return;
     clearTimeout(el._t);
-    // после отсчёта заливка уезжает вверх и открывает колесо, надписи гаснут, а постеры возвращаются в колесо, и оно стартует
+    // после отсчёта половины разъезжаются, как двери, и открывают колесо, надписи гаснут, а постеры возвращаются в колесо, и оно стартует
     if (!reduceMotion && el.classList.contains('on')) {
       el.classList.add('out');
       $$('#finalePair figure').forEach(fig => wheelFlight(fig, wheelPoint(fig.dataset.id), { duration: 650, easing: 'cubic-bezier(.5, 0, .75, 0)', fill: 'forwards' }, true));
     } else el.classList.remove('on');
-    el._t = setTimeout(() => { el.hidden = true; el.classList.remove('on', 'out'); }, 700);
+    el._t = setTimeout(() => { el.hidden = true; el.classList.remove('on', 'out'); }, 800);
   }
   function endDrama() {
     clearInterval(heartTimer); heartTimer = null;
@@ -817,11 +965,21 @@ function initRoom(roomId) {
       if (!spin.chapter) musicOff(); // перед стартом тишина и отсчёт; на главе музыка серии не прерывается
       if (spin.stage === 'final') showFinale(spin);
       startCountdown(spin);
-    } else musicOn(spin.stage);
-    if (spin.stage === 'final') {
-      heartTimer = setInterval(() => { if (settings.sound && wheel.anim && wheel.speed > 0 && wheel.speed < 0.35) Sfx.heart(); }, 860);
+    } else {
+      musicOn(spin.stage);
+      launchAt(spin, elapsed);
     }
+    if (spin.stage === 'final') {
+      heartTimer = setInterval(() => {
+        if (!wheel.anim || !(wheel.speed > 0 && wheel.speed < 0.35)) return;
+        if (settings.sound) Sfx.heart();
+        heartFx();
+      }, 860);
+    }
+    // зашедший, когда колесо уже стоит, остановку не видит: без вспышки и осколков
+    const live = elapsed < spin.duration * 1000;
     wheel.spin(spin, state.angle, elapsed, () => {
+      if (live) landFx();
       spinningSid = null;
       curSpin = null;
       clearInterval(heartTimer); heartTimer = null;
@@ -835,6 +993,7 @@ function initRoom(roomId) {
       // после финала фокус держится до окна победителя; между прокрутами серии этап не сбрасывается — комната не мигает
       setTimeout(() => { if (!spinningSid && !(state.series && spin.stage !== 'final')) setStage(null); }, spin.stage === 'final' ? 1700 : 0);
       setAmbient(wheel.items[wheel.currentIndex()]);
+      paintFilm(wheel.items[wheel.currentIndex()], true);
       render();
     });
     render();
@@ -849,6 +1008,7 @@ function initRoom(roomId) {
         hideFinale();
         if (!quiet) beep(true);
         musicOn(spin.stage);
+        launchAt(spin);
         render();
         return;
       }
@@ -859,6 +1019,7 @@ function initRoom(roomId) {
         const c = $('#finaleCount');
         c.textContent = String(sec);
         c.classList.remove('beat'); void c.offsetWidth; c.classList.add('beat');
+        clash(sec);
         render();
         const b = $('#spinBtn');
         b.classList.remove('beat'); void b.offsetWidth; b.classList.add('beat');
@@ -904,10 +1065,24 @@ function initRoom(roomId) {
     const label = kind === 'out' ? `Выбывает${left > 1 ? `, осталось ${left}` : ''}` : 'Сегодня смотрим';
     // победа в стиле автора: его аватар с рамкой и ник с эффектом, его фон профиля — светом сверху, свечение — его цветом
     const win = kind === 'win', author = personOf(f), ap = prof(author), aname = f.addedBy || 'Без имени';
-    const ac = win && authorColor(author);
-    if (ac) $('#winDetail').style.setProperty('--glow', `color-mix(in srgb, ${ac} 55%, transparent)`); else $('#winDetail').style.removeProperty('--glow');
-    $('#winDetail').innerHTML = `
-      ${f.poster ? `<div class="win-bg" style="--img:url('${esc(pimg(f.poster))}')"></div>` : ''}
+    const ac = win && authorColor(author), det = $('#winDetail');
+    if (ac) det.style.setProperty('--glow', `color-mix(in srgb, ${ac} 55%, transparent)`); else det.style.removeProperty('--glow');
+    // фон победителя — заливка цветом его постера (style.css .win-flood); свечение постера тоже его цветом, если у автора нет своего
+    const paint = h => {
+      det.style.setProperty('--wc', h == null ? '#24232E' : `hsl(${h} 68% 36%)`);
+      if (!ac) { if (h == null) det.style.removeProperty('--glow'); else det.style.setProperty('--glow', `hsl(${h} 85% 58% / .5)`); }
+    };
+    if (win) {
+      if (!f.poster) paint(hue(f.title));
+      else {
+        const url = pimg(f.poster);
+        paint(hueCache.get(url) ?? null); // тон обычно уже посчитан: постер только что был под стрелкой
+        if (!hueCache.has(url)) posterHue(url).then(h => { if (det.dataset.id === f.id) paint(h); });
+      }
+    }
+    const bg = f.poster ? `<div class="win-bg" style="--img:url('${esc(pimg(f.poster))}')"></div>` : '';
+    det.innerHTML = `
+      ${win ? `<div class="win-flood"><i></i>${bg}</div>` : bg}
       ${win && ap.banner && ap.banner !== 'none' ? `<div class="win-banner bn-box bn-${esc(ap.banner)}"></div>` : ''}
       <div class="win-inner">
         ${f.poster ? `<img src="${esc(pimg(f.poster))}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"></div>`}
@@ -926,9 +1101,14 @@ function initRoom(roomId) {
           </div>` : ''}
         </div>
       </div>`;
+    if (win) inkMask($('#winDetail .win-flood'));
     openModal('#winModal');
-    // победитель вырастает из сектора под стрелкой: постер летит из колеса на своё место, текст проявляется следом (CSS)
-    if (kind === 'win' && !reduceMotion) wheelFlight($('#winDetail .win-inner > img, #winDetail .win-inner > .noposter'), wheelPoint(), { duration: 1000, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' });
+    // победитель вырастает из сектора под стрелкой: постер летит из колеса на своё место, текст проявляется следом (CSS),
+    // название собирается из полос, как на заставках
+    if (kind === 'win' && !reduceMotion) {
+      wheelFlight($('#winDetail .win-inner > img, #winDetail .win-inner > .noposter'), wheelPoint(), { duration: 1000, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' });
+      sliceIn($('#winDetail .win-title'), { delay: 430, dur: 820 });
+    }
     $('#winDetail [data-remove]')?.addEventListener('click', async e => {
       await removeFilm(e.currentTarget.dataset.remove);
       closeModal('#winModal');
