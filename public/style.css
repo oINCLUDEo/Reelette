@@ -634,7 +634,8 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 
 /* колесо вписывается в свободное место своих колонок, но не больше 960px */
 .wheel-area { min-width: 0; min-height: 0; container-type: size; display: grid; place-items: center; }
-.wheel-box { position: relative; width: min(100cqw, 100cqh, 960px); aspect-ratio: 1; container-type: inline-size; }
+/* --tilt задаёт wheel.js: на скорости колесо чуть запрокидывается, к остановке выпрямляется */
+.wheel-box { position: relative; width: min(100cqw, 100cqh, 960px); aspect-ratio: 1; container-type: inline-size; transform: perspective(1800px) rotateX(var(--tilt, 0deg)); }
 .wheel-box canvas { width: 100%; height: 100%; display: block; }
 /* выбывший постер выскакивает из-под стрелки и падает за край экрана (app.js hitWheel) */
 /* карточка в 3D: лицо — постер с бликом глянца, оборот — тёмный картон; у каждой стороны своя тень */
@@ -734,26 +735,29 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 .tk-in { position: relative; display: flex; flex-direction: column; align-items: center; padding: 0 16px; text-align: center; }
 .tk-title { font: 800 min(20vw, 34vh)/.9 var(--f-head); }
 .tk-sub { margin-top: 2.4vh; font: 600 clamp(15px, 1.6vw, 22px)/1.3 var(--f-ui); color: rgba(255,255,255,.82); }
-.takeover.play .tk-flood { animation: tkFlood 2.3s both; }
-.takeover.play .tk-slice { animation: tkSlice 2.3s both; animation-delay: calc(var(--i) * 35ms); }
-.takeover.play .tk-sub { animation: tkSub 2.3s both; }
-.takeover.play .tk-shard { animation: tkBurst 1.1s .72s cubic-bezier(.16, 1, .3, 1) both; }
+/* 3,2 с: заливка 0,8 с, сборка, спокойная пауза с лёгким «дыханием», уход вверх по плавной S-кривой.
+   Смаз небольшой (blur 8, растяжение 12%), уход без размытия — чтобы было чётко */
+.takeover.play .tk-flood { animation: tkFlood 3.2s both; }
+.takeover.play .tk-slice { animation: tkSlice 3.2s both; animation-delay: calc(var(--i) * 30ms); }
+.takeover.play .tk-sub { animation: tkSub 3.2s both; }
+.takeover.play .tk-shard { animation: tkBurst 1.3s .85s cubic-bezier(.16, 1, .3, 1) both; }
 @keyframes tkFlood {
-  0% { transform: translateY(100%); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
-  26% { transform: translateY(0); }
-  70% { transform: translateY(-1.5%); animation-timing-function: cubic-bezier(.65, 0, .85, .3); }
+  0% { transform: translateY(100%); animation-timing-function: cubic-bezier(.22, 1, .36, 1); }
+  25% { transform: translateY(0); animation-timing-function: linear; }
+  70% { transform: translateY(-1.2%); animation-timing-function: cubic-bezier(.76, 0, .24, 1); }
   100% { transform: translateY(-112%); }
 }
 @keyframes tkSlice {
-  0%, 14% { opacity: 0; transform: translateX(var(--dx)) scaleX(1.3); filter: blur(14px); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
-  34% { opacity: 1; transform: none; filter: blur(0); }
-  70% { opacity: 1; transform: scale(1.03); animation-timing-function: cubic-bezier(.65, 0, .85, .3); }
-  100% { opacity: 1; transform: translateY(-80vh) scale(1.03); filter: blur(4px); }
+  0%, 10% { opacity: 0; transform: translateX(var(--dx)) scaleX(1.12); filter: blur(8px); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+  30% { opacity: 1; transform: none; filter: blur(0); animation-timing-function: linear; }
+  70% { opacity: 1; transform: scale(1.025); animation-timing-function: cubic-bezier(.76, 0, .24, 1); }
+  100% { opacity: 1; transform: translateY(-84vh) scale(1.025); }
 }
 @keyframes tkSub {
-  0%, 30% { opacity: 0; transform: translateY(14px); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
-  42%, 70% { opacity: 1; transform: none; animation-timing-function: cubic-bezier(.65, 0, .85, .3); }
-  100% { opacity: 1; transform: translateY(-80vh); }
+  0%, 26% { opacity: 0; transform: translateY(12px); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+  38% { opacity: 1; transform: none; animation-timing-function: linear; }
+  70% { opacity: 1; transform: none; animation-timing-function: cubic-bezier(.76, 0, .24, 1); }
+  100% { opacity: 1; transform: translateY(-84vh); }
 }
 
 /* ---------- финал: заставка на весь экран перед последним прокрутом ---------- */
@@ -769,7 +773,7 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 /* до сборки полосы невидимы (иначе на пару кадров мелькает готовое слово); после — держатся видимыми */
 .fn-t .tk-slice { opacity: 0; }
 .finale.on .fn-t .tk-slice { animation: tkSliceIn .8s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(.25s + var(--i) * 35ms); }
-@keyframes tkSliceIn { from { opacity: 0; transform: translateX(var(--dx)) scaleX(1.3); filter: blur(14px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes tkSliceIn { from { opacity: 0; transform: translateX(var(--dx)) scaleX(1.12); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
 .fn-h { position: relative; } /* осколки финала разлетаются от заголовка */
 .finale.on .tk-shard { animation: tkBurst 1.2s .55s cubic-bezier(.16, 1, .3, 1) both; }
 .fn-s { margin-top: 8px; font: 600 17px/24px var(--f-ui); color: rgba(255,255,255,.82); opacity: 0; transition: opacity .5s var(--ease) .6s; }
@@ -1466,7 +1470,8 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
   .quiz:not([hidden]) .qz-video { animation: riseIn .7s .22s var(--ease) both; }
   .quiz:not([hidden]) .qz-guess { animation: riseIn .7s .32s var(--ease) both; }
   .quiz:not([hidden]) .qz-side { animation: riseIn .7s .28s var(--ease) both; }
-  .stage:not(.karaoke-on) .wheel-box { animation: riseIn .8s .1s var(--ease) both; }
+  /* без заливки после конца: иначе анимация держала бы transform и перебивала наклон колеса (--tilt) */
+  .stage:not(.karaoke-on) .wheel-box { animation: riseIn .8s .1s var(--ease) backwards; }
 
   /* новый фильм в списке */
   .film.fresh { animation: filmIn .7s var(--spring) both; }
@@ -1763,7 +1768,7 @@ body.karaoke-on #room .quiz { align-self: center; }
   .current span::after { transition: none; }
   .films-panel { transition: none; }
   /* без движения: заставки просто проявляются и гаснут, заливка стоит на месте, осколков нет */
-  .takeover.play { animation: tkFade 2.3s linear both; }
+  .takeover.play { animation: tkFade 3.2s linear both; }
   .takeover.play .tk-flood, .takeover.play .tk-slice, .takeover.play .tk-sub, .finale.on .fn-t .tk-slice { animation: none; }
   .fn-t .tk-slice { opacity: 1; }
   .tk-shard { display: none; }

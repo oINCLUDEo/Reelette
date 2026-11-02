@@ -474,7 +474,7 @@ function initRoom(roomId) {
   // заголовок из шести горизонтальных полос: каждая влетает со своей стороны; длинное слово ужимаем в ширину экрана
   function sliceTitle(box, text) {
     box.style.fontSize = '';
-    box.innerHTML = Array.from({ length: 6 }, (_, i) => `<span class="tk-slice" style="--i:${i};--dx:${((i % 2 ? 1 : -1) * (10 + Math.random() * 16)).toFixed(1)}vw"${i ? ' aria-hidden="true"' : ''}>${esc(text)}</span>`).join('');
+    box.innerHTML = Array.from({ length: 6 }, (_, i) => `<span class="tk-slice" style="--i:${i};--dx:${((i % 2 ? 1 : -1) * (6 + Math.random() * 10)).toFixed(1)}vw"${i ? ' aria-hidden="true"' : ''}>${esc(text)}</span>`).join('');
     const w = box.firstChild.offsetWidth, max = innerWidth * 0.9;
     if (w > max) box.style.fontSize = `${parseFloat(getComputedStyle(box).fontSize) * max / w}px`;
   }
@@ -486,7 +486,9 @@ function initRoom(roomId) {
       return `<i class="tk-shard" style="--s:${s.toFixed(2)}vw;--sx:${(Math.cos(a) * d).toFixed(1)}vmin;--sy:${(Math.sin(a) * d).toFixed(1)}vmin;--sr:${(Math.random() * 540 - 270).toFixed(0)}deg;clip-path:polygon(${pts})"></i>`;
     }).join('');
   }
-  // этап выбывания: «Топ-10», «Топ-5», «Полуфинал» на весь экран, цвет заливки с каждым этапом краснее
+  // этап выбывания: «Топ-15», «Топ-5» на весь экран, цвет заливки у топ-5 краснее.
+  // 3,2 с анимации плюс разнос полос; прячем, когда доиграла последняя полоса, иначе конец обрывается
+  const CHAPTER_SUB = { 'Топ-15': 'осталось пятнадцать фильмов', 'Топ-5': 'осталось пять фильмов' };
   let tkTimer = null;
   function showChapter(text, sub, tone) {
     const el = $('#takeover');
@@ -500,7 +502,7 @@ function initRoom(roomId) {
     shards($('#tkShards'));
     void el.offsetWidth;
     el.classList.add('play');
-    tkTimer = setTimeout(hideChapter, 2400);
+    tkTimer = setTimeout(hideChapter, 3450);
   }
   function hideChapter() {
     clearTimeout(tkTimer);
@@ -808,11 +810,11 @@ function initRoom(roomId) {
     clearOut();
     endDrama();
     setStage(spin.stage);
-    // глава — на первом прокруте этапа внутри выбывания: у всех в комнате одинаково, без памяти о прошлых сериях
-    const chapter = { mid: [10, 'Топ-10', 'осталось десять фильмов'], top: [5, 'Топ-5', 'осталось пять фильмов'], semi: [3, 'Полуфинал', 'осталось три фильма'] }[spin.stage];
-    if (chapter && chapter[0] === spin.left && state.eliminated.length && elapsed < 1000) showChapter(chapter[1], chapter[2], spin.stage);
+    // глава этапа (топ-15, топ-5): сервер дал под неё паузу перед стартом, колесо трогается, когда она отыграла.
+    // Зашедший посреди паузы главу не видит, если от неё остались крохи
+    if (spin.chapter && -elapsed > 1500) showChapter(spin.chapter, CHAPTER_SUB[spin.chapter] || '', spin.left > 5 ? 'mid' : 'top');
     if (elapsed < 0) {
-      musicOff(); // перед стартом тишина и отсчёт
+      if (!spin.chapter) musicOff(); // перед стартом тишина и отсчёт; на главе музыка серии не прерывается
       if (spin.stage === 'final') showFinale(spin);
       startCountdown(spin);
     } else musicOn(spin.stage);
@@ -839,12 +841,13 @@ function initRoom(roomId) {
   }
 
   function startCountdown(spin) {
+    const quiet = Boolean(spin.chapter); // пауза под главу — не отсчёт: без сигналов
     const step = () => {
       const left = spin.startedAt - (Date.now() + serverOffset);
       if (left <= 0) {
         stopCountdown();
         hideFinale();
-        beep(true);
+        if (!quiet) beep(true);
         musicOn(spin.stage);
         render();
         return;
@@ -852,7 +855,7 @@ function initRoom(roomId) {
       const sec = Math.ceil(left / 1000);
       if (sec !== countdown) {
         countdown = sec;
-        beep(false);
+        if (!quiet) beep(false);
         const c = $('#finaleCount');
         c.textContent = String(sec);
         c.classList.remove('beat'); void c.offsetWidth; c.classList.add('beat');

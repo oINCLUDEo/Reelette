@@ -322,13 +322,19 @@ function elimPace(n) {
   return { stage: 'fast', duration: 2.8, turns: 2, pause: 1.1 };
 }
 
+// Главы выбывания: на первом прокруте топ-15 и топ-5 (внутри серии) перед стартом пауза под заставку
+// на весь экран (клиент — showChapter), колесо трогается, когда она отыграла
+const CHAPTERS = { 15: 'Топ-15', 5: 'Топ-5' };
+const CHAPTER_INTRO = 3.6; // с
+
 function startSpin(r, { mode, duration, auto, by, delay }) {
   const list = activeFilms(r);
   if (list.length < 2) return 'Нужно хотя бы два фильма в колесе';
   mode = mode === 'elimination' ? 'elimination' : 'normal';
   const pace = mode === 'elimination' ? elimPace(list.length) : null;
   duration = pace ? pace.duration : Math.min(60, Math.max(0, num(duration, 12))); // 0 — сразу результат, без вращения
-  delay = Math.max(pace?.intro || 0, Math.min(15, Math.max(0, Math.round(num(delay, 0)))));
+  const chapter = (mode === 'elimination' && r.eliminated.length && CHAPTERS[list.length]) || '';
+  delay = Math.max(pace?.intro || 0, chapter ? CHAPTER_INTRO : 0, Math.min(15, Math.max(0, Math.round(num(delay, 0)))));
   const rt = runtime(r);
   // обычный режим: сектор = шанс победить; выбывание: сектор = шанс вылететь, стрелка выбивает именно по нему
   let W = chanceWeights(r, list);
@@ -354,7 +360,7 @@ function startSpin(r, { mode, duration, auto, by, delay }) {
     filmId: landed.id,
     offset: pace?.stage === 'final' ? (crypto.randomInt(0, 2) ? edge : 1 - edge) : 0.12 + (crypto.randomInt(0, 1000) / 1000) * 0.76,
     turns: pace ? pace.turns : duration ? Math.max(2, Math.round(duration * 0.9)) : 0,
-    stage: pace?.stage || null, left: list.length,
+    stage: pace?.stage || null, left: list.length, chapter,
   };
   rt.series = r.spin.auto;
   broadcast(r.id, { type: 'spin', spin: r.spin, now: Date.now() });
