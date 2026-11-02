@@ -378,6 +378,7 @@ function finishSpin(r, sid) {
     rt.series = false;
     recordWin(r, film, 'normal');
     broadcast(r.id, { type: 'result', mode: 'normal', film });
+    playWinTrack(r, film);
   } else {
     r.eliminated.push(s.filmId);
     const left = activeFilms(r);
@@ -387,6 +388,7 @@ function finishSpin(r, sid) {
       r.plan = null;
       rt.series = false;
       broadcast(r.id, { type: 'result', mode: 'final', film: left[0] });
+      playWinTrack(r, left[0], 1700);
     } else if (rt.series) {
       rt.next = setTimeout(() => {
         rt.next = null;
@@ -525,6 +527,62 @@ async function youtubeFilm(q) {
   };
 }
 const isYoutubeLink = q => /youtu\.?be/i.test(q);
+
+// Поиск трека на YouTube без ключа API: страница поиска несёт результаты в ytInitialData (так же делает пакет yt-search).
+// Агент Googlebot — чтобы YouTube отдал обычную страницу без согласия на cookies и «обновите браузер».
+// sp=EgIQAQ== — только видео (без каналов и плейлистов). Ответы на 10 минут кешируем: люди набирают одно и то же
+const ytCache = new Map();
+async function ytSearch(q) {
+  const key = q.toLowerCase();
+  const hit = ytCache.get(key);
+  if (hit && Date.now() - hit.at < 600_000) return hit.list;
+  const u = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&sp=EgIQAQ%253D%253D&hl=ru&gl=RU`;
+  const html = await (await fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)', 'Accept-Language': 'ru' }, signal: AbortSignal.timeout(8000) })).text();
+  // объект после «ytInitialData» вырезаем по скобкам (с учётом строк): запись присваивания у YouTube бывает разной
+  const objAt = from => {
+    const start = html.indexOf('{', from);
+    for (let i = start, depth = 0, inStr = false; start >= 0 && i < html.length; i++) {
+      const ch = html[i];
+      if (inStr) { if (ch === '\\') i++; else if (ch === '"') inStr = false; }
+      else if (ch === '"') inStr = true;
+      else if (ch === '{') depth++;
+      else if (ch === '}' && --depth === 0) return html.slice(start, i + 1);
+    }
+    return '';
+  };
+  let data = null;
+  for (let at = html.indexOf('ytInitialData'); at >= 0 && !data; at = html.indexOf('ytInitialData', at + 1)) {
+    try { const o = JSON.parse(objAt(at)); if (o?.contents) data = o; } catch { /* не тот объект, ищем дальше */ }
+  }
+  if (!data) throw new Error('YouTube не отдал результаты');
+  const text = t => t?.simpleText || (t?.runs || []).map(x => x.text).join('') || '';
+  const list = [];
+  // ищем все videoRenderer, где бы они ни лежали: обёртки вокруг них YouTube меняет чаще, чем сами карточки
+  (function walk(o) {
+    if (!o || typeof o !== 'object' || list.length >= 10) return;
+    const v = o.videoRenderer;
+    if (v?.videoId && v.lengthText) { // без длительности — прямой эфир, его не берём
+      list.push({ vid: v.videoId, title: text(v.title).slice(0, 160), author: text(v.ownerText || v.longBylineText || v.shortBylineText).slice(0, 80), length: text(v.lengthText) });
+      return;
+    }
+    for (const k in o) walk(o[k]);
+  })(data);
+  ytCache.set(key, { at: Date.now(), list });
+  if (ytCache.size > 300) ytCache.delete(ytCache.keys().next().value);
+  return list;
+}
+
+// Победная музыка автора: если он выбрал её в профиле, она включается у всех, когда выпал его фильм.
+// В финале выбывания — вместе со страницей победителя (она открывается через 1,7 с)
+function playWinTrack(r, film, delay = 0) {
+  const t = film && profiles[personOf(film)]?.winTrack;
+  if (!t?.vid) return;
+  setTimeout(() => {
+    if (!rooms[r.id] || r.karaoke || r.quiz) return;
+    playTrack(r, { vid: t.vid, title: t.title, author: t.author || '', by: film.addedBy || 'победитель' });
+    pushState(r);
+  }, delay);
+}
 function playTrack(r, track) {
   r.music = {
     vid: track.vid, title: track.title, author: track.author, by: track.by,
@@ -1111,10 +1169,30 @@ async function api(req, res, url) {
     const b = await readBody(req);
     const pid = personKey(me, b);
     if (!pid) return json(res, 400, { error: 'Не понятно, чей профиль' });
-    profiles[pid] = { ...cleanProfile(b), at: Date.now() };
+    // победная музыка: новый трек проверяем, как музыку в комнате (есть ли видео, можно ли встраивать)
+    let winTrack = null;
+    const wv = String(b.winTrack?.vid || '');
+    if (/^[\w-]{11}$/.test(wv)) {
+      const old = profiles[pid]?.winTrack;
+      if (old?.vid === wv) winTrack = old;
+      else {
+        const t = await fetchTrack(wv);
+        if (t.error) return json(res, 400, { error: `Победная музыка: ${t.error}` });
+        winTrack = { vid: t.vid, title: t.title, author: t.author };
+      }
+    }
+    profiles[pid] = { ...cleanProfile(b), winTrack, at: Date.now() };
     saveProfiles();
     for (const set of clients.values()) for (const c of set) send(c.res, { type: 'profiles', profiles });
     return json(res, 200, { ok: true });
+  }
+
+  // поиск трека на YouTube для плеера и победной музыки
+  if (parts[0] === 'ytsearch' && m === 'GET') {
+    const q = str(url.searchParams.get('q'), 100);
+    if (q.length < 2) return json(res, 200, { results: [] });
+    try { return json(res, 200, { results: await ytSearch(q) }); }
+    catch (e) { return json(res, 502, { error: `Поиск YouTube не ответил (${e.message}). Вставьте ссылку на трек` }); }
   }
 
   if (parts[0] === 'search' && m === 'GET') {

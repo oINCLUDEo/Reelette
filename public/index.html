@@ -76,9 +76,11 @@
         <span class="label">Наши треки</span>
         <button type="button" class="our-track" data-our="RnMVb0lJ8LI" title="Включить у всех сейчас, по экрану пролетит ворона"><i style="background-image:url('https://i.ytimg.com/vi/RnMVb0lJ8LI/mqdefault.jpg')"></i><span><b>Ворона</b><small>с вороной на экране</small></span></button>
         <button type="button" class="our-track" data-our="cYIf9_bdx-w" title="Включить у всех сейчас"><i style="background-image:url('https://i.ytimg.com/vi/cYIf9_bdx-w/mqdefault.jpg')"></i><span><b>andy warhol</b><small>Kai Angel</small></span></button>
+        <button type="button" class="our-track" data-our="LBhcqYqeu0U" title="Включить у всех сейчас"><i style="background-image:url('https://i.ytimg.com/vi/LBhcqYqeu0U/mqdefault.jpg')"></i><span><b>Lemonade</b><small>aespa</small></span></button>
       </div>
       <label class="yt-vol" title="Громкость у вас"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg><input type="range" id="ytVol" min="0" max="100" value="50" aria-label="Громкость общей музыки у вас"></label>
-      <input id="ytUrl" placeholder="Ссылка на трек на YouTube" autocomplete="off">
+      <input id="ytUrl" placeholder="Название трека или ссылка на YouTube" autocomplete="off">
+      <div class="yt-results" id="ytResults"></div>
       <div class="yt-add-row">
         <button class="btn btn-primary" type="submit" data-mode="queue" id="ytQueueBtn">В очередь</button>
         <button class="btn btn-ghost" type="submit" data-mode="now" id="ytNowBtn">Включить сейчас</button>
@@ -120,7 +122,7 @@
         <div id="historyList" class="history-list"></div>
       </div>
       <div class="np" id="navMusic">
-        <button class="np-empty" id="musicBtn" type="button" title="Общая музыка из YouTube, её слышат все в комнате"><span class="art"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span><span class="nt"><b>Музыка</b><small>Ворона, andy warhol или ссылка</small></span></button>
+        <button class="np-empty" id="musicBtn" type="button" title="Общая музыка из YouTube, её слышат все в комнате"><span class="art"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span><span class="nt"><b>Музыка</b><small>Поиск трека или наши треки</small></span></button>
         <button class="nav-icon np-replay" id="ytReplay" type="button" hidden aria-label="Сыграть ещё раз"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
         <div class="yt-card" id="ytCard" hidden>
           <button class="yt-thumb" id="ytThumb" type="button" title="Очередь, громкость и добавить трек" aria-label="Открыть музыку: очередь и громкость"></button>
@@ -285,7 +287,6 @@
           <button id="spinBtn" class="hub-btn" title="Крутить (пробел)"><span class="hub-label">Крутить</span><span class="hub-sub" id="hubSub"></span></button>
           <div class="pointer" id="pointer"><svg viewBox="0 0 40 52"><path d="M20 50 3 14A18 18 0 1 1 37 14Z"/></svg></div>
           <div class="wheel-empty" id="wheelEmpty" hidden><b id="wheelEmptyText">Колесо пустое</b><button class="btn btn-primary" id="wheelAddBtn" type="button">Добавить фильмы</button></div>
-          <div class="chapter" id="chapter" aria-hidden="true"><b id="chapterT"></b></div>
         </div>
         </div>
         <div class="stage-foot">
@@ -306,9 +307,16 @@
   </div>
 
   <button class="sheet-scrim" id="sheetScrim" type="button" hidden aria-label="Свернуть список фильмов"></button>
+  <!-- заставка этапа выбывания на весь экран: «Топ-10», «Топ-5», «Полуфинал» (app.js showChapter) -->
+  <div class="takeover" id="takeover" hidden aria-hidden="true">
+    <i class="tk-flood"></i>
+    <div class="tk-in"><div class="tk-title" id="tkTitle"></div><div class="tk-sub" id="tkSub"></div></div>
+    <div class="tk-shards" id="tkShards"></div>
+  </div>
   <div class="finale" id="finale" hidden aria-live="polite">
+    <i class="tk-flood"></i>
     <div class="fn-in">
-      <h2 class="fn-h"><span class="fn-t">Финал</span><span class="fn-s">Колесо выбьет один из двух</span></h2>
+      <h2 class="fn-h"><span class="fn-t"></span><span class="fn-s">Колесо выбьет один из двух</span><span class="tk-shards" id="fnShards"></span></h2>
       <div class="fn-pair" id="finalePair"></div>
       <b class="fn-count" id="finaleCount"></b>
     </div>

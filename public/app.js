@@ -454,11 +454,58 @@ function initRoom(roomId) {
   function setStage(stage) {
     if (stage) document.body.dataset.stage = stage; else delete document.body.dataset.stage;
   }
-  // главы выбывания: на старте нового этапа через колесо проходит его название
-  function showChapter(text) {
-    const el = $('#chapter');
-    $('#chapterT').textContent = text;
-    el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  // ---- заставки на весь экран: этап выбывания и финал (по мотивам сайта Notturno) ----
+  // Заливка поднимается снизу рваным чернильным краем, заголовок собирается из полос со смазом,
+  // на сборке разлетаются осколки, потом всё уезжает вверх и открывает колесо.
+  // Край заливки — щетина разной длины, как мазок сухой кистью; каждый раз новый
+  function inkEdge(top) {
+    const ph = [Math.random() * 6, Math.random() * 6, Math.random() * 6];
+    let d = '';
+    for (let x = 0; x < 1000;) {
+      const w = 2 + Math.random() * 5;
+      const n = 0.5 + 0.22 * Math.sin(x / 90 + ph[0]) + 0.14 * Math.sin(x / 31 + ph[1]) + 0.08 * Math.sin(x / 11 + ph[2]);
+      const h = Math.min(200, Math.max(6, 200 * n * (0.55 + Math.random() * 0.6))).toFixed(1);
+      d += top ? `M${x.toFixed(1)} 200h${w.toFixed(1)}v-${h}h-${w.toFixed(1)}z` : `M${x.toFixed(1)} 0h${w.toFixed(1)}v${h}h-${w.toFixed(1)}z`;
+      x += w;
+    }
+    return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 200" preserveAspectRatio="none"><path d="${d}"/></svg>`)}")`;
+  }
+  const inkMask = el => { el.style.setProperty('--edge-t', inkEdge(true)); el.style.setProperty('--edge-b', inkEdge(false)); };
+  // заголовок из шести горизонтальных полос: каждая влетает со своей стороны; длинное слово ужимаем в ширину экрана
+  function sliceTitle(box, text) {
+    box.style.fontSize = '';
+    box.innerHTML = Array.from({ length: 6 }, (_, i) => `<span class="tk-slice" style="--i:${i};--dx:${((i % 2 ? 1 : -1) * (10 + Math.random() * 16)).toFixed(1)}vw"${i ? ' aria-hidden="true"' : ''}>${esc(text)}</span>`).join('');
+    const w = box.firstChild.offsetWidth, max = innerWidth * 0.9;
+    if (w > max) box.style.fontSize = `${parseFloat(getComputedStyle(box).fontSize) * max / w}px`;
+  }
+  // белые осколки разлетаются от заголовка, когда он собрался
+  function shards(box) {
+    box.innerHTML = Array.from({ length: 12 }, () => {
+      const a = Math.random() * Math.PI * 2, d = 26 + Math.random() * 36, s = 0.8 + Math.random() * 2.8;
+      const pts = Array.from({ length: 4 }, (_, k) => { const t = k * Math.PI / 2 + Math.random() * 0.9, rr = 30 + Math.random() * 20; return `${(50 + Math.cos(t) * rr).toFixed(0)}% ${(50 + Math.sin(t) * rr).toFixed(0)}%`; }).join(',');
+      return `<i class="tk-shard" style="--s:${s.toFixed(2)}vw;--sx:${(Math.cos(a) * d).toFixed(1)}vmin;--sy:${(Math.sin(a) * d).toFixed(1)}vmin;--sr:${(Math.random() * 540 - 270).toFixed(0)}deg;clip-path:polygon(${pts})"></i>`;
+    }).join('');
+  }
+  // этап выбывания: «Топ-10», «Топ-5», «Полуфинал» на весь экран, цвет заливки с каждым этапом краснее
+  let tkTimer = null;
+  function showChapter(text, sub, tone) {
+    const el = $('#takeover');
+    clearTimeout(tkTimer);
+    el.classList.remove('play');
+    el.dataset.tone = tone;
+    el.hidden = false;
+    inkMask(el);
+    sliceTitle($('#tkTitle'), text);
+    $('#tkSub').textContent = sub;
+    shards($('#tkShards'));
+    void el.offsetWidth;
+    el.classList.add('play');
+    tkTimer = setTimeout(hideChapter, 2400);
+  }
+  function hideChapter() {
+    clearTimeout(tkTimer);
+    $('#takeover').hidden = true;
+    $('#takeover').classList.remove('play');
   }
   // точка на экране: середина сектора фильма на колесе, без id — сектор под стрелкой
   function wheelPoint(id) {
@@ -524,12 +571,14 @@ function initRoom(roomId) {
     const pair = spin.snapshot.map(s => byId.get(s.id)).filter(Boolean);
     setHTML($('#finalePair'), pair.map(f => `<figure data-id="${esc(f.id)}" style="--h:${hue(f.title)}"><span class="fn-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</span><figcaption><b>${esc(f.title)}</b><span>${esc(f.addedBy || '')}</span></figcaption></figure>`).join(''));
     const el = $('#finale');
-    // фон заставки — свечение цветов двух финалистов
-    pair.forEach((f, i) => el.style.setProperty(i ? '--fb' : '--fa', hue(f.title)));
     clearTimeout(el._t);
-    el.classList.remove('out');
+    el.classList.remove('on', 'out');
     el.hidden = false;
-    // постеры финалистов поднимаются со своих секторов колеса, пока комната гаснет
+    // тем же языком, что заставки этапов: красная заливка рваным краем, «Финал» из полос, осколки
+    inkMask(el);
+    sliceTitle($('#finale .fn-t'), 'Финал');
+    shards($('#fnShards'));
+    // постеры финалистов поднимаются со своих секторов колеса, пока заливка накрывает комнату
     if (!reduceMotion) $$('#finalePair figure').forEach((fig, i) => wheelFlight(fig, wheelPoint(fig.dataset.id), { duration: 1100, delay: 250 + i * 120, easing: 'cubic-bezier(.34, 1.3, .64, 1)', fill: 'backwards' }));
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
   }
@@ -537,7 +586,7 @@ function initRoom(roomId) {
     const el = $('#finale');
     if (el.hidden) return;
     clearTimeout(el._t);
-    // после отсчёта гаснут фон и надписи заставки, а постеры видно, как они возвращаются в колесо, и оно стартует
+    // после отсчёта заливка уезжает вверх и открывает колесо, надписи гаснут, а постеры возвращаются в колесо, и оно стартует
     if (!reduceMotion && el.classList.contains('on')) {
       el.classList.add('out');
       $$('#finalePair figure').forEach(fig => wheelFlight(fig, wheelPoint(fig.dataset.id), { duration: 650, easing: 'cubic-bezier(.5, 0, .75, 0)', fill: 'forwards' }, true));
@@ -546,7 +595,7 @@ function initRoom(roomId) {
   }
   function endDrama() {
     clearInterval(heartTimer); heartTimer = null;
-    $('#chapter').classList.remove('on');
+    hideChapter();
     hideFinale();
     setStage(null);
   }
@@ -760,8 +809,8 @@ function initRoom(roomId) {
     endDrama();
     setStage(spin.stage);
     // глава — на первом прокруте этапа внутри выбывания: у всех в комнате одинаково, без памяти о прошлых сериях
-    const chapter = { mid: [10, 'Топ-10'], top: [5, 'Топ-5'], semi: [3, 'Полуфинал'] }[spin.stage];
-    if (chapter && chapter[0] === spin.left && state.eliminated.length && elapsed < 1000) showChapter(chapter[1]);
+    const chapter = { mid: [10, 'Топ-10', 'осталось десять фильмов'], top: [5, 'Топ-5', 'осталось пять фильмов'], semi: [3, 'Полуфинал', 'осталось три фильма'] }[spin.stage];
+    if (chapter && chapter[0] === spin.left && state.eliminated.length && elapsed < 1000) showChapter(chapter[1], chapter[2], spin.stage);
     if (elapsed < 0) {
       musicOff(); // перед стартом тишина и отсчёт
       if (spin.stage === 'final') showFinale(spin);
@@ -1889,21 +1938,65 @@ function initRoom(roomId) {
   const setKaraoke = on => api(`/rooms/${roomId}`, { method: 'PATCH', body: { karaoke: on } }).catch(e => toast(e.message, true));
   $('#kExit').addEventListener('click', () => setKaraoke(false));
   $('#karaokeBtn').addEventListener('click', () => { Sfx.unlock(); setKaraoke(!state?.karaoke); });
+  // ---- поиск трека на YouTube: в панели музыки и для победной музыки в профиле ----
+  const isYtLink = s => /youtu\.?be|^[\w-]{11}$/.test(s);
+  const ytLinkVid = s => (s.match(/(?:v=|youtu\.be\/|shorts\/|embed\/|live\/)([\w-]{11})/) || s.match(/^([\w-]{11})$/) || [])[1] || '';
+  const ytFind = q => api('/ytsearch?q=' + encodeURIComponent(q)).then(r => r.results || []);
+  const ytRowHtml = (t, extra = '') => `<div class="yt-res"><button type="button" class="yt-res-main" data-pick="${esc(t.vid)}"><img src="${esc(pimg(`https://i.ytimg.com/vi/${t.vid}/default.jpg`))}" alt=""><span><b>${esc(t.title)}</b><small>${esc([t.author, t.length].filter(Boolean).join(', '))}</small></span></button>${extra}</div>`;
+  // выдача по мере набора: пауза 0,4 с, ответы на устаревший запрос отбрасываются
+  function ytSearchInput(input, box, onList) {
+    let timer = null, seq = 0;
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 2 || isYtLink(q)) { onList([]); return; }
+      timer = setTimeout(async () => {
+        const my = ++seq;
+        box.innerHTML = '<p class="note">Ищу на YouTube…</p>';
+        try { const list = await ytFind(q); if (my === seq) { onList(list); if (!list.length) box.innerHTML = '<p class="note">Ничего не нашлось</p>'; } }
+        catch (err) { if (my === seq) box.innerHTML = `<p class="note">${esc(err.message)}</p>`; }
+      }, 400);
+    });
+  }
+  let ytFound = [];
+  // клик по строке: играет — в очередь, тишина — сразу; ▶ у строки — сейчас у всех
+  function renderYtResults() {
+    const playing = Boolean(state?.music);
+    $('#ytResults').innerHTML = ytFound.map(t => ytRowHtml(t, playing ? `<button type="button" class="nav-icon" data-now="${esc(t.vid)}" title="Включить сейчас у всех" aria-label="Включить сейчас у всех"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg></button>` : '')).join('');
+  }
+  ytSearchInput($('#ytUrl'), $('#ytResults'), list => { ytFound = list; renderYtResults(); });
+  async function addTrack(url, now) {
+    const r = await api(`/rooms/${roomId}/music`, { method: 'POST', body: { url, now, by: me.name } });
+    $('#ytUrl').value = '';
+    ytFound = []; renderYtResults();
+    Sfx.unlock();
+    if (r.queued) toast('Трек добавлен в очередь');
+    else { ytChanging = false; syncMusic(); }
+  }
   $('#ytAdd').addEventListener('submit', async e => {
     e.preventDefault();
-    const url = $('#ytUrl').value.trim();
-    if (!url) return;
+    const q = $('#ytUrl').value.trim();
+    if (!q) return;
     const now = e.submitter?.dataset.mode === 'now' || !state?.music;
     try {
-      const r = await api(`/rooms/${roomId}/music`, { method: 'POST', body: { url, now, by: me.name } });
-      $('#ytUrl').value = '';
-      Sfx.unlock();
-      if (r.queued) toast('Трек добавлен в очередь');
-      else { ytChanging = false; syncMusic(); }
+      // название вместо ссылки: берём первый найденный трек
+      let url = q;
+      if (!isYtLink(q)) {
+        const list = ytFound.length ? ytFound : await ytFind(q);
+        if (!list.length) return toast('Ничего не нашлось', true);
+        url = list[0].vid;
+      }
+      await addTrack(url, now);
     } catch (err) { toast(err.message, true); }
   });
   // наши треки в панели музыки: включаются у всех сразу; на вороне сервер ещё и пускает ворону по экрану
   $('#ytAdd').addEventListener('click', async e => {
+    const pick = e.target.closest('[data-pick], [data-now]');
+    if (pick) {
+      try { await addTrack(pick.dataset.pick || pick.dataset.now, pick.dataset.now !== undefined || !state?.music); }
+      catch (err) { toast(err.message, true); }
+      return;
+    }
     const b = e.target.closest('[data-our]');
     if (!b) return;
     if (state?.music?.vid === b.dataset.our) return toast(b.dataset.our === 'RnMVb0lJ8LI' ? 'Ворона уже летит' : 'Уже играет');
@@ -2066,7 +2159,7 @@ function initRoom(roomId) {
   const PROFILE_ICONS = ['', '👑', '🔥', '⭐', '🎤', '🎬', '💀', '👾', '🐸', '🌙', '⚡', '🍿', '🦄', '🎧'];
   const PROFILE_FRAMES = [['none', 'Без рамки'], ['accent', 'Акцент'], ['neon', 'Неон'], ['gold', 'Золото'], ['rainbow', 'Радуга'], ['fire', 'Огонь'], ['ice', 'Лёд'], ['toxic', 'Токсик'], ['holo', 'Голограмма']];
   const PROFILE_BANNERS = [['none', 'Без фона'], ['aurora', 'Сияние'], ['sunset', 'Закат'], ['ocean', 'Океан'], ['ember', 'Угли'], ['night', 'Ночь'], ['live', 'Живое сияние'], ['stars', 'Звёзды']];
-  const PROFILE_DEFAULTS = { color: '', effect: 'none', frame: 'none', banner: 'none', font: 'default', icon: '', badge: '', status: '' };
+  const PROFILE_DEFAULTS = { color: '', effect: 'none', frame: 'none', banner: 'none', font: 'default', icon: '', badge: '', status: '', winTrack: null };
   let profDraft = null, profEditing = false, profTab = 'nick';
   const profBase = pid => ({ ...PROFILE_DEFAULTS, ...prof(pid) });
   const profDirty = pid => profEditing && JSON.stringify({ ...PROFILE_DEFAULTS, ...profDraft }) !== JSON.stringify(profBase(pid));
@@ -2164,6 +2257,7 @@ function initRoom(roomId) {
       </div>
       <section class="profile-sec"><h3>Бейджи <span class="m">${d.earned.length} из ${BADGES.length}</span></h3><div class="bdgs">${d.earned.map(b => badgeHtml(b, true, d.stats)).join('')}${d.locked.map(b => badgeHtml(b, false, d.stats)).join('')}</div></section>
       ${d.genres.length ? `<section class="profile-sec"><h3>Любимые жанры</h3><div class="chips">${d.genres.map(g => `<span class="chip on-static">${esc(g)}</span>`).join('')}</div></section>` : ''}
+      ${p.winTrack ? `<section class="profile-sec"><h3>Победная музыка <span class="m">играет, когда выпал ${you ? 'ваш' : 'его'} фильм</span></h3><div class="pe-win">${ytRowHtml(p.winTrack)}</div></section>` : ''}
       ${sec(`${you ? 'Хочу посмотреть' : 'Хочет посмотреть'} <span class="m">${d.voted.length} из ${votesMax(pid)} голосов</span>`, d.voted)}
       ${sec(you ? 'Выбирали ваши фильмы' : 'Выбирали его фильмы', d.wins)}
       ${sec(you ? 'Вы добавили в колесо' : 'Добавил(а) в колесо', d.added)}`;
@@ -2194,7 +2288,11 @@ function initRoom(roomId) {
         <section class="pe-group"><h4>Фон</h4><div class="opt-grid wide">${PROFILE_BANNERS.map(([k, t]) => opt('data-pb', k, p.banner === k, `<span class="opt-bn bn-box bn-${k}"></span>`, t)).join('')}</div></section>
         <section class="pe-group"><h4>Бейдж у ника <span class="m">из полученных</span></h4>
           ${d.earned.length ? `<div class="opt-grid wide">${opt('data-pbadge', '', !p.badge, '<span class="opt-ico"><svg viewBox="0 0 24 24"><path d="M6 6l12 12"/></svg></span>', 'Не показывать')}${d.earned.map(b => opt('data-pbadge', b.id, p.badge === b.id, `<span class="opt-ico badge-ico"><svg viewBox="0 0 24 24">${b.icon}</svg></span>`, b.name)).join('')}</div>` : '<p class="note">Пока нет полученных бейджей. Как их получить — в профиле, по наведению на бейдж.</p>'}</section>
-        <section class="pe-group"><h4>Статус</h4><input id="peStatus" maxlength="60" placeholder="Например: сегодня пою Земфиру" value="${esc(p.status || '')}"></section>`,
+        <section class="pe-group"><h4>Статус</h4><input id="peStatus" maxlength="60" placeholder="Например: сегодня пою Земфиру" value="${esc(p.status || '')}"></section>
+        <section class="pe-group"><h4>Победная музыка <span class="m">играет у всех, когда выпал ваш фильм</span></h4>
+          ${p.winTrack ? `<div class="pe-win">${ytRowHtml(p.winTrack)}<button type="button" class="btn btn-ghost" data-pwin-clear>Убрать</button></div>` : ''}
+          <input id="peWinQ" placeholder="${p.winTrack ? 'Выбрать другой трек' : 'Название трека или ссылка на YouTube'}" autocomplete="off">
+          <div class="yt-results" id="peWinResults"></div></section>`,
     };
     $('#profileBody').innerHTML = `
       <div class="pe-top">
@@ -2214,6 +2312,23 @@ function initRoom(roomId) {
   $('#profileBody').addEventListener('change', e => {
     const t = e.target.closest('[data-person-set]');
     if (t) setPerson($('#profileBody').dataset.pid, { [t.dataset.personSet]: !t.checked });
+  });
+  // победная музыка: поиск по названию или ссылка; поле живёт, пока не перерисовали редактор
+  let peFound = [], peTimer = null, peSeq = 0;
+  $('#profileBody').addEventListener('input', e => {
+    if (e.target.id !== 'peWinQ') return;
+    clearTimeout(peTimer);
+    const q = e.target.value.trim(), box = $('#peWinResults');
+    const vid = ytLinkVid(q);
+    // ссылка: название трека сервер возьмёт у YouTube при сохранении
+    if (vid) { peFound = [{ vid, title: 'Трек по ссылке', author: 'название подтянется при сохранении' }]; box.innerHTML = ytRowHtml(peFound[0]); return; }
+    if (q.length < 2) { peFound = []; box.innerHTML = ''; return; }
+    peTimer = setTimeout(async () => {
+      const my = ++peSeq;
+      box.innerHTML = '<p class="note">Ищу на YouTube…</p>';
+      try { const list = await ytFind(q); if (my === peSeq) { peFound = list; box.innerHTML = list.length ? list.map(t => ytRowHtml(t)).join('') : '<p class="note">Ничего не нашлось</p>'; } }
+      catch (err) { if (my === peSeq) box.innerHTML = `<p class="note">${esc(err.message)}</p>`; }
+    }, 400);
   });
   $('#profileBody').addEventListener('input', e => {
     if (e.target.id !== 'peStatus') return;
@@ -2238,6 +2353,11 @@ function initRoom(roomId) {
     else if (t.dataset.pn) profDraft.font = t.dataset.pn;
     else if (t.dataset.pi !== undefined) profDraft.icon = t.dataset.pi;
     else if (t.dataset.pbadge !== undefined) profDraft.badge = t.dataset.pbadge;
+    else if (t.dataset.pick && profEditing) {
+      const tr = peFound.find(x => x.vid === t.dataset.pick);
+      if (!tr) return;
+      profDraft.winTrack = { vid: tr.vid, title: tr.title, author: tr.author };
+    } else if (t.matches('[data-pwin-clear]')) profDraft.winTrack = null;
     else if (t.matches('[data-psave]')) {
       try {
         await api('/profile', { method: 'POST', body: { ...profDraft, cid: me.cid } });

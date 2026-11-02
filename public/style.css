@@ -358,16 +358,30 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 .yt-head-btns { display: flex; gap: 2px; }
 .yt-head-btns .nav-icon { width: 36px; height: 36px; border-radius: 18px; }
 /* наши треки: одно нажатие — играет у всех; тот, что играет сейчас, подсвечен */
-.our-tracks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+/* три плитки в ряд: обложка сверху, подпись под ней */
+.our-tracks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .our-tracks .label { grid-column: 1 / -1; }
-.our-track { display: flex; align-items: center; gap: 10px; min-width: 0; height: 56px; padding: 6px 12px 6px 6px; border-radius: 16px; background: var(--s1); text-align: left; transition: background .2s, box-shadow .2s, transform .3s var(--spring); }
+.our-track { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 6px 6px 8px; border-radius: 16px; background: var(--s1); text-align: left; transition: background .2s, box-shadow .2s, transform .3s var(--spring); }
 .our-track:hover { background: var(--s2); }
 .our-track:active { transform: scale(.97); }
-.our-track i { width: 44px; height: 44px; flex: none; border-radius: 10px; background: var(--s3) center/cover; }
-.our-track span { display: flex; flex-direction: column; min-width: 0; }
+.our-track i { width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; background: var(--s3) center/cover; }
+.our-track span { display: flex; flex-direction: column; min-width: 0; padding: 0 4px; }
 .our-track b { font: 600 14px/20px var(--f-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .our-track small { font: 500 12px/16px var(--f-ui); color: var(--tx2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .our-track.on { background: color-mix(in srgb, var(--acc) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc-hi) 45%, transparent); }
+/* выдача поиска трека (панель музыки и победная музыка в профиле) */
+.yt-results { display: flex; flex-direction: column; gap: 2px; max-height: 264px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
+.yt-results:empty { display: none; }
+.yt-res { display: flex; align-items: center; gap: 4px; border-radius: 14px; transition: background .2s; }
+.yt-res:hover { background: var(--s1); }
+.yt-res-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 14px; text-align: left; }
+.yt-res img { width: 48px; height: 36px; flex: none; border-radius: 8px; object-fit: cover; background: var(--s3); }
+.yt-res span { display: flex; flex-direction: column; min-width: 0; }
+.yt-res b { font: 600 13.5px/18px var(--f-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yt-res small { font: 500 12px/16px var(--f-ui); color: var(--tx2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yt-res .nav-icon { flex: none; width: 36px; height: 36px; border-radius: 18px; }
+.pe-win { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pe-win .yt-res { flex: 1; min-width: 0; background: var(--s1); }
 .yt-vol { display: flex; align-items: center; gap: 12px; height: 32px; color: var(--tx2); }
 .yt-vol svg { width: 18px; height: 18px; }
 .yt-vol input { flex: 1; }
@@ -622,12 +636,6 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 .wheel-area { min-width: 0; min-height: 0; container-type: size; display: grid; place-items: center; }
 .wheel-box { position: relative; width: min(100cqw, 100cqh, 960px); aspect-ratio: 1; container-type: inline-size; }
 .wheel-box canvas { width: 100%; height: 100%; display: block; }
-/* главы выбывания: «Топ-10», «Топ-5», «Полуфинал» проходят через колесо на старте этапа — тем же шрифтом, что заставка финала */
-.chapter { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; opacity: 0; }
-.chapter::before { content: ""; position: absolute; inset: 20%; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.62), transparent); }
-.chapter b { position: relative; font: 800 clamp(48px, 14cqi, 128px)/.95 var(--f-head); letter-spacing: -.055em; padding: 0 .04em .07em; white-space: nowrap; background: linear-gradient(180deg, var(--h1a) 30%, var(--acc-hi) 125%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 40px var(--glow)); }
-.chapter.on { animation: chapter 2.1s var(--ease) both; }
-@keyframes chapter { 0% { opacity: 0; transform: scale(1.08); filter: blur(16px); } 22%, 70% { opacity: 1; transform: none; filter: blur(0); } 100% { opacity: 0; transform: scale(.97); filter: blur(10px); } }
 /* выбывший постер выскакивает из-под стрелки и падает за край экрана (app.js hitWheel) */
 /* карточка в 3D: лицо — постер с бликом глянца, оборот — тёмный картон; у каждой стороны своя тень */
 .toss { position: fixed; z-index: 40; aspect-ratio: 2 / 3; pointer-events: none; transform-style: preserve-3d; will-change: transform; }
@@ -702,18 +710,70 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 .chat-form input { width: 220px; height: 44px; padding: 0 18px; font-size: 14px; border-radius: 22px; background: var(--fill); border-color: transparent; transition: width .3s var(--ease), border-color .2s, box-shadow .2s; }
 .chat-form input:focus { width: 280px; }
 
+/* ---------- заставки на весь экран: этап выбывания и финал (по мотивам сайта Notturno, app.js showChapter / showFinale) ----------
+   Плоская заливка поднимается снизу рваным краем из «щетины» (маска inkEdge), заголовок собирается из шести полос
+   со смазом, на сборке разлетаются белые осколки, на уходе всё уезжает вверх и открывает колесо.
+   Цвет заливки с каждым этапом краснее и темнее: топ-10 → топ-5 → полуфинал → финал */
+.takeover, .finale { --tk-c: #E8501C; }
+.takeover[data-tone="top"] { --tk-c: #E3261C; }
+.takeover[data-tone="semi"] { --tk-c: #C1121F; }
+.finale { --tk-c: #A50E1C; }
+/* заливка выше и ниже экрана на 24vh: там её рваные края, середина сплошная (слои маски чуть заходят друг на друга, без швов) */
+.tk-flood { position: absolute; left: 0; right: 0; top: -24vh; height: calc(100% + 48vh); background: var(--tk-c);
+  -webkit-mask: var(--edge-t) top / 100% 24vh no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - 47vh) no-repeat, var(--edge-b) bottom / 100% 24vh no-repeat;
+  mask: var(--edge-t) top / 100% 24vh no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - 47vh) no-repeat, var(--edge-b) bottom / 100% 24vh no-repeat; }
+/* заголовок: копии слова, каждая обрезана своей полосой; длинное слово app.js ужимает в 90% ширины экрана */
+.tk-title, .fn-t { display: grid; justify-items: center; color: #fff; text-transform: uppercase; letter-spacing: -.05em; }
+.tk-slice { grid-area: 1 / 1; display: block; white-space: nowrap; padding: 0 .04em .06em; clip-path: inset(calc(var(--i) * 16.6667% - 1px) 0 calc(100% - (var(--i) + 1) * 16.6667% - 1px) 0); }
+.tk-shards { position: absolute; left: 50%; top: 50%; pointer-events: none; }
+.tk-shard { position: absolute; width: var(--s); height: var(--s); margin: calc(var(--s) / -2); background: #fff; opacity: 0; }
+@keyframes tkBurst { 0% { opacity: 0; transform: scale(.3); } 8% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--sx), var(--sy)) rotate(var(--sr)) scale(1); } }
+
+/* этап выбывания: 2,3 с, пока колесо разгоняется под заставкой */
+.takeover { position: fixed; inset: 0; z-index: 60; overflow: hidden; pointer-events: none; display: grid; place-items: center; }
+.tk-in { position: relative; display: flex; flex-direction: column; align-items: center; padding: 0 16px; text-align: center; }
+.tk-title { font: 800 min(20vw, 34vh)/.9 var(--f-head); }
+.tk-sub { margin-top: 2.4vh; font: 600 clamp(15px, 1.6vw, 22px)/1.3 var(--f-ui); color: rgba(255,255,255,.82); }
+.takeover.play .tk-flood { animation: tkFlood 2.3s both; }
+.takeover.play .tk-slice { animation: tkSlice 2.3s both; animation-delay: calc(var(--i) * 35ms); }
+.takeover.play .tk-sub { animation: tkSub 2.3s both; }
+.takeover.play .tk-shard { animation: tkBurst 1.1s .72s cubic-bezier(.16, 1, .3, 1) both; }
+@keyframes tkFlood {
+  0% { transform: translateY(100%); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+  26% { transform: translateY(0); }
+  70% { transform: translateY(-1.5%); animation-timing-function: cubic-bezier(.65, 0, .85, .3); }
+  100% { transform: translateY(-112%); }
+}
+@keyframes tkSlice {
+  0%, 14% { opacity: 0; transform: translateX(var(--dx)) scaleX(1.3); filter: blur(14px); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+  34% { opacity: 1; transform: none; filter: blur(0); }
+  70% { opacity: 1; transform: scale(1.03); animation-timing-function: cubic-bezier(.65, 0, .85, .3); }
+  100% { opacity: 1; transform: translateY(-80vh) scale(1.03); filter: blur(4px); }
+}
+@keyframes tkSub {
+  0%, 30% { opacity: 0; transform: translateY(14px); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+  42%, 70% { opacity: 1; transform: none; animation-timing-function: cubic-bezier(.65, 0, .85, .3); }
+  100% { opacity: 1; transform: translateY(-80vh); }
+}
+
 /* ---------- финал: заставка на весь экран перед последним прокрутом ---------- */
-.finale { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; text-align: center; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease); }
-/* фон — отдельным слоем: на уходе (.out) гаснут фон и надписи, а постеры остаются видны и улетают в колесо */
-.finale::before { content: ""; position: absolute; inset: 0; z-index: -1;
-  background: radial-gradient(40% 55% at 38% 50%, hsl(var(--fa, 258) 60% 40% / .45), transparent 70%), radial-gradient(40% 55% at 62% 50%, hsl(var(--fb, 300) 60% 40% / .45), transparent 70%), color-mix(in srgb, var(--hero) 86%, transparent); }
-.finale.on { opacity: 1; }
-.finale.out::before, .finale.out .fn-h, .finale.out .fn-count { opacity: 0; transition: opacity .45s var(--ease); }
-.fn-in { display: flex; flex-direction: column; align-items: center; gap: clamp(24px, 4.4vh, 40px); transform: scale(1.03); transition: transform .9s var(--ease); }
-.finale.on .fn-in { transform: none; }
+/* на уходе (.out) заливка уезжает вверх и открывает колесо, надписи гаснут, постеры улетают в колесо (app.js hideFinale) */
+.finale { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; text-align: center; pointer-events: none; overflow: hidden; }
+.finale .tk-flood { transform: translateY(100%); transition: transform .8s cubic-bezier(.16, 1, .3, 1); }
+.finale.on .tk-flood { transform: none; }
+.finale.out .tk-flood { transform: translateY(-112%); transition: transform .65s cubic-bezier(.65, 0, .85, .3); }
+.finale.out .fn-h, .finale.out .fn-count { opacity: 0; transition: opacity .3s var(--ease); }
+.fn-in { position: relative; display: flex; flex-direction: column; align-items: center; gap: clamp(20px, 3.6vh, 36px); }
 .fn-h { display: flex; flex-direction: column; align-items: center; }
-.fn-t { font: 800 clamp(72px, 8.4vw, 120px)/.93 var(--f-head); letter-spacing: -.055em; padding-bottom: .07em; background: linear-gradient(180deg, var(--h1a) 30%, var(--acc-hi) 125%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 40px var(--glow)); }
-.fn-s { margin-top: 8px; font: 500 17px/24px var(--f-ui); color: var(--tx2); }
+.fn-t { font: 800 clamp(80px, 12vw, 176px)/.9 var(--f-head); filter: drop-shadow(0 12px 40px rgba(0,0,0,.3)); }
+/* до сборки полосы невидимы (иначе на пару кадров мелькает готовое слово); после — держатся видимыми */
+.fn-t .tk-slice { opacity: 0; }
+.finale.on .fn-t .tk-slice { animation: tkSliceIn .8s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(.25s + var(--i) * 35ms); }
+@keyframes tkSliceIn { from { opacity: 0; transform: translateX(var(--dx)) scaleX(1.3); filter: blur(14px); } to { opacity: 1; transform: none; filter: none; } }
+.fn-h { position: relative; } /* осколки финала разлетаются от заголовка */
+.finale.on .tk-shard { animation: tkBurst 1.2s .55s cubic-bezier(.16, 1, .3, 1) both; }
+.fn-s { margin-top: 8px; font: 600 17px/24px var(--f-ui); color: rgba(255,255,255,.82); opacity: 0; transition: opacity .5s var(--ease) .6s; }
+.finale.on .fn-s { opacity: 1; }
 .fn-pair { display: flex; justify-content: center; gap: 24px; }
 /* постеры финалистов поднимаются со своих секторов колеса (app.js showFinale) */
 .fn-pair figure { margin: 0; width: clamp(140px, 14.7vw, 212px); display: flex; flex-direction: column; align-items: center; gap: 12px; rotate: -3deg; }
@@ -1700,11 +1760,16 @@ body.karaoke-on #room .quiz { align-self: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .finale, .fn-in { transform: none; transition: opacity .3s; }
   .current span::after { transition: none; }
   .films-panel { transition: none; }
-  /* без движения: глава просто проявляется, переключатель серии и отсчёт не прыгают */
-  .chapter.on { animation: chapterFade 2.1s linear both; }
+  /* без движения: заставки просто проявляются и гаснут, заливка стоит на месте, осколков нет */
+  .takeover.play { animation: tkFade 2.3s linear both; }
+  .takeover.play .tk-flood, .takeover.play .tk-slice, .takeover.play .tk-sub, .finale.on .fn-t .tk-slice { animation: none; }
+  .fn-t .tk-slice { opacity: 1; }
+  .tk-shard { display: none; }
+  .finale { opacity: 0; transition: opacity .3s; }
+  .finale.on { opacity: 1; }
+  .finale .tk-flood, .finale.on .tk-flood, .finale.out .tk-flood { transform: none; transition: none; }
   #autoWrap:not([hidden]), .fn-count.beat { animation: none; }
 }
-@keyframes chapterFade { 0%, 100% { opacity: 0; } 15%, 75% { opacity: 1; } }
+@keyframes tkFade { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
