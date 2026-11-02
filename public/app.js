@@ -14,6 +14,8 @@ const ICON = {
   minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>',
   x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   check: '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>',
+  eye: '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24"><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.6 3.3M6.6 6.9C4 8.6 2.5 12 2.5 12s3.5 6.5 9.5 6.5a9 9 0 0 0 4.4-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
   heart: '<svg viewBox="0 0 24 24" class="heart"><path d="M12 20.5s-7.5-4.6-7.5-10.3A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3Z"/></svg>',
 };
 
@@ -638,9 +640,11 @@ function initRoom(roomId) {
     return true;
   }
   const watchedIds = () => new Set((state?.history || []).map(h => h.film.id));
+  // кого создатель отключил из колеса (как на сервере): его фильмы не крутятся
+  const isOff = pid => Boolean(state?.off?.includes(pid));
   function activeFilms() {
     const watched = watchedIds();
-    return state ? state.films.filter(f => !state.eliminated.includes(f.id) && !watched.has(f.id) && matchesFilters(f)) : [];
+    return state ? state.films.filter(f => !state.eliminated.includes(f.id) && !watched.has(f.id) && !isOff(personOf(f)) && matchesFilters(f)) : [];
   }
   // ---- голоса: тот же расчёт веса, что на сервере ----
   const rules = () => state?.rules || { votes: 3, points: 4, cap: 4 };
@@ -1029,11 +1033,12 @@ function initRoom(roomId) {
     const avatarOf = avatarFor;
     const filmRow = f => {
       const seen = watched.has(f.id);
-      const filtered = !seen && !out.has(f.id) && !matchesFilters(f);
+      const off = !seen && isOff(personOf(f));
+      const filtered = !seen && !out.has(f.id) && (off || !matchesFilters(f));
       const share = (W.get(f.id) || 0) / total;
       const pct = seen || out.has(f.id) || filtered || !total ? '—' : `${(share * 100).toFixed(share < 0.1 ? 1 : 0)}%`;
       const nv = (f.votes || []).length, mine = iVoted(f);
-      const meta = seen ? ['уже смотрели'] : filtered ? ['не подходит под фильтры'] : [f.year, f.runtime && fmtRuntime(f.runtime)].filter(Boolean);
+      const meta = seen ? ['уже смотрели'] : off ? ['автор сегодня не участвует'] : filtered ? ['не подходит под фильтры'] : [f.year, f.runtime && fmtRuntime(f.runtime)].filter(Boolean);
       const fresh = seenFilms && !seenFilms.has(f.id);
       return `<div class="film${fresh ? ' fresh' : ''}${out.has(f.id) || seen ? ' out' : ''}${seen ? ' watched' : ''}${filtered ? ' filtered' : ''}${wheel.curId === f.id ? ' hot' : ''}" data-id="${esc(f.id)}">
         <div class="film-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</div>
@@ -1055,16 +1060,19 @@ function initRoom(roomId) {
     $('#filmList').innerHTML = ordered.map(g => {
       const gShare = total ? g.films.reduce((a, f) => a + (W.get(f.id) || 0), 0) / total : 0;
       const ava = avatarOf(g.pid);
-      const closed = collapsed.has(g.pid);
-      return `<div class="film-group${closed ? ' closed' : ''}">
+      const closed = collapsed.has(g.pid), off = isOff(g.pid);
+      // создатель отключает человека прямо из шапки группы; отключённая группа приглушена у всех
+      const offBtn = amOwner ? `<button type="button" class="g-off${off ? ' on' : ''}" data-off="${esc(g.pid)}" title="${off ? 'Вернуть в колесо' : 'Отключить из колеса: сегодня его нет'}" aria-label="${off ? 'Вернуть в колесо' : 'Отключить из колеса'}">${off ? ICON.eyeOff : ICON.eye}</button>` : '';
+      return `<div class="film-group${closed ? ' closed' : ''}${off ? ' off' : ''}">
         <div class="group-head" data-group="${esc(g.pid)}" role="button" tabindex="0" aria-expanded="${!closed}" title="${closed ? 'Развернуть' : 'Свернуть'}">
           <svg class="g-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           <span class="g-person" data-person="${esc(g.pid)}" data-name="${esc(g.name)}" title="Профиль">
             ${ava ? `<img class="${frameCls(g.pid)}" style="${frameVars(g.pid)}" src="${esc(pimg(ava))}" alt="">` : `<span class="g-ava${frameCls(g.pid)}" style="background:hsl(${hue(g.name)} 55% 42%);${frameVars(g.pid)}">${initial(g.name)}</span>`}
             <b>${nick(g.pid, g.name)}${g.pid === myPid() ? ' <span class="m">(вы)</span>' : ''}</b>
           </span>
-          <span class="g-count${g.left < g.films.length ? ' part' : ''}" title="${g.left < g.films.length ? `На колесе ${g.left} из ${g.films.length}` : `${g.films.length} ${plural(g.films.length, 'фильм', 'фильма', 'фильмов')} на колесе`}">${g.left < g.films.length ? `${g.left}<i>/${g.films.length}</i>` : g.films.length}</span>
-          ${modChip(g.pid)}
+          ${off ? '<span class="g-offtag">не участвует</span>' : `<span class="g-count${g.left < g.films.length ? ' part' : ''}" title="${g.left < g.films.length ? `На колесе ${g.left} из ${g.films.length}` : `${g.films.length} ${plural(g.films.length, 'фильм', 'фильма', 'фильмов')} на колесе`}">${g.left < g.films.length ? `${g.left}<i>/${g.films.length}</i>` : g.films.length}</span>
+          ${modChip(g.pid)}`}
+          ${offBtn}
           <em>${gShare ? `${(gShare * 100).toFixed(gShare < 0.1 ? 1 : 0)}%` : '—'}</em>
         </div>
         <div class="g-body"><div>${g.films.map(filmRow).join('')}</div></div>
@@ -1134,12 +1142,13 @@ function initRoom(roomId) {
         : by ? `Крутит ${by}` : 'Колесо крутится';
     }
     $('#resetBtn').hidden = !state.eliminated.length || spinning;
-    const addClosed = (state.addLock && !isRoomOwner()) || state.elimActive;
+    const banned = Boolean(state.noAdd?.includes(myPid())) && !isRoomOwner(); // создатель запретил этому человеку добавлять
+    const addClosed = (state.addLock && !isRoomOwner()) || banned || state.elimActive;
     $('#addBtn').disabled = spinning || addClosed;
     $('#wheelAddBtn').disabled = $('#addBtn').disabled;
     $('#quickSearch').disabled = $('#addBtn').disabled;
+    $('#addBtn').title = state.elimActive ? 'Идёт выбывание: добавлять фильмы можно после него' : banned ? 'Создатель комнаты запретил вам добавлять фильмы' : state.addLock && !isRoomOwner() ? 'Создатель комнаты закрыл добавление фильмов' : '';
     $('#quickSearch').placeholder = $('#addBtn').disabled && $('#addBtn').title ? $('#addBtn').title : 'Фильм или ссылка на YouTube';
-    $('#addBtn').title = state.elimActive ? 'Идёт выбывание: добавлять фильмы можно после него' : state.addLock && !isRoomOwner() ? 'Создатель комнаты закрыл добавление фильмов' : '';
     $('#addLockWrap').hidden = !isRoomOwner();
     $('#ownerCtl').hidden = !isRoomOwner();
     $('#addLockOn').checked = Boolean(state.addLock);
@@ -1182,6 +1191,8 @@ function initRoom(roomId) {
   const ytBroken = new Set(), ytRetried = new Set();
   const playKey = m => `${m.vid}:${m.startedAt}`;
   let ytReloadAt = 0;
+  let ytWaitAt = 0, ytBufAt = 0; // с какого момента ждём загрузки плеера и с какого трек «грузится»
+  const UNMUTE = '#ytUnmute, #kUnmute, #qUnmute'; // кнопки «Слушать» в карточке музыки, караоке и игре
   function loadYT(cb) {
     if (window.YT?.Player) return cb();
     if (!loadYT.queue) {
@@ -1189,6 +1200,8 @@ function initRoom(roomId) {
       window.onYouTubeIframeAPIReady = () => loadYT.queue.forEach(f => f());
       const sc = document.createElement('script');
       sc.src = 'https://www.youtube.com/iframe_api';
+      // YouTube не открылся (у части людей без VPN): следующая синхронизация попробует загрузить заново
+      sc.onerror = () => { sc.remove(); loadYT.queue = null; };
       document.head.append(sc);
     }
     loadYT.queue.push(cb);
@@ -1254,6 +1267,7 @@ function initRoom(roomId) {
     if (last) $('#ytReplay').title = `Сыграть ещё раз: ${last.title}`;
     if (!m) {
       if (yt) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $(ytHostCur).innerHTML = ''; }
+      ytWaitAt = ytBufAt = 0;
       return;
     }
     $('#ytTitle').textContent = m.title;
@@ -1263,6 +1277,12 @@ function initRoom(roomId) {
       ? '<svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>'
       : '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>';
     $('#ytToggle').title = m.pausedAt != null ? 'Играть у всех' : 'Пауза у всех';
+    // плеер YouTube так и не загрузился (у части людей YouTube без VPN не открывается): показываем «Слушать»,
+    // нажатие пробует загрузить ещё раз; иначе карточка пишет «играет», а звука нет и непонятно почему
+    if (!ytReady) {
+      ytWaitAt ||= Date.now();
+      if (Date.now() - ytWaitAt > 10000) $$(UNMUTE).forEach(el => { el.hidden = false; el.title = 'Плеер YouTube у вас не загрузился. Нажмите, чтобы попробовать ещё раз; если YouTube у вас не открывается без VPN, общую музыку не слышно'; });
+    } else ytWaitAt = 0;
     loadYT(() => {
       if (!yt) {
         ytVid = m.vid;
@@ -1278,7 +1298,7 @@ function initRoom(roomId) {
               // Номер — того видео, что доиграло у нас: отставший плеер не должен сбросить у всех уже новый трек
               if (e.data === 0 && state?.music && ytVid === state.music.vid) api(`/rooms/${roomId}/music/ended`, { method: 'POST', body: { vid: ytVid } }).catch(() => {});
               if (e.data === 1 && state?.music) reportDuration(state.music);
-              if (e.data === 1) $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => (el.hidden = true));
+              if (e.data === 1 && !yt.isMuted?.()) $$(UNMUTE).forEach(el => (el.hidden = true));
             },
             onError: e => {
               const m = state?.music;
@@ -1315,19 +1335,38 @@ function initRoom(roomId) {
         // сам запускает видео, и при обратном порядке пауза срывалась — музыка играла дальше
         if (Math.abs(cur - exp) > 1) yt.seekTo(exp, true);
         if (st !== 2) yt.pauseVideo();
-        $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => (el.hidden = true));
+        $$(UNMUTE).forEach(el => (el.hidden = true));
       } else {
         const dur = m.duration || yt.getDuration() || 0;
-        if (st === 0 && (!dur || exp >= dur - 1.5)) { $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => (el.hidden = true)); return; } // доиграл, ждём сервер
+        if (st === 0 && (!dur || exp >= dur - 1.5)) { $$(UNMUTE).forEach(el => (el.hidden = true)); return; } // доиграл, ждём сервер
         if (Math.abs(cur - exp) > 2.5) yt.seekTo(exp, true);
         if (st !== 1 && st !== 3) yt.playVideo();
-        // браузер не дал включить звук без клика: просим нажать
-        $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => (el.hidden = st === 1 || st === 3));
+        // YouTube мог запустить трек без звука: браузер не даёт звук, пока по странице не кликнули.
+        // После любого клика включаем звук сами, до клика просим нажать «Слушать»
+        let muted = Boolean(yt.isMuted?.());
+        if (muted && navigator.userActivation?.hasBeenActive) { yt.unMute(); muted = false; }
+        // грузится дольше 8 секунд (YouTube у части людей без VPN тормозит) — тоже кнопка: состояние «грузится» звука не даёт
+        ytBufAt = st === 3 ? ytBufAt || Date.now() : 0;
+        const stuck = Boolean(ytBufAt) && Date.now() - ytBufAt > 8000;
+        $$(UNMUTE).forEach(el => {
+          el.hidden = (st === 1 || st === 3) && !muted && !stuck;
+          el.title = stuck ? 'Трек у вас никак не загрузится: YouTube тормозит. Нажмите, чтобы попробовать ещё раз' : 'Браузер ждёт клика, чтобы включить звук';
+        });
       }
     });
   }
   setInterval(() => { if (state?.music) syncMusic(); }, 4000);
-  $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => el.addEventListener('click', () => { Sfx.unlock(); if (ytReady) { yt.playVideo(); ytVolume(); } setTimeout(syncMusic, 600); }));
+  // «Слушать»: клик разрешает звук — снимаем беззвучный режим и запускаем; если плеера нет — синхронизация загрузит его заново
+  $$(UNMUTE).forEach(el => el.addEventListener('click', () => { Sfx.unlock(); if (ytReady) { yt.unMute(); yt.playVideo(); ytVolume(); } ytBufAt = 0; setTimeout(syncMusic, 600); }));
+  // любой клик по странице тоже разрешает звук: если трек играл без звука или ждал разрешения — включаем сразу, без кнопки
+  document.addEventListener('click', () => {
+    const mu = state?.music;
+    if (!ytReady || !mu || mu.pausedAt != null || ytBroken.has(playKey(mu))) return;
+    if (yt.isMuted?.()) yt.unMute();
+    const st = yt.getPlayerState?.();
+    if (st !== 1 && st !== 3 && st !== 0) yt.playVideo();
+    ytVolume();
+  }, true);
 
   // ---- караоке: сцена с большим плеером, очередь певцов, оценки выступлений ----
   function renderKaraoke() {
@@ -2114,6 +2153,10 @@ function initRoom(roomId) {
         </div>
       </div>
       ${you ? '<button type="button" class="btn btn-ghost pe-open" data-pedit><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Изменить оформление</button>' : ''}
+      ${isRoomOwner() && !you ? `<section class="profile-sec profile-own"><h3>Создатель комнаты</h3><div class="grp">
+        <label class="check row"><input type="checkbox" role="switch" data-person-set="off" ${isOff(pid) ? '' : 'checked'}><span class="box"></span><span class="check-text">Участвует в колесе <button type="button" class="hint" data-hint="Если человека сегодня нет, выключите: его фильмы уйдут с колеса, но останутся в списке. Пока идёт выбывание, менять нельзя." aria-label="Подсказка: участвует в колесе">?</button></span></label>
+        <label class="check row"><input type="checkbox" role="switch" data-person-set="noAdd" ${state.noAdd?.includes(pid) ? '' : 'checked'}><span class="box"></span><span class="check-text">Может добавлять фильмы</span></label>
+      </div></section>` : ''}
       <div class="profile-stats">
         <div><b>${n}</b><span>${you ? plural(n, 'ваш фильм', 'ваших фильма', 'ваших фильмов') : plural(n, 'фильм', 'фильма', 'фильмов')} в колесе</span></div>
         <div><b>${w}</b><span>${plural(w, 'раз выбрали', 'раза выбрали', 'раз выбрали')} ${you ? 'ваш' : 'его'} фильм</span></div>
@@ -2167,6 +2210,11 @@ function initRoom(roomId) {
     requestAnimationFrame(() => placeSeg($('#peTabs')));
   }
 
+  // переключатели создателя в чужом профиле: «Участвует в колесе», «Может добавлять фильмы»
+  $('#profileBody').addEventListener('change', e => {
+    const t = e.target.closest('[data-person-set]');
+    if (t) setPerson($('#profileBody').dataset.pid, { [t.dataset.personSet]: !t.checked });
+  });
   $('#profileBody').addEventListener('input', e => {
     if (e.target.id !== 'peStatus') return;
     profDraft.status = e.target.value;
@@ -2268,6 +2316,20 @@ function initRoom(roomId) {
     catch (e) { toast(e.message, true); }
   }
 
+  // создатель: отключить человека из колеса или запретить ему добавлять фильмы
+  async function setPerson(pid, patch) {
+    try {
+      await api(`/rooms/${roomId}/person`, { method: 'POST', body: { pid, ...patch, cid: me.cid } });
+      const name = state.films.find(f => personOf(f) === pid)?.addedBy || people.find(p => p.pid === pid)?.name || 'Человек';
+      if (patch.off !== undefined) toast(patch.off ? `${name} не участвует: его фильмов нет на колесе` : `${name} снова на колесе`);
+      if (patch.noAdd !== undefined) toast(patch.noAdd ? `${name} больше не может добавлять фильмы` : `${name} снова может добавлять фильмы`);
+    } catch (err) {
+      toast(err.message, true);
+      // переключатель в профиле вернуть как было
+      if (!$('#profileModal').hidden && $('#profileBody').dataset.pid === pid) renderProfile(pid, $('#profileBody').dataset.name);
+    }
+  }
+
   // свёрнутые группы запоминаются для комнаты в этом браузере
   const collapsed = new Set(ls.get('collapsed_' + roomId, []));
   function toggleGroup(head) {
@@ -2281,9 +2343,12 @@ function initRoom(roomId) {
   }
   $('#filmList').addEventListener('keydown', e => {
     const head = e.target.closest('[data-group]');
-    if (head && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleGroup(head); }
+    // Enter и пробел на кнопках внутри шапки (отключить, бонус) нажимают их, а не сворачивают группу
+    if (head && e.target === head && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleGroup(head); }
   });
   $('#filmList').addEventListener('click', async e => {
+    const off = e.target.closest('[data-off]');
+    if (off) return setPerson(off.dataset.off, { off: !isOff(off.dataset.off) });
     const head = e.target.closest('[data-group]');
     if (head) { if (!e.target.closest('[data-person], .mod-chip')) toggleGroup(head); return; }
     const row = e.target.closest('.film');
@@ -2672,6 +2737,25 @@ function initRoom(roomId) {
     } catch (e) { toast(e.message, true); }
   });
 
+  // создатель: дотянуть постеры, которых нет, и заново загрузить картинки, не открывшиеся у себя
+  $('#postersBtn').addEventListener('click', async e => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    const label = b.textContent;
+    b.textContent = 'Ищу постеры…';
+    wheel.reloadFailed();
+    $$('img.img-lost').forEach(img => {
+      const base = img.src.replace(/[?&]r=\d+$/, '');
+      img.classList.remove('img-lost'); img.dataset.retry = '0';
+      img.src = `${base}${base.includes('?') ? '&' : '?'}r=${Date.now() % 1e5}`;
+    });
+    try {
+      const r = await api(`/rooms/${roomId}/posters`, { method: 'POST', body: { cid: me.cid } });
+      toast(!r.missing ? 'У всех фильмов постеры уже есть' : r.found ? `Нашлось постеров: ${r.found} из ${r.missing}` : `Не нашлось ни одного из ${r.missing}: таких фильмов нет в поиске`);
+    } catch (err) { toast(err.message, true); }
+    b.disabled = false;
+    b.textContent = label;
+  });
   $('#addLockOn').addEventListener('change', e => {
     api(`/rooms/${roomId}`, { method: 'PATCH', body: { addLock: e.target.checked, cid: me.cid } })
       .then(() => toast(e.target.checked ? 'Добавлять фильмы теперь можете только вы' : 'Добавлять фильмы снова могут все'))

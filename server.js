@@ -126,6 +126,8 @@ function publicState(r) {
     music: r.music?.quiz && r.quiz?.state === 'playing' ? { ...r.music, title: 'Угадай мелодию', author: '' } : r.music || null,
     quiz: publicQuiz(r), quizWins: r.quizWins || {}, chat: r.chat || [], queue: r.queue || [], lastTrack: r.music ? null : r.lastTrack || null,
     spinLock: Boolean(r.spinLock), addLock: Boolean(r.addLock),
+    // кого создатель отключил из колеса (его фильмы не крутятся) и кому запретил добавлять фильмы
+    off: r.off || [], noAdd: r.noAdd || [],
     // идёт выбывание: есть выбывшие или серия — новые фильмы сломали бы колесо посреди серии
     elimActive: r.eliminated.length > 0 || runtime(r).series,
     karaoke: Boolean(r.karaoke), perfs: (r.perfs || []).slice(0, 40),
@@ -140,6 +142,22 @@ const VOTES_PER_PERSON = 3;
 // держатся вместе с бонусом или штрафом к шансам — пока снова не выпадет фильм этого человека
 const bonusVotes = factor => (factor >= 2 ? 4 : factor > 1 ? 2 : factor < 1 ? -2 : 0);
 const votesFor = (r, pid) => VOTES_PER_PERSON + bonusVotes(r.mods?.[pid]?.factor || 1);
+// Голосов у человека не больше, чем положено сейчас. Бонус за оценку сгорел (выпал его фильм),
+// стал штрафом или оценки сняли — лишние голоса снимаются, сначала самые свежие
+// (у старых голосов времени нет: среди них снимаем с фильмов, добавленных позже).
+function trimVotes(r) {
+  const byPid = new Map();
+  r.films.forEach((f, i) => (f.votes || []).forEach(v => {
+    if (!byPid.has(v.id)) byPid.set(v.id, []);
+    byPid.get(v.id).push({ f, v, i });
+  }));
+  for (const [pid, list] of byPid) {
+    const extra = list.length - votesFor(r, pid);
+    if (extra <= 0) continue;
+    list.sort((a, b) => (a.v.at || 0) - (b.v.at || 0) || a.i - b.i);
+    for (const { f, v } of list.slice(-extra)) f.votes = f.votes.filter(x => x !== v);
+  }
+}
 const VOTE_BONUS = 0.25;
 // Голос добавляет фильму фиксированные 4 пункта к колесу (колесо = 100 пунктов + голоса),
 // поэтому весит одинаково, сколько бы фильмов ни было у автора.
@@ -195,6 +213,8 @@ for (const r of Object.values(rooms)) {
     }
   }
 }
+// голоса, оставшиеся сверх лимита до исправления, снимаются при запуске
+for (const r of Object.values(rooms)) trimVotes(r);
 
 // Шансы на колесе. Основа — 100 пунктов: с «равными шансами» поровну между авторами,
 // внутри доли автора между его фильмами по весу. Каждый голос добавляет фильму VOTE_POINTS пунктов.
@@ -258,7 +278,8 @@ function presence(roomId) {
   for (const c of clients.get(roomId) || []) if (!seen.has(c.cid)) seen.set(c.cid, { name: c.name, avatar: c.avatar, pid: c.pid });
   broadcast(roomId, { type: 'presence', people: [...seen.values()] });
 }
-function pushState(r) { save(); broadcast(r.id, { type: 'state', state: publicState(r) }); }
+// перед каждой рассылкой лишние голоса снимаются: лимит меняется в нескольких местах (оценка, сброс оценок, выпадение)
+function pushState(r) { trimVotes(r); save(); broadcast(r.id, { type: 'state', state: publicState(r) }); }
 
 setInterval(() => {
   for (const set of clients.values()) for (const c of set) c.res.write(': ping\n\n');
@@ -267,9 +288,11 @@ setInterval(() => {
 // ---------- колесо ----------
 // уже выпадавшие фильмы на колесо не попадают; создатель может убрать фильм из истории, и он вернётся
 const watchedIds = r => new Set(r.history.map(h => h.film.id));
+// фильмы людей, которых создатель отключил (сегодня их нет), тоже не крутятся
 function activeFilms(r) {
   const watched = watchedIds(r);
-  return r.films.filter(f => !r.eliminated.includes(f.id) && !watched.has(f.id) && f.weight > 0 && matchesFilters(r, f));
+  const off = new Set(r.off || []);
+  return r.films.filter(f => !r.eliminated.includes(f.id) && !watched.has(f.id) && f.weight > 0 && !off.has(personOf(f)) && matchesFilters(r, f));
 }
 // Шанс вылететь на выбывании: по каждому фильму на всём колесе, обратно его шансу выиграть.
 // Фавориты (голоса, вес, бонус) получают узкие секторы, фильмы с маленьким шансом вылетают первыми.
@@ -757,6 +780,7 @@ async function fetchDetails(f) {
     const u = `https://api.themoviedb.org/3/${type}/${tid}?language=ru-RU&append_to_response=videos,external_ids&include_video_language=ru,en,null${bearer ? '' : `&api_key=${TMDB_KEY}`}`;
     const j = await getJson(u, bearer ? { Authorization: `Bearer ${TMDB_KEY}` } : {});
     f.runtime = Number(j.runtime || j.episode_run_time?.[0] || 0) || 0;
+    if (!f.poster && j.poster_path) f.poster = `https://image.tmdb.org/t/p/w342${j.poster_path}`; // поиск отдал фильм без постера
     if (j.genres?.length) f.genres = j.genres.map(g => str(g.name, 30).toLowerCase()).slice(0, 3);
     if (!f.overview && j.overview) f.overview = str(j.overview, 2000);
     const vids = (j.videos?.results || []).filter(v => v.site === 'YouTube');
@@ -780,6 +804,29 @@ async function fetchDetails(f) {
   } else return;
   f.detailsAt = Date.now();
   f.idsAt = Date.now(); // отметка, что номер IMDb уже пробовали достать
+}
+
+// Постер, которого нет. У фильма из поиска заново запрашиваем карточку. Добавленный вручную ищем по названию
+// и берём только точное совпадение названия (и года, если он известен), чтобы не прилепить чужой постер.
+async function fillPoster(f) {
+  if (f.poster) return false;
+  if (f.source && f.sourceId) {
+    enrichFailed.delete(f.id);
+    await fetchDetails(f);
+    return Boolean(f.poster);
+  }
+  const year = Number(f.year) || 0;
+  for (const src of PROVIDERS) {
+    const found = await searchMovies(f.title, src);
+    const hit = found.find(x => x.poster && [x.title, x.original].some(t => t && norm(t) === norm(f.title))
+      && (!year || !Number(x.year) || Math.abs(Number(x.year) - year) <= 1));
+    if (!hit) continue;
+    // это тот же фильм: заодно запоминаем, откуда он, — потом догрузятся длительность и жанры
+    Object.assign(f, { poster: hit.poster, source: hit.source, sourceId: hit.sourceId, url: f.url || hit.url, year: f.year || hit.year, rating: f.rating || hit.rating, overview: f.overview || hit.overview });
+    if (!f.genres?.length && hit.genres?.length) f.genres = hit.genres;
+    return true;
+  }
+  return false;
 }
 
 // фильмы, добавленные до появления плеера, разок перезапрашиваем ради номера IMDb
@@ -1498,10 +1545,48 @@ async function api(req, res, url) {
     pushState(r); return json(res, 200, { ok: true });
   }
 
+  // создатель управляет человеком: отключить из колеса (сегодня его нет) или запретить добавлять фильмы
+  if (sub === 'person' && m === 'POST') {
+    if (!isOwner(r, me, b)) return json(res, 403, { error: 'Это может только создатель комнаты' });
+    const pid = str(b.pid, 64);
+    if (!pid) return json(res, 400, { error: 'Не понятно, о ком речь' });
+    const setIn = (key, on) => { r[key] = (r[key] || []).filter(x => x !== pid); if (on) r[key].push(pid); };
+    if (b.off !== undefined) {
+      // набор фильмов на колесе меняется: как с добавлением, посреди прокрута и выбывания нельзя
+      if (r.spin) return json(res, 409, { error: 'Дождитесь конца прокрута' });
+      if (r.eliminated.length || runtime(r).series) return json(res, 409, { error: 'Идёт выбывание: включать и отключать людей можно после него или после «Вернуть выбывших»' });
+      setIn('off', Boolean(b.off));
+      r.plan = null;
+    }
+    if (b.noAdd !== undefined) setIn('noAdd', Boolean(b.noAdd));
+    pushState(r); return json(res, 200, { ok: true });
+  }
+
   if (r.spin && sub !== 'spin') return json(res, 409, { error: 'Колесо крутится, подождите' });
+
+  // создатель просит дотянуть постеры, которых нет: в фоне поиск находит не всё
+  if (sub === 'posters' && m === 'POST') {
+    if (!isOwner(r, me, b)) return json(res, 403, { error: 'Это может только создатель комнаты' });
+    const liveIds = new Set(r.films.map(f => f.id));
+    const list = [...r.films, ...r.history.map(h => h.film).filter(f => !liveIds.has(f.id))]
+      .filter(f => !f.poster && f.source !== 'youtube').slice(0, 60);
+    let found = 0;
+    // по три запроса разом, чтобы не долбить сервис фильмов
+    for (let i = 0; i < list.length; i += 3) {
+      const got = await Promise.all(list.slice(i, i + 3).map(f => fillPoster(f).catch(() => false)));
+      found += got.filter(Boolean).length;
+    }
+    // копии в истории берут постер у фильма в колесе
+    for (const h of r.history) {
+      const live = r.films.find(x => x.id === h.film.id);
+      if (live?.poster && !h.film.poster) h.film.poster = live.poster;
+    }
+    pushState(r); return json(res, 200, { missing: list.length, found });
+  }
 
   if (sub === 'films' && !parts[3] && m === 'POST') {
     if (r.addLock && !isOwner(r, me, b)) return json(res, 403, { error: 'Создатель комнаты закрыл добавление фильмов' });
+    if ((r.noAdd || []).includes(personKey(me, b)) && !isOwner(r, me, b)) return json(res, 403, { error: 'Создатель комнаты запретил вам добавлять фильмы' });
     if (r.eliminated.length || runtime(r).series) return json(res, 409, { error: 'Идёт выбывание: добавлять фильмы можно после него или после «Вернуть выбывших»' });
     const list = Array.isArray(b.films) ? b.films : [b];
     if (list.length === 1 && isSeries(list[0])) return json(res, 400, { error: 'Сериалы в комнату добавлять нельзя' });
@@ -1517,7 +1602,7 @@ async function api(req, res, url) {
         dup.votes ||= [];
         const used = r.films.reduce((n, x) => n + (x.votes || []).filter(v => v.id === pid).length, 0);
         if (pid && !dup.votes.some(v => v.id === pid) && used < votesFor(r, pid)) {
-          dup.votes.push({ id: pid, name: who, avatar: me?.avatar || '' });
+          dup.votes.push({ id: pid, name: who, avatar: me?.avatar || '', at: Date.now() });
           voted.push(dup.title);
         }
         continue;
@@ -1541,7 +1626,7 @@ async function api(req, res, url) {
         const used = r.films.reduce((n, x) => n + (x.votes || []).filter(v => v.id === pid).length, 0);
         const max = votesFor(r, pid);
         if (used >= max) return json(res, 400, { error: `Все голоса (${max}) уже отданы. Снимите голос с другого фильма.` });
-        f.votes.push({ id: pid, name: who, avatar: me?.avatar || '' });
+        f.votes.push({ id: pid, name: who, avatar: me?.avatar || '', at: Date.now() });
       }
       pushState(r); return json(res, 200, { ok: true });
     }

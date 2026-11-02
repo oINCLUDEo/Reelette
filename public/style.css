@@ -460,6 +460,13 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 .group-head .g-count.part { color: var(--tx2); }
 .group-head .g-count i { font-style: normal; color: var(--tx3); }
 .group-head em { flex: none; min-width: 40px; text-align: right; font: 700 13px var(--f-ui); font-style: normal; color: var(--acc-hi); font-variant-numeric: tabular-nums; }
+/* человек сегодня не участвует: группа приглушена у всех, у создателя в шапке переключатель-глаз */
+.g-off { flex: none; width: 28px; height: 28px; border-radius: 14px; display: grid; place-items: center; color: var(--tx3); transition: background .2s, color .2s; }
+.g-off svg { width: 16px; height: 16px; }
+.g-off:hover { background: var(--fill); color: var(--tx); }
+.g-off.on { color: var(--bad); }
+.g-offtag { flex: none; font: 600 12px var(--f-ui); color: var(--tx3); }
+.film-group.off .g-person, .film-group.off .group-head em { opacity: .45; }
 .g-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .4s var(--ease), opacity .3s; }
 .g-body > div { overflow: hidden; }
 .film-group.closed .g-body { grid-template-rows: 0fr; opacity: 0; }

@@ -83,6 +83,11 @@ class Wheel {
     this.images.set(url, img);
   }
 
+  // по кнопке «Подтянуть недостающие постеры»: ещё раз, мимо кеша, все обложки, что так и не загрузились
+  reloadFailed() {
+    for (const [url, img] of this.images) if (!img.ok) this.loadImage(url, 1);
+  }
+
   get total() { return this.items.reduce((s, i) => s + i.w, 0); }
 
   // Повторяет расчёт сервера: конечный угол — доля оборота.
