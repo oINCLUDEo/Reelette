@@ -72,12 +72,14 @@ class Wheel {
     this.dirty = true;
   }
 
-  loadImage(url) {
-    if (this.images.has(url)) return;
+  loadImage(url, attempt = 0) {
+    if (this.images.has(url) && !attempt) return;
     const img = new Image();
     img.decoding = 'async';
     img.onload = () => { img.ok = true; this.dirty = true; };
-    img.src = url;
+    // не загрузилось (сервер или сеть моргнули): пробуем ещё, с паузой побольше и мимо кеша браузера
+    img.onerror = () => { if (attempt < 4 && this.images.get(url) === img) setTimeout(() => this.loadImage(url, attempt + 1), 2000 * 3 ** attempt); };
+    img.src = attempt ? `${url}${url.includes('?') ? '&' : '?'}r=${attempt}` : url;
     this.images.set(url, img);
   }
 
@@ -228,6 +230,11 @@ class Wheel {
         g.fillStyle = grd; g.fillRect(0, 0, S, S);
       }
       if (it.dying) { g.fillStyle = 'rgba(255, 60, 90, .5)'; g.fillRect(0, 0, S, S); }
+      // кромка по ободу цветом автора (его цвет ника из профиля): видно, чьи фильмы на колесе
+      if (it.color) {
+        g.beginPath(); g.arc(c, c, R - S / 160, a0, a1);
+        g.strokeStyle = it.color; g.lineWidth = S / 80; g.globalAlpha = 0.9; g.stroke(); g.globalAlpha = 1;
+      }
       g.restore();
 
       // разделитель
@@ -302,9 +309,11 @@ class Wheel {
         const a1 = a0 + (this.items[idx].w / total) * Math.PI * 2;
         x.beginPath(); x.moveTo(0, 0); x.arc(0, 0, R, a0, a1); x.closePath();
         x.fillStyle = 'rgba(255,255,255,.07)'; x.fill();
+        // подсветка — цветом автора фильма, если он его выбрал, иначе акцентом темы
+        const hc = this.items[idx].color || this.colors.accent;
         x.beginPath(); x.arc(0, 0, R - S / 300, a0, a1);
-        x.strokeStyle = this.colors.accent; x.lineWidth = S / 120;
-        x.shadowColor = this.colors.accent; x.shadowBlur = S / 40; x.stroke();
+        x.strokeStyle = hc; x.lineWidth = S / 120;
+        x.shadowColor = hc; x.shadowBlur = S / 40; x.stroke();
       }
       x.restore();
     }

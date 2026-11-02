@@ -120,6 +120,7 @@ const kpUrl = f => {
   return id ? `https://www.kinopoisk.ru/film/${encodeURIComponent(id)}/` : `https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(f.title + (f.year ? ' ' + f.year : ''))}`;
 };
 const kpBtn = f => {
+  if (f.source === 'youtube') return ''; // ролика на Кинопоиске нет
   const id = f.kpId || (f.source === 'kinopoisk' ? f.sourceId : '');
   return `<a class="btn btn-ghost" href="${kpUrl(f)}" target="_blank" rel="noopener">${id ? 'На Кинопоиске' : 'Найти на Кинопоиске'}</a>`;
 };
@@ -218,9 +219,20 @@ if (new URLSearchParams(location.search).has('login_error')) {
   setTimeout(() => toast(why === 'cancel' ? 'Вход через Discord отменён' : 'Не удалось войти через Discord', why !== 'cancel'), 300);
 }
 function hue(s) { let h = 0; for (const ch of s) h = (h * 31 + ch.codePointAt(0)) % 360; return h; }
-// Постеры идут через свой домен: у части людей в России image.tmdb.org не открывается.
+// Постеры и аватарки идут через свой домен: у части людей в России image.tmdb.org и cdn.discordapp.com не открываются.
 const pimg = u => (/^https:\/\//.test(u || '') ? '/img?u=' + encodeURIComponent(u) : (u || ''));
 function posterStyle(f) { return f.poster ? `background-image:url('${esc(pimg(f.poster))}')` : `--c:hsl(${hue(f.title)} 35% 24%)`; }
+// Картинка не загрузилась (сеть или сервер моргнули): ещё три попытки мимо кеша, с паузой побольше.
+// Без этого битая картинка оставалась навсегда: setHTML не пересоздаёт разметку, пока она не изменилась
+document.addEventListener('error', e => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.getAttribute('src')) return;
+  const n = Number(img.dataset.retry || 0);
+  if (n >= 3) { img.classList.add('img-lost'); return; } // аватарка остаётся цветным кружком, без значка битой картинки
+  img.dataset.retry = String(n + 1);
+  const base = img.src.replace(/[?&]r=\d+$/, '');
+  setTimeout(() => { if (img.isConnected) img.src = `${base}${base.includes('?') ? '&' : '?'}r=${n + 1}`; }, 1500 * 3 ** n);
+}, true);
 function initial(t) { return esc((t || '?').trim()[0]?.toUpperCase() || '?'); }
 function timeAgo(ts) {
   const d = new Date(ts);
@@ -256,7 +268,7 @@ function initHome() {
 
   accountReady.then(() => {
     const box = $('#homeAcct');
-    if (account.user) box.innerHTML = `<span class="user-chip"><img src="${esc(account.user.avatar)}" alt="">${esc(account.user.name)}</span><button class="ghost sm" id="homeLogout">Выйти</button>`;
+    if (account.user) box.innerHTML = `<span class="user-chip"><img src="${esc(pimg(account.user.avatar))}" alt="">${esc(account.user.name)}</span><button class="ghost sm" id="homeLogout">Выйти</button>`;
     else if (account.discord) box.innerHTML = `<a class="btn btn-discord" href="${loginUrl()}"><svg class="dc"><use href="#discord"/></svg>Войти через Discord</a>`;
     $('#homeLogout')?.addEventListener('click', logout);
   });
@@ -286,7 +298,8 @@ function initRoom(roomId) {
   let es = null;
   let provider = 'none';
   // серия «до победителя» по умолчанию включена: на выбывании колесо само крутит до финала
-  const settings = { mode: ls.get('mode', 'normal'), duration: ls.get('dur', 12), auto: ls.get('auto', true), sound: ls.get('sound', true), showOut: ls.get('showOut', true), flyChat: ls.get('flyChat', true), music: ls.get('music', false), delay: 0 };
+  // дуэль убрана: кто выбирал её последней, тот попадает в обычный режим
+  const settings = { mode: ls.get('mode', 'normal') === 'elimination' ? 'elimination' : 'normal', duration: ls.get('dur', 12), auto: ls.get('auto', true), sound: ls.get('sound', true), showOut: ls.get('showOut', true), flyChat: ls.get('flyChat', true), music: ls.get('music', false), delay: 0 };
   let people = [];
   let countdown = null; // секунд до старта, пока идёт отсчёт
   let countdownTimer = null;
@@ -304,6 +317,8 @@ function initRoom(roomId) {
     onCurrent: it => {
       if (!outShown) { setCurrent(it ? it.title : ' '); updateNow(it); }
       $$('.film').forEach(el => el.classList.toggle('hot', el.dataset.id === it?.id));
+      // стрелка светится цветом автора фильма под ней (style.css .pointer)
+      if (it?.color) $('#pointer').style.setProperty('--pg', it.color); else $('#pointer').style.removeProperty('--pg');
       // фон перекрашивается под фильм у стрелки, когда колесо уже медленное: на быстром ходу смена мельтешила бы
       if (!wheel.anim || wheel.speed < 1.2) setAmbient(it);
     },
@@ -546,7 +561,11 @@ function initRoom(roomId) {
 
   function handle(msg) {
     if (msg.now) serverOffset = msg.now - Date.now();
-    if (msg.type === 'profiles') { profilesMap = msg.profiles || {}; render(); return; }
+    if (msg.type === 'profiles') {
+      profilesMap = msg.profiles || {};
+      if (state && !spinningSid && !state.spin) syncWheel(); // кто-то сменил цвет ника — меняется кромка его секторов
+      render(); return;
+    }
     if (msg.type === 'react') { spawnReaction(msg.kind, msg.pid, msg.name); return; }
     if (msg.type === 'throw') { throwItem(msg); return; }
     if (msg.type === 'watch') {
@@ -596,8 +615,6 @@ function initRoom(roomId) {
       render();
     } else if (msg.type === 'music-skip') {
       toast(`«${msg.title}» нельзя проиграть на сайте, включаю следующий`, true);
-    } else if (msg.type === 'duel-stop') {
-      toast(msg.by ? `${msg.by} остановил(а) дуэль` : 'Дуэль остановлена');
     } else if (msg.type === 'deleted') {
       es.close();
       ls.set('rooms', ls.get('rooms', []).filter(r => r.id !== roomId));
@@ -714,17 +731,24 @@ function initRoom(roomId) {
   }
   const viewWeights = list => (elimView() ? elimWeights(chanceWeights(list), list) : chanceWeights(list));
   const ratingFactor = avg => (avg < 6 ? 0.5 : avg < 8 ? 1 : avg < 10 ? 1.5 : 2);
+  // цвет автора на колесе — его цвет ника из профиля (у градиента первый цвет); без своего цвета кромки нет
+  const authorColor = pid => { const c = prof(pid).color || ''; return c.startsWith('grad:') ? GRADS[c.slice(5)]?.[1] || '' : c; };
+  const wheelItem = (f, weight) => ({ ...f, poster: pimg(f.poster), weight, color: authorColor(personOf(f)) });
+  // аватарка человека: кто сейчас в комнате, иначе из его голосов, а своя — из входа через Discord
+  const avatarFor = pid => people.find(p => p.pid === pid)?.avatar
+    || state.films.flatMap(f => f.votes || []).find(v => v.id === pid && v.avatar)?.avatar
+    || (account.user && pid === myPid() ? account.user.avatar : '');
   function syncWheel() {
     const list = activeFilms();
     const W = viewWeights(list);
-    wheel.setItems(list.map(f => ({ ...f, poster: pimg(f.poster), weight: W.get(f.id) })));
+    wheel.setItems(list.map(f => wheelItem(f, W.get(f.id))));
   }
 
   function runSpin(spin) {
     spinningSid = spin.sid;
     curSpin = spin;
     const byId = new Map(state.films.map(f => [f.id, f]));
-    wheel.setItems(spin.snapshot.map(s => ({ ...byId.get(s.id), poster: pimg(byId.get(s.id)?.poster), weight: s.weight })).filter(f => f.id), { snap: true });
+    wheel.setItems(spin.snapshot.filter(s => byId.has(s.id)).map(s => wheelItem(byId.get(s.id), s.weight)), { snap: true });
     const elapsed = Date.now() + serverOffset - spin.startedAt;
     $$('.modal.winner').forEach(closeModal);
     stopCountdown();
@@ -798,7 +822,7 @@ function initRoom(roomId) {
   function showResult(msg) {
     const f = msg.film;
     if (!f) return;
-    if (msg.mode !== 'elimination' && settings.music) setTimeout(() => Sfx.win(), msg.mode === 'final' ? 1700 : msg.mode === 'duel' ? 600 : 0);
+    if (msg.mode !== 'elimination' && settings.music) setTimeout(() => Sfx.win(), msg.mode === 'final' ? 1700 : 0);
     if (msg.mode === 'elimination') {
       if (settings.sound) Sfx.out();
       flashOut(f);
@@ -812,29 +836,33 @@ function initRoom(roomId) {
     } else if (msg.mode === 'final') {
       clearTimeout(finalTimer);
       finalTimer = setTimeout(() => showWin(f, 'win'), 1700);
-    } else if (msg.mode === 'duel') {
-      setTimeout(() => showWin(f, 'win', 0, 'Победитель дуэли'), 600);
     } else showWin(f, 'win');
   }
 
-  function showWin(f, kind, left, title) {
+  function showWin(f, kind, left) {
     const card = $('#winModal .win-card');
     card.classList.toggle('out', kind === 'out');
     // победитель — на весь экран, как страница фильма; выбывший — небольшой карточкой
     $('#winModal').classList.toggle('full', kind === 'win');
     $('#winDetail').dataset.id = f.id;
-    const label = title || (kind === 'out' ? `Выбывает${left > 1 ? `, осталось ${left}` : ''}` : 'Сегодня смотрим');
+    const label = kind === 'out' ? `Выбывает${left > 1 ? `, осталось ${left}` : ''}` : 'Сегодня смотрим';
+    // победа в стиле автора: его аватар с рамкой и ник с эффектом, его фон профиля — светом сверху, свечение — его цветом
+    const win = kind === 'win', author = personOf(f), ap = prof(author), aname = f.addedBy || 'Без имени';
+    const ac = win && authorColor(author);
+    if (ac) $('#winDetail').style.setProperty('--glow', `color-mix(in srgb, ${ac} 55%, transparent)`); else $('#winDetail').style.removeProperty('--glow');
     $('#winDetail').innerHTML = `
       ${f.poster ? `<div class="win-bg" style="--img:url('${esc(pimg(f.poster))}')"></div>` : ''}
+      ${win && ap.banner && ap.banner !== 'none' ? `<div class="win-banner bn-box bn-${esc(ap.banner)}"></div>` : ''}
       <div class="win-inner">
         ${f.poster ? `<img src="${esc(pimg(f.poster))}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"></div>`}
         <div>
           <div class="win-label">${label}</div>
           <div class="win-title">${esc(f.title)}</div>
-          ${facts(f)}
+          ${win ? `<div class="win-by">${avaHtml(author, aname, ap, avatarFor(author), 'win-ava')}<span><small>Добавил(а)</small>${nick(author, aname, ap)}</span></div>` : ''}
+          ${facts(f, !win)}
           ${kind === 'win' && f.overview ? `<p>${esc(f.overview)}</p>` : ''}
           ${kind === 'win' ? `<div class="detail-actions">
-            ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Открыть страницу фильма</a>` : ''}
+            ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">${f.source === 'youtube' ? 'Открыть на YouTube' : 'Открыть страницу фильма'}</a>` : ''}
             ${watchBtn(f)}
             ${trailerBtn(f)}
             ${kpBtn(f)}
@@ -843,22 +871,21 @@ function initRoom(roomId) {
         </div>
       </div>`;
     openModal('#winModal');
-    // победитель вырастает из сектора под стрелкой: постер летит из колеса на своё место, текст проявляется следом (CSS).
-    // У дуэли (title) колеса в игре не было — без полёта
-    if (kind === 'win' && !title && !reduceMotion) wheelFlight($('#winDetail .win-inner > img, #winDetail .win-inner > .noposter'), wheelPoint(), { duration: 1000, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' });
+    // победитель вырастает из сектора под стрелкой: постер летит из колеса на своё место, текст проявляется следом (CSS)
+    if (kind === 'win' && !reduceMotion) wheelFlight($('#winDetail .win-inner > img, #winDetail .win-inner > .noposter'), wheelPoint(), { duration: 1000, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' });
     $('#winDetail [data-remove]')?.addEventListener('click', async e => {
       await removeFilm(e.currentTarget.dataset.remove);
       closeModal('#winModal');
     });
   }
 
-  function facts(f) {
+  function facts(f, withBy = true) {
     const parts = [];
     if (f.year) parts.push(`<span><b>${esc(f.year)}</b></span>`);
     if (f.runtime) parts.push(`<span><b>${fmtRuntime(f.runtime)}</b></span>`);
     if (f.rating) parts.push(`<span>Рейтинг <b>${esc(f.rating)}</b></span>`);
     if (f.genres?.length) parts.push(`<span>${esc(f.genres.join(', '))}</span>`);
-    if (f.addedBy) parts.push(`<span>Добавил(а) <button class="person" data-person="${esc(personOf(f))}" data-name="${esc(f.addedBy)}">${esc(f.addedBy)}</button></span>`);
+    if (f.addedBy && withBy) parts.push(`<span>Добавил(а) <button class="person" data-person="${esc(personOf(f))}" data-name="${esc(f.addedBy)}">${esc(f.addedBy)}</button></span>`);
     return parts.length ? `<div class="facts">${parts.join('')}</div>` : '';
   }
 
@@ -877,6 +904,15 @@ function initRoom(roomId) {
     $('#watchBar').innerHTML = '';
     $('#watchAll').hidden = true;
     openModal('#watchModal');
+    // ролик с YouTube смотрим плеером YouTube, Kodik тут не нужен; «Включить всем» работает так же
+    if (f.source === 'youtube') {
+      if (!by) $('#watchLabel').textContent = 'Смотрим на YouTube';
+      $('#watchFrame').innerHTML = `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(f.sourceId.slice(3))}?autoplay=1&rel=0&playsinline=1" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+      $('#watchBar').innerHTML = `<a class="btn btn-ghost" href="${esc(f.url)}" target="_blank" rel="noopener">Открыть на YouTube</a>`;
+      $('#watchAll').dataset.film = f.id;
+      $('#watchAll').hidden = Boolean(by);
+      return;
+    }
     let data;
     try {
       data = await api(`/rooms/${roomId}/kodik/${id}?cid=${encodeURIComponent(me.cid)}`);
@@ -971,7 +1007,7 @@ function initRoom(roomId) {
       return `<button type="button" class="mod-chip ${m.factor < 1 ? 'down' : 'up'}" data-tt="${esc(tip)}" aria-label="${esc(tip)}">${fmtFactor(m.factor)}</button>`;
     };
     $('#fairOn').checked = state.fair !== false;
-    $('#fairOn').disabled = spinning || Boolean(state.duel);
+    $('#fairOn').disabled = spinning;
     renderRate();
 
     $('#filmCount').textContent = state.films.length ? String(state.films.length) : '';
@@ -990,9 +1026,7 @@ function initRoom(roomId) {
       g.films = [...g.films.filter(f => onWheel.has(f.id)), ...g.films.filter(f => !onWheel.has(f.id))];
     }
     const ordered = [...groups.values()].sort((a, b) => (b.pid === myPid()) - (a.pid === myPid()) || b.films.length - a.films.length);
-    const avatarOf = pid => people.find(p => p.pid === pid)?.avatar
-      || state.films.flatMap(f => f.votes || []).find(v => v.id === pid && v.avatar)?.avatar
-      || (account.user && pid === myPid() ? account.user.avatar : '');
+    const avatarOf = avatarFor;
     const filmRow = f => {
       const seen = watched.has(f.id);
       const filtered = !seen && !out.has(f.id) && !matchesFilters(f);
@@ -1026,7 +1060,7 @@ function initRoom(roomId) {
         <div class="group-head" data-group="${esc(g.pid)}" role="button" tabindex="0" aria-expanded="${!closed}" title="${closed ? 'Развернуть' : 'Свернуть'}">
           <svg class="g-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           <span class="g-person" data-person="${esc(g.pid)}" data-name="${esc(g.name)}" title="Профиль">
-            ${ava ? `<img class="${frameCls(g.pid)}" style="${frameVars(g.pid)}" src="${esc(ava)}" alt="">` : `<span class="g-ava${frameCls(g.pid)}" style="background:hsl(${hue(g.name)} 55% 42%);${frameVars(g.pid)}">${initial(g.name)}</span>`}
+            ${ava ? `<img class="${frameCls(g.pid)}" style="${frameVars(g.pid)}" src="${esc(pimg(ava))}" alt="">` : `<span class="g-ava${frameCls(g.pid)}" style="background:hsl(${hue(g.name)} 55% 42%);${frameVars(g.pid)}">${initial(g.name)}</span>`}
             <b>${nick(g.pid, g.name)}${g.pid === myPid() ? ' <span class="m">(вы)</span>' : ''}</b>
           </span>
           <span class="g-count${g.left < g.films.length ? ' part' : ''}" title="${g.left < g.films.length ? `На колесе ${g.left} из ${g.films.length}` : `${g.films.length} ${plural(g.films.length, 'фильм', 'фильма', 'фильмов')} на колесе`}">${g.left < g.films.length ? `${g.left}<i>/${g.films.length}</i>` : g.films.length}</span>
@@ -1048,9 +1082,8 @@ function initRoom(roomId) {
 
     const btn = $('#spinBtn');
     const counting = countdown !== null;
-    const duel = state.duel;
     const locked = Boolean(state.spinLock) && !isRoomOwner();
-    btn.disabled = spinning || Boolean(duel) || active.length < 2 || locked;
+    btn.disabled = spinning || active.length < 2 || locked;
     btn.classList.toggle('locked', locked && !spinning);
     $('#lockWrap').hidden = !isRoomOwner();
     $('#spinLockOn').checked = Boolean(state.spinLock);
@@ -1058,9 +1091,9 @@ function initRoom(roomId) {
     btn.classList.toggle('count', counting);
     $('#spinBtn .hub-label').innerHTML = counting ? String(countdown) : spinning ? 'Крутится'
       : locked ? '<svg class="hub-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
-      : settings.mode === 'duel' ? 'Дуэль' : settings.mode === 'elimination' && state.eliminated.length ? 'Дальше' : 'Крутить';
+      : settings.mode === 'elimination' && state.eliminated.length ? 'Дальше' : 'Крутить';
     // на колесе нечего крутить: вместо кнопки предлагаем добавить фильмы
-    const empty = !spinning && !duel && active.length === 0;
+    const empty = !spinning && active.length === 0;
     $('#wheelEmpty').hidden = !empty;
     $('#spinBtn').hidden = empty;
     $('#now').hidden = empty;
@@ -1074,7 +1107,7 @@ function initRoom(roomId) {
     $('#stopBtn').textContent = counting ? 'Отменить прокрут' : 'Остановить серию';
     // выбывание: «осталось N из M». На широком экране — строкой слева под фильмом, на узком — строкой с полоской под колесом
     const elimTotal = active.length + state.eliminated.length;
-    const elimOn = !duel && (state.eliminated.length > 0 || (spinning && (state.spin || curSpin)?.mode === 'elimination'));
+    const elimOn = state.eliminated.length > 0 || (spinning && (state.spin || curSpin)?.mode === 'elimination');
     const progP = elimTotal > 1 ? (state.eliminated.length / (elimTotal - 1)).toFixed(3) : 0;
     // строка появляется, когда выбывание пошло: «осталось 50 из 50» до старта ничего не говорит.
     // Название над ней не прыгает — блок держится на оси центра колеса (style.css, «под стрелкой»)
@@ -1102,19 +1135,16 @@ function initRoom(roomId) {
     }
     $('#resetBtn').hidden = !state.eliminated.length || spinning;
     const addClosed = (state.addLock && !isRoomOwner()) || state.elimActive;
-    $('#addBtn').disabled = spinning || Boolean(duel) || addClosed;
+    $('#addBtn').disabled = spinning || addClosed;
     $('#wheelAddBtn').disabled = $('#addBtn').disabled;
     $('#quickSearch').disabled = $('#addBtn').disabled;
-    $('#quickSearch').placeholder = $('#addBtn').disabled && $('#addBtn').title ? $('#addBtn').title : 'Добавить фильм';
+    $('#quickSearch').placeholder = $('#addBtn').disabled && $('#addBtn').title ? $('#addBtn').title : 'Фильм или ссылка на YouTube';
     $('#addBtn').title = state.elimActive ? 'Идёт выбывание: добавлять фильмы можно после него' : state.addLock && !isRoomOwner() ? 'Создатель комнаты закрыл добавление фильмов' : '';
     $('#addLockWrap').hidden = !isRoomOwner();
     $('#ownerCtl').hidden = !isRoomOwner();
     $('#addLockOn').checked = Boolean(state.addLock);
     $('#showOutWrap').hidden = settings.mode !== 'elimination';
 
-    $('.stage').classList.toggle('dueling', Boolean(duel));
-    $('#duelBox').hidden = !duel;
-    if (duel) renderDuel(duel);
     const quiz = state.quiz;
     const karaoke = Boolean(state.karaoke) && !quiz;
     const stageMode = karaoke || Boolean(quiz); // сцена на всю страницу
@@ -1128,10 +1158,9 @@ function initRoom(roomId) {
     $('#funBtn').classList.toggle('has-on', Boolean(state.karaoke || quiz));
     if (karaoke) renderKaraoke();
     if (quiz) renderQuiz(quiz);
-    renderFilters(spinning || Boolean(duel));
+    renderFilters(spinning);
 
-    if (duel) $('#stageStatus').textContent = '';
-    else if (!spinning) {
+    if (!spinning) {
       prog = elimOn && active.length >= 2 && state.eliminated.length > 0;
       $('#stageStatus').textContent = active.length < 2
         ? (state.eliminated.length && active.length === 1 ? 'Остался один фильм. Чтобы начать заново, верните выбывших.'
@@ -1139,7 +1168,6 @@ function initRoom(roomId) {
         : state.eliminated.length ? `Осталось ${active.length} из ${elimTotal}`
         : locked ? 'Крутит только создатель комнаты'
         : settings.mode === 'elimination' ? 'Колесо выбивает по фильму, последний побеждает'
-        : settings.mode === 'duel' ? 'Фильмы выходят парами, проигравший вылетает'
         : 'Один прокрут выбирает фильм на вечер';
     }
     $('#stageStatus').classList.toggle('prog', prog && elimTotal > 1);
@@ -1149,7 +1177,10 @@ function initRoom(roomId) {
   // Сервер хранит, когда трек был на нуле (startedAt) или на какой секунде пауза (pausedAt).
   // Каждый плеер считает ожидаемую позицию сам и подтягивается, если ушёл больше чем на 2,5 с.
   let yt = null, ytReady = false, ytVid = null, ytDucked = false, ytChanging = false;
-  const ytBroken = new Set(); // видео, которые YouTube отказался играть: не пытаемся грузить снова
+  // запуски трека (vid:startedAt), которые YouTube отказался играть: этот запуск не трогаем,
+  // а новый запуск того же трека (заново, с начала, после паузы) пробуем снова
+  const ytBroken = new Set(), ytRetried = new Set();
+  const playKey = m => `${m.vid}:${m.startedAt}`;
   let ytReloadAt = 0;
   function loadYT(cb) {
     if (window.YT?.Player) return cb();
@@ -1243,23 +1274,33 @@ function initRoom(roomId) {
           events: {
             onReady: () => { ytReady = true; ytVolume(); syncMusic(); },
             onStateChange: e => {
-              // трек доиграл: сообщаем серверу, он включит следующий из очереди или выключит музыку
-              if (e.data === 0 && state?.music) api(`/rooms/${roomId}/music/ended`, { method: 'POST', body: { vid: state.music.vid } }).catch(() => {});
+              // трек доиграл: сообщаем серверу, он включит следующий из очереди или выключит музыку.
+              // Номер — того видео, что доиграло у нас: отставший плеер не должен сбросить у всех уже новый трек
+              if (e.data === 0 && state?.music && ytVid === state.music.vid) api(`/rooms/${roomId}/music/ended`, { method: 'POST', body: { vid: ytVid } }).catch(() => {});
               if (e.data === 1 && state?.music) reportDuration(state.music);
               if (e.data === 1) $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => (el.hidden = true));
             },
-            onError: () => {
-              const vid = state?.music?.vid;
-              if (!vid || ytBroken.has(vid)) return;
-              ytBroken.add(vid);
-              api(`/rooms/${roomId}/music/failed`, { method: 'POST', body: { vid } }).catch(() => {});
+            onError: e => {
+              const m = state?.music;
+              if (!m || ytVid !== m.vid || ytBroken.has(playKey(m))) return;
+              const k = playKey(m);
+              // 5 — сбой плеера у этого человека (сеть, браузер): разок перезагружаем видео, остальных не трогаем
+              if (e.data === 5 && !ytRetried.has(k)) {
+                ytRetried.add(k);
+                setTimeout(() => { if (ytReady && state?.music && playKey(state.music) === k) yt.loadVideoById({ videoId: m.vid, startSeconds: ytExpected(state.music) }); }, 1500);
+                return;
+              }
+              ytBroken.add(k);
+              // видео удалено (100), запрещено встраивать (101, 150) или номер кривой (2) — это у всех: просим сервер включить следующий.
+              // 5 и 153 (браузер не отдал Referer) — беда одного человека, остальным трек не сбиваем
+              if ([2, 100, 101, 150].includes(e.data)) api(`/rooms/${roomId}/music/failed`, { method: 'POST', body: { vid: m.vid } }).catch(() => {});
             },
           },
         });
         return;
       }
       if (!ytReady) return;
-      if (ytBroken.has(m.vid)) return;
+      if (ytBroken.has(playKey(m))) return;
       const playing = yt.getVideoData?.()?.video_id;
       // чужое видео (кликнули по подсказке YouTube) возвращаем не чаще раза в 8 секунд, чтобы не мигало
       if (ytVid !== m.vid || (playing && playing !== m.vid && Date.now() - ytReloadAt > 8000)) {
@@ -1270,8 +1311,10 @@ function initRoom(roomId) {
       reportDuration(m);
       const exp = ytExpected(m), cur = yt.getCurrentTime(), st = yt.getPlayerState();
       if (m.pausedAt != null) {
-        if (st === 1 || st === 3) yt.pauseVideo();
+        // сначала встаём на место паузы, потом ставим паузу: seekTo из состояния «играет» по правилам YouTube
+        // сам запускает видео, и при обратном порядке пауза срывалась — музыка играла дальше
         if (Math.abs(cur - exp) > 1) yt.seekTo(exp, true);
+        if (st !== 2) yt.pauseVideo();
         $$('#ytUnmute, #kUnmute, #qUnmute').forEach(el => (el.hidden = true));
       } else {
         const dur = m.duration || yt.getDuration() || 0;
@@ -1904,8 +1947,20 @@ function initRoom(roomId) {
       <h3><span>Оцените фильм <button type="button" class="hint" data-hint="${esc(effect)}" aria-label="Подсказка: что даёт оценка">?</button></span>${done ? ' <button class="link-btn" data-rate-close>Свернуть</button>' : ''}</h3>
       <div class="rate-film" data-h="0"><i style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><div><b>${esc(h.film.title)}</b><span>добавил(а) ${who}</span></div></div>
       ${isAuthor ? '<p class="note">Это ваш фильм, его оценивают остальные.</p>' : rateScale(h)}
-      ${list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>` : ''}`;
+      ${list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>${rateClearBtn(h)}` : ''}`;
   }
+  // создатель комнаты может снять все оценки фильма, чтобы его оценили заново
+  const rateClearBtn = h => (isRoomOwner() ? `<button class="link-btn rate-clear" data-rate-clear="${esc(h.hid)}">Снять оценки</button>` : '');
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-rate-clear]');
+    if (!b) return;
+    const h = state.history.find(x => x.hid === b.dataset.rateClear);
+    if (!h || !confirm(`Снять все оценки с «${h.film.title}»? Фильм оценят заново, бонус автора посчитается по новым оценкам.`)) return;
+    try {
+      await api(`/rooms/${roomId}/rate/clear`, { method: 'POST', body: { hid: h.hid, cid: me.cid } });
+      if (detailHid === h.hid) setTimeout(() => showHist(h.hid), 250);
+    } catch (err) { toast(err.message, true); }
+  });
   $('#rateBox').addEventListener('click', e => {
     if (e.target.closest('[data-rate-open]')) { rateOpen = state.history[0]?.hid; renderRate(); }
     if (e.target.closest('[data-rate-close]')) { rateOpen = null; renderRate(); }
@@ -1932,7 +1987,7 @@ function initRoom(roomId) {
     const list = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author);
     const a = avgRating(h);
     return `<div class="hist-rate">
-      <div class="hr-head">Оценки${a !== null ? ` <b>${a.toFixed(1).replace('.', ',')}</b>` : ''}</div>
+      <div class="hr-head">Оценки${a !== null ? ` <b>${a.toFixed(1).replace('.', ',')}</b>` : ''}${list.length ? rateClearBtn(h) : ''}</div>
       ${author === myPid() ? '<p class="note">Это ваш фильм, его оценивают остальные.</p>' : rateScale(h)}
       ${list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>` : ''}
     </div>`;
@@ -2021,7 +2076,7 @@ function initRoom(roomId) {
   }
 
   const avaHtml = (pid, name, p, avatar, cls = 'profile-ava') => (avatar
-    ? `<img class="${cls}${frameCls(pid, p)}" style="${frameVars(pid, p)}" src="${esc(avatar)}" alt="">`
+    ? `<img class="${cls}${frameCls(pid, p)}" style="${frameVars(pid, p)}" src="${esc(pimg(avatar))}" alt="">`
     : `<span class="${cls}${frameCls(pid, p)}" style="background:hsl(${hue(name)} 55% 42%);${frameVars(pid, p)}">${initial(name)}</span>`);
 
   // бейдж: полученный цветной; неполученный приглушённый, с прогрессом и подсказкой, как получить
@@ -2158,42 +2213,6 @@ function initRoom(roomId) {
     openProfile(t.dataset.person, t.dataset.name || 'Без имени');
   });
 
-  // ---- дуэль ----
-  const myVoter = () => (account.user ? 'd' + account.user.id : me.cid);
-  function renderDuel(d) {
-    const pair = d.matches[d.idx] || [];
-    const byId = new Map(state.films.map(f => [f.id, f]));
-    const mine = d.votes[myVoter()]?.film;
-    const voters = Object.values(d.votes);
-    $('#duelProgress').innerHTML = `<b>Раунд ${d.round}</b><span>пара ${d.idx + 1} из ${d.matches.length}</span><span>осталось ${d.left}</span>`;
-    $('#duelPair').innerHTML = pair.map((fid, i) => {
-      const f = byId.get(fid) || { title: '?' };
-      const names = voters.filter(v => v.film === fid).map(v => v.name);
-      const rv = d.reveal;
-      const cls = [mine === fid && 'mine', rv && (rv.winner === fid ? 'win' : 'lose')].filter(Boolean).join(' ');
-      const card = `<button class="duel-card ${cls}" data-vote="${esc(fid)}" ${rv ? 'disabled' : ''}>
-        <span class="duel-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</span>
-        <span class="duel-info"><b>${esc(f.title)}</b><span>${[f.year, f.runtime && fmtRuntime(f.runtime)].filter(Boolean).map(esc).join(', ')}</span></span>
-        <span class="duel-voters">${names.length ? names.map(n => `<i>${esc(n)}</i>`).join('') : '<em>нет голосов</em>'}</span>
-        ${rv ? `<span class="duel-badge">${rv.winner === fid ? (rv.tie ? 'Ничья, прошёл по жребию' : 'Проходит дальше') : 'Вылетает'}</span>` : ''}
-      </button>`;
-      return i === 0 ? card + '<span class="duel-vs">VS</span>' : card;
-    }).join('');
-    $('#duelVotes').textContent = d.reveal ? 'Итог пары' : `Проголосовали ${voters.length} из ${Math.max(people.length, voters.length)}`;
-    $('#duelNext').hidden = Boolean(d.reveal);
-  }
-  $('#duelPair').addEventListener('click', async e => {
-    const c = e.target.closest('[data-vote]');
-    if (!c || c.disabled) return;
-    try { await api(`/rooms/${roomId}/duel/vote`, { method: 'POST', body: { filmId: c.dataset.vote, cid: me.cid, by: me.name } }); }
-    catch (err) { toast(err.message, true); }
-  });
-  $('#duelNext').addEventListener('click', () => api(`/rooms/${roomId}/duel/next`, { method: 'POST' }).catch(e => toast(e.message, true)));
-  $('#duelStop').addEventListener('click', () => {
-    if (!confirm('Остановить дуэль? Прогресс пропадёт.')) return;
-    api(`/rooms/${roomId}/duel/stop`, { method: 'POST', body: { by: me.name } }).catch(e => toast(e.message, true));
-  });
-
   // ---- фильтры (общие для комнаты) ----
   function saveFilters(patch) {
     state.filters = { ...state.filters, ...patch };
@@ -2233,11 +2252,10 @@ function initRoom(roomId) {
 
   function renderPeople(list) {
     people = list;
-    if (state?.duel) renderDuel(state.duel);
     const people_ = list;
-    const row = p => `<button class="menu-item person-item" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}"><span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span><span>${nick(p.pid, p.name)}${p.pid === myPid() ? ' <small>это вы</small>' : p.pid?.startsWith('d') ? ' <small>Discord</small>' : ''}</span></button>`;
+    const row = p => `<button class="menu-item person-item" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}"><span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}">${p.avatar ? `<img src="${esc(pimg(p.avatar))}" alt="">` : initial(p.name)}</span><span>${nick(p.pid, p.name)}${p.pid === myPid() ? ' <small>это вы</small>' : p.pid?.startsWith('d') ? ' <small>Discord</small>' : ''}</span></button>`;
     // аватарки в шапке, как раньше: клик — профиль, при наведении имя; лишние — «+N» со списком
-    $('#people').innerHTML = list.slice(0, 6).map(p => `<span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}" data-tip="${esc(p.name)}" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : initial(p.name)}</span>`).join('')
+    $('#people').innerHTML = list.slice(0, 6).map(p => `<span class="ava${frameCls(p.pid)}" style="background:hsl(${hue(p.name)} 55% 42%);${frameVars(p.pid)}" data-tip="${esc(p.name)}" data-person="${esc(p.pid || '')}" data-name="${esc(p.name)}">${p.avatar ? `<img src="${esc(pimg(p.avatar))}" alt="">` : initial(p.name)}</span>`).join('')
       + (list.length > 6 ? `<button type="button" class="ava ava-more" data-people-more title="Все в комнате">+${list.length - 6}</button>` : '');
     $('#peopleNum').textContent = String(list.length);
     $('#peopleBtn').setAttribute('aria-label', `В комнате ${list.length} ${plural(list.length, 'человек', 'человека', 'человек')}`);
@@ -2319,7 +2337,7 @@ function initRoom(roomId) {
         ${h ? histRateHtml(h) : ''}
         <p>${f.overview ? esc(f.overview) : '<span class="muted">Описания нет.</span>'}</p>
         <div class="detail-actions">
-          ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">Страница фильма</a>` : ''}
+          ${f.url ? `<a class="btn btn-primary" href="${esc(f.url)}" target="_blank" rel="noopener">${f.source === 'youtube' ? 'Открыть на YouTube' : 'Страница фильма'}</a>` : ''}
           ${watchBtn(f)}
           ${trailerBtn(f)}
           ${kpBtn(f)}
@@ -2424,7 +2442,8 @@ function initRoom(roomId) {
     const seq = ++searchSeq;
     if (q.length < 2) { box.innerHTML = ''; return; }
     let results = [];
-    if (provider !== 'none') {
+    const ytLink = /youtu\.?be/i.test(q); // ссылка на ролик: сервер вернёт его как вариант для колеса, ключ сервиса фильмов не нужен
+    if (provider !== 'none' || ytLink) {
       box.innerHTML = '<p class="note">Ищу…</p>';
       try { results = (await api('/search?q=' + encodeURIComponent(q) + srcParam())).results; }
       catch (e) { if (seq === searchSeq) toast(e.message, true); }
@@ -2432,10 +2451,10 @@ function initRoom(roomId) {
     if (seq !== searchSeq) return;
     lastResults = results;
     box.innerHTML = results.map((r, i) => `<button class="res" data-i="${i}">
-        <i style="${r.poster ? `background-image:url('${esc(r.poster)}')` : ''}"></i>
-        <div><b>${esc(r.title)}</b><span>${[r.year, r.original, r.rating && `★ ${r.rating}`].filter(Boolean).map(esc).join(', ')}</span></div>
+        <i style="${r.poster ? `background-image:url('${esc(pimg(r.poster))}')` : ''}"></i>
+        <div><b>${esc(r.title)}</b><span>${[r.year, r.original, r.rating && `★ ${r.rating}`, r.source === 'youtube' && 'ролик с YouTube'].filter(Boolean).map(esc).join(', ')}</span></div>
         <span class="plus">${ICON.plus}</span></button>`).join('')
-      + `<button class="res res-manual" data-manual><i></i><div><b>Добавить «${esc(q)}»</b><span>Без постера и описания</span></div><span class="plus">${ICON.plus}</span></button>`;
+      + (ytLink ? '' : `<button class="res res-manual" data-manual><i></i><div><b>Добавить «${esc(q)}»</b><span>Без постера и описания</span></div><span class="plus">${ICON.plus}</span></button>`);
   }
 
   const qr = document.createElement('div');
@@ -2497,7 +2516,7 @@ function initRoom(roomId) {
 
   async function addFilms(films) {
     const r = await api(`/rooms/${roomId}/films`, { method: 'POST', body: { films, by: me.name, cid: me.cid } });
-    toast(`Добавлено: ${r.added.length}${r.merged.length ? `, уже были: ${r.merged.length}` : ''}${r.voted.length ? `, за ${r.voted.length} из них отдан ваш голос` : ''}`);
+    toast(`Добавлено: ${r.added.length}${r.merged.length ? `, уже были: ${r.merged.length}` : ''}${r.voted.length ? `, за ${r.voted.length} из них отдан ваш голос` : ''}${r.series?.length ? `, сериалы пропущены: ${r.series.length}` : ''}`);
   }
   async function findFilm(q) {
     try { return (await api('/search?q=' + encodeURIComponent(q) + srcParam())).results.slice(0, 6); } catch { return []; }
@@ -2619,8 +2638,7 @@ function initRoom(roomId) {
     placeSeg($('#modeSeg'));
     if (state && !spinningSid && !state.spin) syncWheel();
     $('#autoWrap').hidden = m !== 'elimination';
-    // в дуэли прокрута нет; на выбывании длительность задаёт темп серии, ползунок только для обычного режима
-    $('#spinCtl').hidden = m === 'duel';
+    // на выбывании длительность задаёт темп серии, ползунок только для обычного режима
     $('#durField').hidden = m !== 'normal';
     $('#paceNote').hidden = m !== 'elimination';
     render();
@@ -2682,11 +2700,6 @@ function initRoom(roomId) {
   async function spin() {
     if ($('#spinBtn').disabled || state?.karaoke || state?.quiz) return;
     Sfx.unlock(); // браузер разрешает звук только после клика
-    if (settings.mode === 'duel') {
-      try { await api(`/rooms/${roomId}/duel/start`, { method: 'POST', body: { by: me.name, cid: me.cid } }); }
-      catch (e) { toast(e.message, true); }
-      return;
-    }
     try {
       await api(`/rooms/${roomId}/spin`, { method: 'POST', body: { mode: settings.mode, duration: settings.duration, auto: settings.auto, delay: settings.delay, by: me.name, cid: me.cid } });
     } catch (e) { toast(e.message, true); }
@@ -2711,7 +2724,7 @@ function initRoom(roomId) {
     $('#setNick').value = me.name;
     $('#nickField').hidden = Boolean(account.user);
     $('#accountBox').innerHTML = account.user
-      ? `<img src="${esc(account.user.avatar)}" alt=""><div><b>${esc(account.user.name)}</b><span>Вход через Discord</span></div><button class="btn btn-ghost" id="logoutBtn">Выйти</button>`
+      ? `<img src="${esc(pimg(account.user.avatar))}" alt=""><div><b>${esc(account.user.name)}</b><span>Вход через Discord</span></div><button class="btn btn-ghost" id="logoutBtn">Выйти</button>`
       : account.discord ? `<span class="ava" style="background:hsl(${hue(me.name)} 55% 42%)">${initial(me.name)}</span><div><b>${esc(me.name)}</b><span>Гость</span></div><a class="btn btn-discord" href="${loginUrl()}"><svg class="dc"><use href="#discord"/></svg>Войти</a>` : '';
     $('#logoutBtn')?.addEventListener('click', logout);
     $('#deleteRoom').hidden = Boolean(state?.owner && state.owner !== myPid());

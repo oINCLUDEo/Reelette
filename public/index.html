@@ -106,7 +106,7 @@
         <div class="quick-add">
           <div class="search-box">
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-            <input id="quickSearch" placeholder="Добавить фильм" autocomplete="off" aria-label="Найти и добавить фильм" aria-controls="quickResults" aria-expanded="false">
+            <input id="quickSearch" placeholder="Фильм или ссылка на YouTube" autocomplete="off" aria-label="Найти фильм или вставить ссылку на ролик YouTube" aria-controls="quickResults" aria-expanded="false">
           </div>
           <button id="addBtn" class="icon-btn" title="Добавить списком" aria-label="Добавить списком"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg></button>
         </div>
@@ -148,7 +148,6 @@
           <span class="seg-ind"></span>
           <button data-mode="normal" title="Один прокрут выбирает один фильм. Шанс фильма равен его доле в колесе.">Обычный</button>
           <button data-mode="elimination" title="Каждый прокрут выбивает один фильм, последний побеждает. Шанс победить тот же, что в обычном режиме, а колесо показывает шанс вылететь: у фаворитов сектор уже.">Выбывание</button>
-          <button data-mode="duel" title="Фильмы выходят парами, все голосуют, проигравший вылетает. При ничьей решает жребий с учётом веса.">Дуэль</button>
         </div>
         <label class="check glass auto-check" id="autoWrap" title="Прокруты идут подряд без остановок, пока не останется один фильм"><input type="checkbox" role="switch" id="autoSpin"><span class="box"></span><span class="check-text">До победителя</span></label>
       </div>
@@ -288,15 +287,6 @@
           <div class="wheel-empty" id="wheelEmpty" hidden><b id="wheelEmptyText">Колесо пустое</b><button class="btn btn-primary" id="wheelAddBtn" type="button">Добавить фильмы</button></div>
           <div class="chapter" id="chapter" aria-hidden="true"><b id="chapterT"></b></div>
         </div>
-        </div>
-        <div class="duel" id="duelBox" hidden>
-          <div class="duel-progress" id="duelProgress"></div>
-          <div class="duel-pair" id="duelPair"></div>
-          <div class="duel-foot">
-            <span id="duelVotes"></span>
-            <button id="duelNext" class="ghost sm">Подвести итог</button>
-            <button id="duelStop" class="ghost sm">Остановить</button>
-          </div>
         </div>
         <div class="stage-foot">
           <div class="stage-status" id="stageStatus"></div>
@@ -482,7 +472,7 @@
       <div class="ctl-head">Создатель комнаты</div>
       <div class="grp">
         <label class="check row" id="addLockWrap" hidden><input type="checkbox" role="switch" id="addLockOn"><span class="box"></span><span class="check-text">Закрыть добавление фильмов <button type="button" class="hint" data-hint="Пока включено, добавлять фильмы можете только вы. Во время выбывания добавлять нельзя никому, чтобы колесо не менялось посреди серии." aria-label="Подсказка: закрыть добавление фильмов">?</button></span></label>
-        <label class="check row" id="lockWrap" hidden><input type="checkbox" role="switch" id="spinLockOn"><span class="box"></span><span class="check-text">Крутит только создатель <button type="button" class="hint" data-hint="Пока включено, запускать прокрут, серию и дуэль, отменять отсчёт и останавливать серию можете только вы. Остальные голосуют, добавляют фильмы и смотрят." aria-label="Подсказка: крутит только создатель">?</button></span></label>
+        <label class="check row" id="lockWrap" hidden><input type="checkbox" role="switch" id="spinLockOn"><span class="box"></span><span class="check-text">Крутит только создатель <button type="button" class="hint" data-hint="Пока включено, запускать прокрут и серию, отменять отсчёт и останавливать серию можете только вы. Остальные голосуют, добавляют фильмы и смотрят." aria-label="Подсказка: крутит только создатель">?</button></span></label>
       </div>
     </section>
     <section class="ctl">

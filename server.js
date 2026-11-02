@@ -78,7 +78,8 @@ function loadEnv(file) {
 let rooms = {};
 try { rooms = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { rooms = {}; }
 for (const r of Object.values(rooms)) {
-  r.spin = null; r.plan = null; r.duel = null; r.quiz = null;
+  r.spin = null; r.plan = null; r.quiz = null;
+  delete r.duel; // дуэль убрана из сайта
   if (r.music?.quiz) r.music = null;
   for (const h of r.history || []) { h.hid ||= crypto.randomBytes(4).toString('hex'); h.ratings ||= {}; }
 }
@@ -91,7 +92,7 @@ function save() {
       fs.mkdirSync(DATA_DIR, { recursive: true });
       const tmp = DATA_FILE + '.tmp';
       const out = {};
-      for (const [id, r] of Object.entries(rooms)) out[id] = { ...r, spin: null, plan: null, duel: null, quiz: null };
+      for (const [id, r] of Object.entries(rooms)) out[id] = { ...r, spin: null, plan: null, quiz: null };
       fs.writeFileSync(tmp, JSON.stringify(out));
       fs.renameSync(tmp, DATA_FILE);
     } catch (e) {
@@ -117,7 +118,7 @@ function publicState(r) {
     id: r.id, name: r.name, createdAt: r.createdAt, owner: ownerKey(r),
     films: r.films, history: r.history, eliminated: r.eliminated,
     angle: r.angle, hasWebhook: Boolean(r.webhook), spin: r.spin, series: runtime(r).series,
-    filters: r.filters || cleanFilters({}), duel: r.duel || null,
+    filters: r.filters || cleanFilters({}),
     rules: { votes: VOTES_PER_PERSON, points: VOTE_POINTS, cap: VOTE_CAP },
     fair: r.fair !== false, modifiers: r.mods || {},
     provider: PROVIDERS.includes(r.provider) ? r.provider : (PROVIDERS.includes(PROVIDER) ? PROVIDER : 'none'), providers: PROVIDERS,
@@ -373,91 +374,11 @@ function finishSpin(r, sid) {
   pushState(r);
 }
 
-// ---------- дуэль: пары, голосование, проигравший вылетает ----------
+// перемешивание для «Угадай мелодию»
 function shuffle(a) {
   a = [...a];
   for (let i = a.length - 1; i > 0; i--) { const j = crypto.randomInt(0, i + 1); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
-}
-function pairUp(ids) {
-  const matches = [];
-  for (let i = 0; i + 1 < ids.length; i += 2) matches.push([ids[i], ids[i + 1]]);
-  return { matches, bye: ids.length % 2 ? ids[ids.length - 1] : null };
-}
-function startDuel(r, by) {
-  const list = activeFilms(r);
-  if (list.length < 2) return 'Для дуэли нужно хотя бы два фильма';
-  const { matches, bye } = pairUp(shuffle(list.map(f => f.id)));
-  r.duel = { did: id(6), by, round: 1, matches, idx: 0, next: bye ? [bye] : [], votes: {}, reveal: null, left: list.length };
-  pushState(r);
-  return null;
-}
-function presentVoters(r) {
-  const set = new Set();
-  for (const c of clients.get(r.id) || []) set.add(c.cid);
-  return set;
-}
-function voteDuel(r, voter, name, filmId) {
-  const d = r.duel;
-  if (!d || d.reveal) return 'Голосование за эту пару уже закрыто';
-  if (!d.matches[d.idx].includes(filmId)) return 'Этого фильма нет в паре';
-  d.votes[voter] = { film: filmId, name };
-  pushState(r);
-  // проголосовали все, кто сейчас в комнате: подводим итог сами
-  const present = presentVoters(r);
-  if (present.size && [...present].every(v => d.votes[v])) {
-    const rt = runtime(r);
-    clearTimeout(rt.duelAuto);
-    rt.duelAuto = setTimeout(() => resolveDuel(r, d.did), 900);
-  }
-  return null;
-}
-function resolveDuel(r, did) {
-  const d = r.duel;
-  if (!d || d.did !== did || d.reveal) return;
-  const [a, b] = d.matches[d.idx];
-  const count = fid => Object.values(d.votes).filter(v => v.film === fid).length;
-  const ca = count(a), cb = count(b);
-  let winner;
-  if (ca !== cb) winner = ca > cb ? a : b;
-  else {
-    // ничья: жребий с теми же шансами, что на колесе
-    const pair = [a, b].map(x => r.films.find(f => f.id === x)).filter(Boolean);
-    winner = pickWeighted(pair, chanceWeights(r, activeFilms(r)))?.id || a;
-  }
-  d.reveal = { winner, loser: winner === a ? b : a, counts: { [a]: ca, [b]: cb }, tie: ca === cb };
-  pushState(r);
-  runtime(r).duelNext = setTimeout(() => advanceDuel(r, did), 2400);
-}
-function advanceDuel(r, did) {
-  const d = r.duel;
-  if (!d || d.did !== did || !d.reveal) return;
-  d.next.push(d.reveal.winner);
-  d.left--;
-  d.reveal = null;
-  d.votes = {};
-  d.idx++;
-  if (d.idx >= d.matches.length) {
-    if (d.next.length === 1) {
-      const film = r.films.find(f => f.id === d.next[0]);
-      r.duel = null;
-      recordWin(r, film, 'duel');
-      broadcast(r.id, { type: 'result', mode: 'duel', film });
-      pushState(r);
-      return;
-    }
-    const { matches, bye } = pairUp(shuffle(d.next));
-    d.round++;
-    d.matches = matches;
-    d.idx = 0;
-    d.next = bye ? [bye] : [];
-  }
-  pushState(r);
-}
-function stopDuel(r) {
-  const rt = runtime(r);
-  clearTimeout(rt.duelAuto); clearTimeout(rt.duelNext);
-  r.duel = null;
 }
 
 // Угол хранится как доля оборота, считается так же, как на клиенте.
@@ -507,12 +428,15 @@ async function postWebhook(r, film) {
 }
 
 // ---------- поиск фильмов ----------
+// Сериалы в комнатах запрещены: поиск их не показывает
+const KP_SERIES = ['TV_SERIES', 'MINI_SERIES', 'TV_SHOW'];
+const isSeries = f => /^tv\//.test(String(f?.sourceId || '')); // у TMDB тип записан в sourceId, у Кинопоиска его в добавлении нет
 async function searchMovies(q, src) {
   const use = PROVIDERS.includes(src) ? src : PROVIDER;
   if (use === 'kinopoisk' && KP_KEY) {
     const u = `https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=${encodeURIComponent(q)}&page=1`;
     const j = await getJson(u, { 'X-API-KEY': KP_KEY });
-    return (j.films || []).slice(0, 12).map(f => ({
+    return (j.films || []).filter(f => !KP_SERIES.includes(f.type)).slice(0, 12).map(f => ({
       source: 'kinopoisk', sourceId: String(f.filmId),
       title: f.nameRu || f.nameEn || 'Без названия',
       original: f.nameRu && f.nameEn ? f.nameEn : '',
@@ -527,7 +451,7 @@ async function searchMovies(q, src) {
     const bearer = TMDB_KEY.length > 40;
     const u = `https://api.themoviedb.org/3/search/multi?language=ru-RU&include_adult=false&query=${encodeURIComponent(q)}${bearer ? '' : `&api_key=${TMDB_KEY}`}`;
     const j = await getJson(u, bearer ? { Authorization: `Bearer ${TMDB_KEY}` } : {});
-    return (j.results || []).filter(f => f.media_type === 'movie' || f.media_type === 'tv').slice(0, 12).map(f => {
+    return (j.results || []).filter(f => f.media_type === 'movie').slice(0, 12).map(f => {
       const title = f.title || f.name || 'Без названия';
       const orig = f.original_title || f.original_name || '';
       return {
@@ -559,6 +483,25 @@ async function fetchTrack(url) {
   } catch { /* YouTube не ответил: включаем без названия */ }
   return { vid, title: str(meta.title || '', 160) || 'Трек с YouTube', author: str(meta.author_name || '', 80) };
 }
+// Ролик с YouTube как вариант на колесе: название и канал — из той же проверки oEmbed, что у музыки.
+// Обложка — самая чёткая из тех, что есть: maxresdefault бывает не у всех роликов, hqdefault — у всех
+async function youtubeFilm(q) {
+  const t = await fetchTrack(q);
+  if (t.error) return t;
+  let poster = `https://i.ytimg.com/vi/${t.vid}/hqdefault.jpg`;
+  try {
+    const hd = `https://i.ytimg.com/vi/${t.vid}/maxresdefault.jpg`;
+    if ((await fetch(hd, { method: 'HEAD', signal: AbortSignal.timeout(4000) })).ok) poster = hd;
+  } catch { /* остаётся hqdefault */ }
+  return {
+    source: 'youtube', sourceId: `yt/${t.vid}`,
+    title: t.title === 'Трек с YouTube' ? 'Ролик с YouTube' : t.title, original: '', year: '',
+    poster, rating: '', genres: ['ролик'],
+    overview: t.author ? `Ролик на YouTube, канал «${t.author}».` : 'Ролик на YouTube.',
+    url: `https://www.youtube.com/watch?v=${t.vid}`,
+  };
+}
+const isYoutubeLink = q => /youtu\.?be/i.test(q);
 function playTrack(r, track) {
   r.music = {
     vid: track.vid, title: track.title, author: track.author, by: track.by,
@@ -999,7 +942,7 @@ let enrichActive = 0;
 function queueEnrich(r) {
   for (const f of r.films) {
     if (!f.source || !f.sourceId || !needsDetails(f) || enrichQueued.has(f.id) || enrichFailed.has(f.id)) continue;
-    if ((f.source === 'tmdb' && !TMDB_KEY) || (f.source === 'kinopoisk' && !KP_KEY)) continue;
+    if ((f.source === 'tmdb' && !TMDB_KEY) || (f.source === 'kinopoisk' && !KP_KEY) || f.source === 'youtube') continue; // у ролика всё есть сразу
     enrichQueued.add(f.id);
     enrichQueue.push([r, f]);
   }
@@ -1035,28 +978,37 @@ async function getJson(url, headers) {
 // ---------- постеры через свой домен ----------
 // image.tmdb.org у части людей в России не открывается, а сервер до него достаёт.
 // Поэтому картинку забирает сервер и отдаёт со своего адреса; заодно TMDB не видит гостей.
+// Аватарки Discord — тоже через сервер: cdn.discordapp.com у части людей не открывается.
 const IMG_HOSTS = new Set([
   'image.tmdb.org', 'st.kp.yandex.net', 'avatars.mds.yandex.net', 'kinopoiskapiunofficial.tech',
-  'images.metahub.space', 'm.media-amazon.com',
+  'images.metahub.space', 'm.media-amazon.com', 'cdn.discordapp.com', 'i.ytimg.com',
 ]);
 const IMG_MAX = 8 * 1024 * 1024;
+// ошибку не кешируем нигде: следующая попытка должна снова сходить за картинкой
+const imgFail = (res, code, msg) => { res.writeHead(code, { 'Cache-Control': 'no-store' }); res.end(msg); };
 async function proxyImage(res, raw) {
   let u;
-  try { u = new URL(String(raw || '')); } catch { res.writeHead(400); return res.end('bad url'); }
-  if (u.protocol !== 'https:' || !IMG_HOSTS.has(u.hostname)) { res.writeHead(403); return res.end('host not allowed'); }
-  try {
-    const up = await fetch(u, { headers: { Accept: 'image/*,*/*', 'User-Agent': 'Reelette' }, signal: AbortSignal.timeout(10000) });
-    const type = up.headers.get('content-type') || '';
-    if (!up.ok || !type.startsWith('image/')) { res.writeHead(502); return res.end('not an image'); }
-    if (Number(up.headers.get('content-length') || 0) > IMG_MAX) { res.writeHead(413); return res.end('too big'); }
-    const body = Buffer.from(await up.arrayBuffer());
-    if (body.length > IMG_MAX) { res.writeHead(413); return res.end('too big'); }
-    // постеры не меняются: пусть лежат в кеше браузера неделю
-    res.writeHead(200, { 'Content-Type': type, 'Content-Length': body.length, 'Cache-Control': 'public, max-age=604800, immutable' });
-    res.end(body);
-  } catch (e) {
-    res.writeHead(504);
-    res.end('upstream timeout');
+  try { u = new URL(String(raw || '')); } catch { return imgFail(res, 400, 'bad url'); }
+  if (u.protocol !== 'https:' || !IMG_HOSTS.has(u.hostname)) return imgFail(res, 403, 'host not allowed');
+  // источник иногда отвечает ошибкой или не успевает: пробуем второй раз, прежде чем сдаться
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const up = await fetch(u, { headers: { Accept: 'image/*,*/*', 'User-Agent': 'Reelette' }, signal: AbortSignal.timeout(attempt ? 12000 : 8000) });
+      const type = up.headers.get('content-type') || '';
+      if (!up.ok || !type.startsWith('image/')) {
+        if (!attempt && (up.status >= 500 || up.status === 429)) continue;
+        return imgFail(res, 502, 'not an image');
+      }
+      if (Number(up.headers.get('content-length') || 0) > IMG_MAX) return imgFail(res, 413, 'too big');
+      const body = Buffer.from(await up.arrayBuffer());
+      if (body.length > IMG_MAX) return imgFail(res, 413, 'too big');
+      // постеры не меняются, у аватарки в адресе её хеш: пусть лежат в кеше браузера неделю
+      res.writeHead(200, { 'Content-Type': type, 'Content-Length': body.length, 'Cache-Control': 'public, max-age=604800, immutable' });
+      return res.end(body);
+    } catch {
+      if (!attempt) continue;
+      return imgFail(res, 504, 'upstream timeout');
+    }
   }
 }
 
@@ -1121,6 +1073,11 @@ async function api(req, res, url) {
   if (parts[0] === 'search' && m === 'GET') {
     const q = str(url.searchParams.get('q'), 100);
     if (q.length < 2) return json(res, 200, { results: [] });
+    // ссылка на YouTube — это не поиск, а ролик на колесо
+    if (isYoutubeLink(q)) {
+      const v = await youtubeFilm(q);
+      return v.error ? json(res, 400, { error: v.error }) : json(res, 200, { results: [v] });
+    }
     try { return json(res, 200, { results: await searchMovies(q, str(url.searchParams.get('src'), 20)) }); }
     catch (e) { return json(res, 502, { error: `Сервис фильмов не ответил (${e.message})` }); }
   }
@@ -1169,17 +1126,17 @@ async function api(req, res, url) {
       r.spinLock = Boolean(b.spinLock);
     }
     if (b.karaoke !== undefined) {
-      if (r.spin || r.duel) return json(res, 409, { error: 'Дождитесь конца прокрута или дуэли' });
+      if (r.spin) return json(res, 409, { error: 'Дождитесь конца прокрута' });
       r.karaoke = Boolean(b.karaoke);
       if (r.karaoke && r.music) loadLyrics(r);
     }
     if (b.fair !== undefined) {
-      if (r.spin || r.duel) return json(res, 409, { error: 'Это можно менять, когда колесо стоит' });
+      if (r.spin) return json(res, 409, { error: 'Это можно менять, когда колесо стоит' });
       r.fair = Boolean(b.fair);
       r.plan = null;
     }
     if (b.filters !== undefined) {
-      if (r.spin || r.duel) return json(res, 409, { error: 'Фильтры можно менять, когда колесо стоит' });
+      if (r.spin) return json(res, 409, { error: 'Фильтры можно менять, когда колесо стоит' });
       r.filters = cleanFilters(b.filters);
       // набор фильмов изменился, серия на выбывание начинается заново
       r.eliminated = []; r.plan = null;
@@ -1203,7 +1160,7 @@ async function api(req, res, url) {
   if (!sub && m === 'DELETE') {
     if (ownerKey(r) && !isOwner(r, me, b)) return json(res, 403, { error: 'Удалить комнату может только тот, кто её создал' });
     const rt = runtime(r);
-    clearTimeout(rt.finish); clearTimeout(rt.next); clearTimeout(rt.duelAuto); clearTimeout(rt.duelNext); clearTimeout(rt.musicT);
+    clearTimeout(rt.finish); clearTimeout(rt.next); clearTimeout(rt.musicT);
     runtimes.delete(r.id);
     delete rooms[r.id];
     save();
@@ -1261,7 +1218,7 @@ async function api(req, res, url) {
   if (sub === 'quiz' && m === 'POST') {
     const action = parts[3];
     if (action === 'start') {
-      if (r.spin || r.duel) return json(res, 409, { error: 'Дождитесь конца прокрута или дуэли' });
+      if (r.spin) return json(res, 409, { error: 'Дождитесь конца прокрута' });
       if (r.quiz && r.quiz.state !== 'final') return json(res, 409, { error: 'Игра уже идёт' });
       const err = startQuiz(r, b, who);
       return err ? json(res, 400, { error: err }) : json(res, 200, { ok: true });
@@ -1508,6 +1465,16 @@ async function api(req, res, url) {
     pushState(r); return json(res, 200, { ok: true });
   }
 
+  // создатель снимает все оценки фильма: его оценивают заново, бонус автора считается по новым оценкам
+  if (sub === 'rate' && parts[3] === 'clear' && m === 'POST') {
+    if (!isOwner(r, me, b)) return json(res, 403, { error: 'Снять оценки может только создатель комнаты' });
+    const h = r.history.find(x => x.hid === str(b.hid, 16));
+    if (!h) return json(res, 404, { error: 'Этого фильма нет в истории' });
+    h.ratings = {};
+    if (h.src) { r.mods ||= {}; delete r.mods[personOf(h.film)]; }
+    pushState(r); return json(res, 200, { ok: true });
+  }
+
   // оценка фильма после просмотра: свою оценку можно поменять в течение минуты
   if (sub === 'rate' && m === 'POST') {
     const h = r.history.find(x => x.hid === str(b.hid, 16));
@@ -1531,39 +1498,17 @@ async function api(req, res, url) {
     pushState(r); return json(res, 200, { ok: true });
   }
 
-  if (sub === 'duel' && m === 'POST') {
-    const action = parts[3];
-    if (r.spinLock && !isOwner(r, me, b) && ['start', 'next', 'stop'].includes(action)) return json(res, 403, { error: 'Крутить сейчас может только создатель комнаты' });
-    if (action === 'start') {
-      if (r.spin || r.duel) return json(res, 409, { error: 'Сначала дождитесь конца прокрута или дуэли' });
-      const err = startDuel(r, who);
-      return err ? json(res, 400, { error: err }) : json(res, 200, { ok: true });
-    }
-    if (!r.duel) return json(res, 409, { error: 'Дуэль не идёт' });
-    if (action === 'vote') {
-      const voter = me ? 'd' + me.id : str(b.cid, 32);
-      if (!voter) return json(res, 400, { error: 'Не понятно, кто голосует' });
-      const err = voteDuel(r, voter, who, str(b.filmId, 20));
-      return err ? json(res, 400, { error: err }) : json(res, 200, { ok: true });
-    }
-    if (action === 'next') { resolveDuel(r, r.duel.did); return json(res, 200, { ok: true }); }
-    if (action === 'stop') {
-      stopDuel(r);
-      broadcast(r.id, { type: 'duel-stop', by: who });
-      pushState(r); return json(res, 200, { ok: true });
-    }
-  }
-
-  if (r.duel && sub !== 'duel') return json(res, 409, { error: 'Идёт дуэль, подождите' });
   if (r.spin && sub !== 'spin') return json(res, 409, { error: 'Колесо крутится, подождите' });
 
   if (sub === 'films' && !parts[3] && m === 'POST') {
     if (r.addLock && !isOwner(r, me, b)) return json(res, 403, { error: 'Создатель комнаты закрыл добавление фильмов' });
     if (r.eliminated.length || runtime(r).series) return json(res, 409, { error: 'Идёт выбывание: добавлять фильмы можно после него или после «Вернуть выбывших»' });
     const list = Array.isArray(b.films) ? b.films : [b];
-    const added = [], merged = [], voted = [];
+    if (list.length === 1 && isSeries(list[0])) return json(res, 400, { error: 'Сериалы в комнату добавлять нельзя' });
+    const added = [], merged = [], voted = [], series = [];
     for (const raw of list.slice(0, 100)) {
       if (r.films.length >= MAX_FILMS) break;
+      if (isSeries(raw)) { series.push(str(raw.title, 200)); continue; }
       const f = makeFilm(raw, who, personKey(me, b));
       const dup = r.films.find(x => (f.sourceId && x.sourceId === f.sourceId) || norm(x.title) === norm(f.title) && (x.year || '') === (f.year || ''));
       if (dup) {
@@ -1580,7 +1525,7 @@ async function api(req, res, url) {
       r.films.push(f); added.push(f.title);
     }
     queueEnrich(r);
-    pushState(r); return json(res, 200, { added, merged, voted });
+    pushState(r); return json(res, 200, { added, merged, voted, series });
   }
 
   if (sub === 'films' && parts[3]) {
