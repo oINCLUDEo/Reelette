@@ -1353,16 +1353,20 @@ function initRoom(roomId) {
               const m = state?.music;
               if (!m || ytVid !== m.vid || ytBroken.has(playKey(m))) return;
               const k = playKey(m);
-              // 5 — сбой плеера у этого человека (сеть, браузер): разок перезагружаем видео, остальных не трогаем
-              if (e.data === 5 && !ytRetried.has(k)) {
+              // первый сбой — разок перезагружаем видео: YouTube иногда отказывает случайно, а со второй попытки играет
+              if (!ytRetried.has(k)) {
                 ytRetried.add(k);
                 setTimeout(() => { if (ytReady && state?.music && playKey(state.music) === k) yt.loadVideoById({ videoId: m.vid, startSeconds: ytExpected(state.music) }); }, 1500);
                 return;
               }
               ytBroken.add(k);
-              // видео удалено (100), запрещено встраивать (101, 150) или номер кривой (2) — это у всех: просим сервер включить следующий.
-              // 5 и 153 (браузер не отдал Referer) — беда одного человека, остальным трек не сбиваем
-              if ([2, 100, 101, 150].includes(e.data)) api(`/rooms/${roomId}/music/failed`, { method: 'POST', body: { vid: m.vid } }).catch(() => {});
+              const mine = 'Этот трек у вас не запускается: YouTube не пустил его в ваш плеер. У остальных он играет';
+              // видео удалено (100), запрещено встраивать (101, 150) или номер кривой (2): сервер сам проверит и пропустит трек
+              // у всех, только если он правда недоступен или не играет и у других. 5 и 153 — беда только этого браузера
+              if ([2, 100, 101, 150].includes(e.data)) {
+                api(`/rooms/${roomId}/music/failed`, { method: 'POST', body: { vid: m.vid, cid: me.cid } })
+                  .then(r => { if (r.skipped === false && state?.music && playKey(state.music) === k) toast(mine, true); }).catch(() => {});
+              } else toast(mine, true);
             },
           },
         });

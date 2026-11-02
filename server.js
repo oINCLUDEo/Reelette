@@ -500,12 +500,18 @@ async function fetchTrack(url) {
   const vid = ytKey(url);
   if (!vid) return { error: /list=/.test(String(url || '')) ? 'Это ссылка на плейлист без трека. Откройте нужный трек и скопируйте его ссылку' : 'Не похоже на ссылку на YouTube' };
   let meta = {};
-  try {
-    const o = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + vid)}`, { signal: AbortSignal.timeout(6000) });
-    if (o.status === 401 || o.status === 403) return { error: 'Автор запретил встраивать это видео, возьмите другое' };
-    if (o.status === 404 || o.status === 400) return { error: 'Видео не найдено или оно приватное' };
-    if (o.ok) meta = await o.json();
-  } catch { /* YouTube не ответил: включаем без названия */ }
+  // oEmbed с адреса сервера иногда разово отвечает отказом, а со второго раза пускает: решаем по второму ответу
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const o = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + vid)}`, { signal: AbortSignal.timeout(6000) });
+      if ([400, 401, 403, 404].includes(o.status)) {
+        if (!attempt) { await new Promise(ok => setTimeout(ok, 800)); continue; }
+        return { error: o.status === 401 || o.status === 403 ? 'Автор запретил встраивать это видео, возьмите другое' : 'Видео не найдено или оно приватное' };
+      }
+      if (o.ok) meta = await o.json();
+    } catch { /* YouTube не ответил: включаем без названия */ }
+    break;
+  }
   return { vid, title: str(meta.title || '', 160) || 'Трек с YouTube', author: str(meta.author_name || '', 80) };
 }
 // Ролик с YouTube как вариант на колесе: название и канал — из той же проверки oEmbed, что у музыки.
@@ -1537,12 +1543,24 @@ async function api(req, res, url) {
       if (['next', 'restart', 'toggle'].includes(action)) return json(res, 409, { error: 'Идёт «Угадай мелодию»' });
     }
     if (action === 'ended' || action === 'failed') {
-      const same = r.music.vid === str(b.vid, 11) && r.music.pausedAt == null;
-      if (same && (action === 'failed' || Date.now() - r.music.startedAt > 5000)) {
-        if (action === 'failed') broadcast(r.id, { type: 'music-skip', title: r.music.title });
-        advanceMusic(r);
+      const vid = str(b.vid, 11);
+      const same = () => r.music?.vid === vid && r.music.pausedAt == null;
+      if (action === 'ended') {
+        if (same() && Date.now() - r.music.startedAt > 5000) advanceMusic(r);
+        return json(res, 200, { ok: true });
       }
-      return json(res, 200, { ok: true });
+      if (!same()) return json(res, 200, { ok: true, skipped: false });
+      // Плеер не смог у этого человека. Трек сбиваем у всех, только если не играет и у других (двое и больше
+      // или он здесь один) либо YouTube подтвердил, что видео недоступно. Иначе это беда его сети или страны
+      const rt = runtime(r), key = `${r.music.vid}:${r.music.startedAt}`;
+      if (rt.failKey !== key) { rt.failKey = key; rt.fails = new Set(); }
+      rt.fails.add(personKey(me, b) || 'anon');
+      const here = new Set([...(clients.get(r.id) || [])].map(c => c.cid)).size;
+      const broken = rt.fails.size >= Math.min(2, Math.max(1, here)) || Boolean((await fetchTrack(vid)).error);
+      if (!broken || !same()) return json(res, 200, { ok: true, skipped: false });
+      broadcast(r.id, { type: 'music-skip', title: r.music.title });
+      advanceMusic(r);
+      return json(res, 200, { ok: true, skipped: true });
     }
     if (action === 'duration') {
       // длительность знает только плеер: первый, кто загрузил трек, сообщает её серверу
