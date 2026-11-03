@@ -1937,3 +1937,6 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 @media (min-width: 2200px) and (min-height: 1200px) {
   .films-panel, .stage-top, .tools, .now, .stage-foot, .react-bar { zoom: 1.2; }
 }
+
+/* узкий экран: громкость в панели караоке не помещается — она есть в системе. После базового .k-vol, иначе перебивается */
+@media (max-width: 520px) { .k-bar .k-vol { display: none; } }
