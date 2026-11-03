@@ -50,19 +50,26 @@
     s.boost += (target - s.boost) * Math.min(1, dt * 2.2);
     const b = s.boost;
 
-    // центр и радиус колеса относительно холста
-    let cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.36;
-    if (s.anchor?.offsetParent) {
-      const a = s.anchor.getBoundingClientRect(), c = s.cv.getBoundingClientRect();
-      cx = a.left - c.left + a.width / 2; cy = a.top - c.top + a.height / 2; R = a.width / 2;
-    }
-    // караоке и игра: колеса нет, светимся мягко за видео, без кольца
+    // центр и радиус колеса относительно холста. Замер раз в 250 мс, а не в каждом кадре:
+    // getBoundingClientRect после правок страницы заставлял браузер пересчитывать раскладку посреди кадра
     const stageMode = s.cv.closest('.stage')?.classList.contains('karaoke-on');
-    const kv = stageMode ? [...s.cv.parentElement.querySelectorAll('.k-video')].find(el => el.offsetParent) : null;
-    if (kv) {
-      const a = kv.getBoundingClientRect(), c = s.cv.getBoundingClientRect();
-      cx = a.left - c.left + a.width / 2; cy = a.top - c.top + a.height / 2; R = a.width * 0.42;
+    const pnow = performance.now();
+    if (!s.geo || pnow - s.geoAt > 250) {
+      s.geoAt = pnow;
+      s.geo = { cx: w / 2, cy: h / 2, R: Math.min(w, h) * 0.36 };
+      const c = s.cv.getBoundingClientRect();
+      if (s.anchor?.offsetParent) {
+        const a = s.anchor.getBoundingClientRect();
+        s.geo = { cx: a.left - c.left + a.width / 2, cy: a.top - c.top + a.height / 2, R: a.width / 2 };
+      }
+      // караоке и игра: колеса нет, светимся мягко за видео, без кольца
+      const kv = stageMode ? [...s.cv.parentElement.querySelectorAll('.k-video')].find(el => el.offsetParent) : null;
+      if (kv) {
+        const a = kv.getBoundingClientRect();
+        s.geo = { cx: a.left - c.left + a.width / 2, cy: a.top - c.top + a.height / 2, R: a.width * 0.42 };
+      }
     }
+    let { cx, cy, R } = s.geo;
     // свет не прыгает при смене режима, а переезжает и меняет размер за ~0,4 с; кольцо гаснет плавно
     const ringT = stageMode ? 0 : 1;
     if (s.cx === undefined) { s.cx = cx; s.cy = cy; s.R = R; s.ring = ringT; }
@@ -122,10 +129,21 @@
       if (p.x < -4) p.x = w + 4; else if (p.x > w + 4) p.x = -4;
       if (p.y > h + 4) p.y = -4;
       const near = Math.exp(-((d - r0) ** 2) / (2 * (r0 * 0.35) ** 2));
-      const a = (0.2 + 0.8 * near) * (0.55 + 0.45 * Math.sin(t * p.sp + p.ph)) * (1 + b * 0.5);
-      ctx.fillStyle = rgba(near > 0.4 ? col.ring : [255, 255, 255], a);
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1 + fx.mid * 0.9), 0, 6.283); ctx.fill();
+      p.ring = near > 0.4;
+      p.a = Math.min(1, (0.2 + 0.8 * near) * (0.55 + 0.45 * Math.sin(t * p.sp + p.ph)) * (1 + b * 0.5));
     }
+    // рисуем двумя группами: цвет задаётся дважды за кадр, прозрачность — через globalAlpha
+    // (раньше строка rgba(...) собиралась и разбиралась заново для каждой пылинки в каждом кадре)
+    const pr = 1 + fx.mid * 0.9;
+    for (const ring of [false, true]) {
+      ctx.fillStyle = ring ? rgba(col.ring, 1) : '#fff';
+      for (const p of s.dust) {
+        if (p.ring !== ring) continue;
+        ctx.globalAlpha = p.a;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * pr, 0, 6.283); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   readColors();

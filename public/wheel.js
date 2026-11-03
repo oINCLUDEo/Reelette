@@ -182,8 +182,14 @@ class Wheel {
       this.onCurrent(this.items[idx] || null);
     }
 
-    if (this.dirty) { this.buildCache(); this.dirty = false; }
-    this.draw(now, idx);
+    if (this.dirty) { this.buildCache(); this.dirty = false; this.stale = true; }
+    // в покое кадр не меняется: перерисовываем, только когда колесо крутится, сектор приподнят после остановки
+    // или что-то поменялось (угол, сектор под стрелкой, цвет, размер, секторы)
+    const sig = `${this.rot}|${idx}|${this.tint}|${this.cv.width}`;
+    if (this.anim || this.stale || sig !== this.sig || (this.landAt && now - this.landAt < 1000)) {
+      this.sig = sig; this.stale = false;
+      this.draw(now, idx);
+    }
   }
 
   geom() {
@@ -350,14 +356,17 @@ class Wheel {
     const flash = this.anim && fx && !this.calm ? Math.max(0, 1 - (now - fx.beatAt) / 220) : 0;
     const crawl = this.anim && this.mood === 'final' && this.speed < 0.6;
     const breath = 0.5 + 0.5 * Math.sin(now / 1000 * 7.4);
+    // горящие и тусклые лампы — двумя заливками: размытие тени считается один раз на все горящие, а не на каждую
+    const lit = new Path2D(), dim = new Path2D(), lr0 = S / 170;
     for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2;
-      const on = crawl || (this.anim && ((chase + i) % 3 === 0 || flash > 0.4));
-      x.beginPath(); x.arc(c + Math.cos(a) * lr, c + Math.sin(a) * lr, S / 170, 0, Math.PI * 2);
-      x.fillStyle = on ? this.colors.light : 'rgba(255,255,255,.16)';
-      x.shadowColor = this.tint || this.colors.accent; x.shadowBlur = on ? S / (crawl ? 40 + breath * 60 : 50 - flash * 25) : 0;
-      x.fill();
+      const a = (i / n) * Math.PI * 2, lx = c + Math.cos(a) * lr, ly = c + Math.sin(a) * lr;
+      const p = crawl || (this.anim && ((chase + i) % 3 === 0 || flash > 0.4)) ? lit : dim;
+      p.moveTo(lx + lr0, ly); p.arc(lx, ly, lr0, 0, Math.PI * 2);
     }
+    x.fillStyle = 'rgba(255,255,255,.16)'; x.fill(dim);
+    x.fillStyle = this.colors.light;
+    x.shadowColor = this.tint || this.colors.accent; x.shadowBlur = S / (crawl ? 40 + breath * 60 : 50 - flash * 25);
+    x.fill(lit);
     x.shadowBlur = 0;
 
     if (this.hubButton) return;

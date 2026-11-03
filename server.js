@@ -102,6 +102,39 @@ function save() {
   }, 300);
 }
 
+// ---------- резервные копии: при запуске и раз в сутки все JSON из DATA_DIR (комнаты, профили, входы) копируются в backups/ГГГГ-ММ-ДД,
+// хранятся последние 14 дней. Копия дня не перезаписывается: перезапуск после сбоя не затрёт хорошую копию испорченной.
+// Спасают от ошибки в коде или неудачной правки руками; от гибели диска — нет, копии лежат на том же диске ----
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+const BACKUP_KEEP = 14;
+function backup() {
+  try {
+    const dir = path.join(BACKUP_DIR, new Date().toISOString().slice(0, 10));
+    if (fs.existsSync(dir) || !fs.existsSync(DATA_DIR)) return;
+    fs.mkdirSync(dir, { recursive: true });
+    for (const f of fs.readdirSync(DATA_DIR)) if (f.endsWith('.json')) fs.copyFileSync(path.join(DATA_DIR, f), path.join(dir, f));
+    const days = fs.readdirSync(BACKUP_DIR).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    for (const d of days.slice(0, -BACKUP_KEEP)) fs.rmSync(path.join(BACKUP_DIR, d), { recursive: true, force: true });
+  } catch (e) { console.error(`Не удалось сделать резервную копию: ${e.message}`); }
+}
+backup();
+setInterval(backup, 3600 * 1000).unref(); // проверка раз в час: новая копия появляется, как только сменилась дата
+
+// ---------- итоги месяца: то, чего нет в истории, копится по месяцам в r.stats['ГГГГ-ММ'] (в состояние комнаты не уходит) ----------
+// shortcut: границы месяца и часы сеансов — по Москве (UTC+3), компания там; если появятся люди из других поясов — брать пояс из настроек комнаты
+const MSK = 3 * 3600e3;
+const monthOf = t => new Date(t + MSK).toISOString().slice(0, 7);
+const bump = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
+function monthStats(r) {
+  r.stats ||= {};
+  const m = monthOf(Date.now());
+  if (!r.stats[m]) {
+    r.stats[m] = { spins: 0, series: 0, names: {}, spinners: {}, reacts: {}, chat: {}, tracks: {}, djs: {}, outs: {} };
+    for (const k of Object.keys(r.stats).sort().slice(0, -24)) delete r.stats[k]; // два года хватит
+  }
+  return r.stats[m];
+}
+
 const id = (n = 8) => crypto.randomBytes(16).toString('base64url').replace(/[-_]/g, '').slice(0, n);
 const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
@@ -363,6 +396,7 @@ function startSpin(r, { mode, duration, auto, by, delay }) {
     stage: pace?.stage || null, left: list.length, chapter,
   };
   rt.series = r.spin.auto;
+  monthStats(r).spins++;
   broadcast(r.id, { type: 'spin', spin: r.spin, now: Date.now() });
   pushState(r);
 
@@ -387,6 +421,15 @@ function finishSpin(r, sid) {
     playWinTrack(r, film);
   } else {
     r.eliminated.push(s.filmId);
+    // для итогов: кто вылетает первым и кто проигрывает финал
+    const st = monthStats(r);
+    if (r.eliminated.length === 1) st.series++;
+    if (film) {
+      const out = (st.outs[film.id] ||= { title: film.title, poster: film.poster || '', n: 0, first: 0, final: 0 });
+      out.n++;
+      if (r.eliminated.length === 1) out.first++;
+      if (s.left === 2) out.final++;
+    }
     const left = activeFilms(r);
     broadcast(r.id, { type: 'result', mode: 'elimination', film, left: left.length });
     if (left.length === 1) {
@@ -436,6 +479,126 @@ function recordWin(r, film, mode) {
   if (live) live.votes = [];
   r.history = r.history.slice(0, MAX_HISTORY);
   if (r.webhook) postWebhook(r, film).catch(e => console.warn('webhook:', e.message));
+}
+
+// ---------- итоги месяца: факты для историй (app.js openRecap). Факт попадает в итоги, только если для него хватает данных.
+// Из истории — фильмы, оценки, авторы, жанры, время выбора; из r.stats — прокруты, вылеты, реакции, чат, музыка ----------
+function recap(r, month) {
+  const st = r.stats?.[month] || {};
+  const wins = r.history.filter(h => monthOf(h.at) === month).sort((x, y) => x.at - y.at);
+  const names = { ...(st.names || {}) };
+  const card = f => ({ id: f.id, title: f.title, year: f.year || '', poster: f.poster || '', runtime: f.runtime || 0, pid: personOf(f), source: f.source || '' });
+  const avg = a => a.reduce((s, x) => s + x, 0) / a.length;
+  const top = (o, min = 1) => { const e = Object.entries(o || {}).sort((x, y) => y[1] - x[1])[0]; return e && e[1] >= min ? e : null; };
+  const out = { count: wins.length, minutes: wins.reduce((s, h) => s + (h.film.runtime || 0), 0), spins: st.spins || 0, series: st.series || 0 };
+  out.films = wins.map(h => ({ ...card(h.film), at: h.at }));
+  for (const h of wins) names[personOf(h.film)] ||= h.film.addedBy || 'Без имени';
+
+  // оценки фильма — от остальных, без автора (как в бонусах за оценку)
+  const rated = wins.map(h => {
+    const author = personOf(h.film);
+    const rs = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author);
+    return { h, rs, avg: rs.length ? avg(rs.map(([, v]) => v.score)) : null };
+  });
+  const given = {};
+  for (const h of wins) for (const [pid, v] of Object.entries(h.ratings || {})) { (given[pid] ||= []).push(v.score); names[pid] ||= v.name; }
+
+  // фильм месяца, провал и самый спорный: у фильма хотя бы две оценки
+  const ok = rated.filter(x => x.rs.length >= 2);
+  if (ok.length) {
+    const best = ok.reduce((x, y) => (y.avg > x.avg ? y : x));
+    out.best = { ...card(best.h.film), avg: best.avg, n: best.rs.length };
+    const worst = ok.reduce((x, y) => (y.avg < x.avg ? y : x));
+    if (ok.length >= 3 && worst !== best) out.worst = { ...card(worst.h.film), avg: worst.avg, n: worst.rs.length };
+    const spread = x => Math.max(...x.rs.map(([, v]) => v.score)) - Math.min(...x.rs.map(([, v]) => v.score));
+    const split = ok.reduce((x, y) => (spread(y) > spread(x) ? y : x));
+    if (spread(split) >= 4) {
+      const s = [...split.rs].sort((x, y) => x[1].score - y[1].score);
+      out.split = { ...card(split.h.film), lo: { pid: s[0][0], score: s[0][1].score }, hi: { pid: s.at(-1)[0], score: s.at(-1)[1].score } };
+    }
+  }
+  // король колеса: чьи фильмы выпадали чаще (если поровну — все)
+  const byAuthor = {};
+  for (const h of wins) bump(byAuthor, personOf(h.film));
+  const kingN = Math.max(0, ...Object.values(byAuthor));
+  if (kingN >= 2) out.king = { pids: Object.keys(byAuthor).filter(p => byAuthor[p] === kingN), n: kingN };
+  // лучший вкус: у чьих фильмов выше средняя оценка остальных (сравниваем хотя бы двоих)
+  const taste = {};
+  for (const x of rated) if (x.avg != null) (taste[personOf(x.h.film)] ||= []).push(x.avg);
+  const tastes = Object.entries(taste).map(([pid, a]) => ({ pid, avg: avg(a), n: a.length })).sort((x, y) => y.avg - x.avg);
+  if (tastes.length >= 2) out.taste = tastes[0];
+  // строгий критик и добряк: средняя поставленная оценка, хотя бы три оценки у каждого
+  const raters = Object.entries(given).filter(([, a]) => a.length >= 3).map(([pid, a]) => ({ pid, avg: avg(a), n: a.length })).sort((x, y) => x.avg - y.avg);
+  if (raters.length >= 2 && raters.at(-1).avg - raters[0].avg >= 0.5) { out.critic = raters[0]; out.kind = raters.at(-1); }
+  const rater = Object.entries(given).sort((x, y) => y[1].length - x[1].length)[0];
+  if (rater && rater[1].length >= 3) out.rater = { pid: rater[0], n: rater[1].length };
+  // кино-близнецы и антиподы: средняя разница оценок у пар, которые оценили вместе хотя бы три фильма
+  const pids = Object.keys(given), pairs = [];
+  for (let i = 0; i < pids.length; i++) for (let j = i + 1; j < pids.length; j++) {
+    const d = [];
+    for (const h of wins) { const x = h.ratings?.[pids[i]], y = h.ratings?.[pids[j]]; if (x && y) d.push(Math.abs(x.score - y.score)); }
+    if (d.length >= 3) pairs.push({ a: pids[i], b: pids[j], diff: avg(d), n: d.length });
+  }
+  if (pairs.length >= 2) {
+    pairs.sort((x, y) => x.diff - y.diff);
+    out.twins = pairs[0];
+    if (pairs.at(-1).diff - pairs[0].diff >= 1) out.rivals = pairs.at(-1);
+  }
+  // жанр месяца
+  const genres = {};
+  for (const h of wins) for (const g of h.film.genres || []) bump(genres, g);
+  const genre = top(genres, 2);
+  if (genre) out.genre = { name: genre[0], n: genre[1] };
+  // машина времени: самый старый и самый новый, если между ними хотя бы пять лет
+  const dated = wins.filter(h => Number(h.film.year) > 1800).sort((x, y) => Number(x.film.year) - Number(y.film.year));
+  if (dated.length >= 2 && Number(dated.at(-1).film.year) - Number(dated[0].film.year) >= 5) out.era = { old: card(dated[0].film), new: card(dated.at(-1).film) };
+  // марафон: самый длинный, от двух часов
+  const long = wins.filter(h => h.film.runtime >= 120).sort((x, y) => y.film.runtime - x.film.runtime)[0];
+  if (long) out.longest = card(long.film);
+  // долгожитель: дольше всех ждал на колесе, прежде чем выпасть (от недели)
+  const waited = wins.filter(h => h.film.addedAt).map(h => ({ h, days: (h.at - h.film.addedAt) / 864e5 })).sort((x, y) => y.days - x.days)[0];
+  if (waited && waited.days >= 7) out.waited = { ...card(waited.h.film), days: Math.floor(waited.days) };
+  // голос народа: у кого больше всех голосов, когда он выпал
+  const voted = wins.map(h => ({ h, n: (h.film.votes || []).length })).sort((x, y) => y.n - x.n)[0];
+  if (voted && voted.n >= 3) out.voted = { ...card(voted.h.film), n: voted.n };
+  // ночной сеанс: самый поздний выбор, если он был после 23:00 (по Москве)
+  const late = wins.map(h => { const d = new Date(h.at + MSK), min = d.getUTCHours() * 60 + d.getUTCMinutes(); return { h, min, key: (min + 6 * 60) % 1440 }; })
+    .sort((x, y) => y.key - x.key)[0];
+  if (late && (late.min >= 23 * 60 || late.min < 6 * 60)) out.late = { ...card(late.h.film), time: `${String(Math.floor(late.min / 60)).padStart(2, '0')}:${String(late.min % 60).padStart(2, '0')}` };
+  // любимый день недели
+  const days = {};
+  for (const h of wins) bump(days, new Date(h.at + MSK).getUTCDay());
+  const day = top(days, 2);
+  if (day && wins.length >= 4) out.weekday = { day: Number(day[0]), n: day[1] }; // 0 — воскресенье
+  out.youtube = wins.filter(h => h.film.source === 'youtube').length;
+
+  // кто чаще жмёт «Крутить»
+  const spinner = top(st.spinners, 3);
+  if (spinner) out.spinner = { pid: spinner[0], n: spinner[1] };
+  // вылеты: кто чаще всех первым и кто проигрывал финал
+  const outs = Object.values(st.outs || {});
+  out.outs = outs.reduce((s, o) => s + o.n, 0);
+  const firstOut = outs.filter(o => o.first >= 2).sort((x, y) => y.first - x.first)[0];
+  if (firstOut) out.firstOut = { title: firstOut.title, poster: firstOut.poster, n: firstOut.first };
+  const runnerUp = outs.filter(o => o.final >= 1).sort((x, y) => y.final - x.final)[0];
+  if (runnerUp) out.runnerUp = { title: runnerUp.title, poster: runnerUp.poster, n: runnerUp.final };
+  // реакции: сколько всего, любимая, главный болельщик и сколько раз каркали
+  const kinds = {}, per = {};
+  let rxTotal = 0;
+  for (const [pid, k] of Object.entries(st.reacts || {})) for (const [kind, n] of Object.entries(k)) { bump(kinds, kind, n); bump(per, pid, n); rxTotal += n; }
+  if (rxTotal >= 10) { const fan = top(per); out.reacts = { total: rxTotal, kind: top(kinds)[0], crows: kinds.crow || 0, fan: { pid: fan[0], n: fan[1] } }; }
+  // чат: сколько сообщений и кто писал больше всех
+  const talker = top(st.chat, 5);
+  if (talker) out.chat = { total: Object.values(st.chat).reduce((s, n) => s + n, 0), pid: talker[0], n: talker[1] };
+  // музыка: трек месяца и кто чаще ставил
+  const tracks = Object.entries(st.tracks || {}).sort((x, y) => y[1].n - x[1].n);
+  const plays = tracks.reduce((s, [, t]) => s + t.n, 0);
+  if (plays >= 3) {
+    const dj = top(st.djs, 3);
+    out.music = { plays, track: { vid: tracks[0][0], title: tracks[0][1].title, author: tracks[0][1].author, n: tracks[0][1].n }, dj: dj ? { name: dj[0], n: dj[1] } : null };
+  }
+  out.names = names;
+  return out;
 }
 
 async function postWebhook(r, film) {
@@ -591,7 +754,7 @@ function playWinTrack(r, film, delay = 0) {
   if (!t?.vid) return;
   setTimeout(() => {
     if (!rooms[r.id] || r.karaoke || r.quiz) return;
-    playTrack(r, { vid: t.vid, title: t.title, author: t.author || '', by: film.addedBy || 'победитель' });
+    playTrack(r, { vid: t.vid, title: t.title, author: t.author || '', by: film.addedBy || 'победитель', win: true });
     pushState(r);
   }, delay);
 }
@@ -609,6 +772,10 @@ function playTrack(r, track) {
     r.perfs = r.perfs.slice(0, 60);
     r.music.perfId = perf.perfId;
   }
+  // для итогов: трек месяца и кто чаще ставил музыку (победная музыка — не чей-то выбор)
+  const st = monthStats(r);
+  (st.tracks[track.vid] ||= { title: track.title, author: track.author || '', n: 0 }).n++;
+  if (track.by && !track.win) bump(st.djs, track.by);
   // «Наши хиты»: что играло в комнате, сколько раз и кто пел
   r.hits ||= [];
   let hit = r.hits.find(x => x.vid === track.vid);
@@ -1343,6 +1510,8 @@ async function api(req, res, url) {
     if (recent.length >= 5) return json(res, 429, { error: 'Не так быстро' });
     recent.push(now); rt.chatRx.set(pid, recent);
     const msg = { id: id(6), pid, name: who, avatar: me?.avatar || '', text, at: now };
+    const st = monthStats(r);
+    bump(st.chat, pid); st.names[pid] = who;
     r.chat ||= [];
     r.chat.push(msg);
     r.chat = r.chat.slice(-50);
@@ -1461,6 +1630,8 @@ async function api(req, res, url) {
     rt.rx.set(pid, recent);
     r.reacts ||= {};
     r.reacts[pid] = (r.reacts[pid] || 0) + 1;
+    const st = monthStats(r);
+    bump(st.reacts[pid] ||= {}, kind); st.names[pid] = who;
     save();
     broadcast(r.id, { type: 'react', kind, name: who, pid });
     return json(res, 200, { ok: true });
@@ -1752,7 +1923,22 @@ async function api(req, res, url) {
     if (r.spinLock && !isOwner(r, me, b)) return json(res, 403, { error: 'Крутить сейчас может только создатель комнаты' });
     if (r.spin) return json(res, 409, { error: 'Колесо уже крутится' });
     const err = startSpin(r, b);
+    if (!err) {
+      // для итогов: кто жмёт «Крутить» (серия считается одним нажатием)
+      const st = monthStats(r), pid = personKey(me, b) || 'anon';
+      bump(st.spinners, pid); st.names[pid] = who;
+    }
     return err ? json(res, 400, { error: err }) : json(res, 200, { ok: true });
+  }
+
+  // итоги месяца (app.js openRecap); без ?m= — текущий месяц, а в первую неделю нового — прошлый
+  if (sub === 'recap' && m === 'GET') {
+    const now = monthOf(Date.now());
+    const months = [...new Set([now, ...r.history.map(h => monthOf(h.at)), ...Object.keys(r.stats || {})])].sort().reverse();
+    const prev = months.find(x => x < now);
+    const want = url.searchParams.get('m');
+    const month = months.includes(want) ? want : new Date(Date.now() + MSK).getUTCDate() <= 7 && prev ? prev : now;
+    return json(res, 200, { month, months, ...recap(r, month) });
   }
 
   if (sub === 'reset' && m === 'POST') {

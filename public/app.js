@@ -102,6 +102,7 @@ function closeModal(m) {
     el.hidden = true;
     if (el.id === 'trailerModal') $('#trailerFrame').innerHTML = '';
     if (el.id === 'watchModal') $('#watchFrame').innerHTML = '';
+    if (el.id === 'winModal') el.querySelector('.win-trailer')?.remove(); // трейлер фоном не играет в закрытом окне
   }, 300);
 }
 function openTrailer(key) {
@@ -317,13 +318,17 @@ function initRoom(roomId) {
     hubButton: true,
     onTick: tick,
     onCurrent: it => {
-      if (!outShown) { setCurrent(it ? it.title : ' '); updateNow(it); }
-      $$('.film').forEach(el => el.classList.toggle('hot', el.dataset.id === it?.id));
+      const slow = !wheel.anim || wheel.speed < 1.2;
+      // на быстром ходу год с жанрами и «Добавил(а)» не прочитать: строки спрятаны и не пересобираются на каждом секторе
+      $('#now').classList.toggle('fast', !slow);
+      if (!outShown) { setCurrent(it ? it.title : ' '); if (slow) updateNow(it); }
+      // строка фильма под стрелкой: подсветка переходит с прошлой на новую, без перебора всего списка
+      $$('.film.hot').forEach(el => el.classList.remove('hot'));
+      if (it) $(`.film[data-id="${CSS.escape(it.id)}"]`)?.classList.add('hot');
       // стрелка светится цветом автора фильма под ней (style.css .pointer)
       if (it?.color) $('#pointer').style.setProperty('--pg', it.color); else $('#pointer').style.removeProperty('--pg');
       // фон и акцент интерфейса перекрашиваются под фильм у стрелки, когда колесо уже медленное: на быстром ходу смена мельтешила бы.
       // Свет вокруг колеса и подсветка сектора следуют за стрелкой всегда — на скорости цвета смешиваются в переливы
-      const slow = !wheel.anim || wheel.speed < 1.2;
       paintFilm(it, slow);
       if (slow) setAmbient(it);
     },
@@ -1011,6 +1016,7 @@ function initRoom(roomId) {
     const live = elapsed < spin.duration * 1000;
     wheel.spin(spin, state.angle, elapsed, () => {
       if (live) landFx();
+      $('#now').classList.remove('fast'); // короткий прокрут мог встать, не дойдя до медленного хода
       spinningSid = null;
       curSpin = null;
       clearInterval(heartTimer); heartTimer = null;
@@ -1115,8 +1121,11 @@ function initRoom(roomId) {
       }
     }
     const bg = f.poster ? `<div class="win-bg" style="--img:url('${esc(pimg(f.poster))}')"></div>` : '';
+    // фоном — трейлер без звука (у ролика с YouTube — сам ролик); победная и общая музыка играют как обычно.
+    // Не грузим, если в браузере включена экономия трафика или «уменьшить движение»
+    const tk = win && !reduceMotion && !navigator.connection?.saveData && (f.trailer || (f.source === 'youtube' ? f.sourceId.slice(3) : ''));
     det.innerHTML = `
-      ${win ? `<div class="win-flood"><i></i>${bg}</div>` : bg}
+      ${win ? `<div class="win-flood"><i></i>${bg}${tk ? '<div class="win-trailer"><div id="winTrailer"></div></div>' : ''}</div>` : bg}
       ${win && ap.banner && ap.banner !== 'none' ? `<div class="win-banner bn-box bn-${esc(ap.banner)}"></div>` : ''}
       <div class="win-inner">
         ${f.poster ? `<img src="${esc(pimg(f.poster))}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"></div>`}
@@ -1143,6 +1152,21 @@ function initRoom(roomId) {
       wheelFlight($('#winDetail .win-inner > img, #winDetail .win-inner > .noposter'), wheelPoint(), { duration: 1000, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' });
       sliceIn($('#winDetail .win-title'), { delay: 430, dur: 820 });
     }
+    // трейлер проявляется, только когда видео действительно пошло: у кого YouTube не открывается, остаётся заливка с постером.
+    // Трейлер начинаем с 5-й секунды, там обычно уже нет заставки с возрастным рейтингом
+    if (tk) loadYT(() => {
+      const host = $('#winTrailer');
+      if (!host || det.dataset.id !== f.id) return; // пока грузился плеер, окно сменилось
+      const box = host.parentNode;
+      new YT.Player(host, {
+        videoId: tk,
+        playerVars: { autoplay: 1, mute: 1, controls: 0, loop: 1, playlist: tk, playsinline: 1, rel: 0, disablekb: 1, fs: 0, iv_load_policy: 3, start: f.trailer ? 5 : 0 },
+        events: {
+          onReady: e => { e.target.mute(); e.target.playVideo(); },
+          onStateChange: e => { if (e.data === YT.PlayerState.PLAYING) box.closest('.win-flood')?.classList.add('playing'); },
+        },
+      });
+    });
     $('#winDetail [data-remove]')?.addEventListener('click', async e => {
       await removeFilm(e.currentTarget.dataset.remove);
       closeModal('#winModal');
@@ -1158,6 +1182,142 @@ function initRoom(roomId) {
     if (f.addedBy && withBy) parts.push(`<span>Добавил(а) <button class="person" data-person="${esc(personOf(f))}" data-name="${esc(f.addedBy)}">${esc(f.addedBy)}</button></span>`);
     return parts.length ? `<div class="facts">${parts.join('')}</div>` : '';
   }
+
+  // ---- итоги месяца: истории на весь экран, как Wrapped (style.css .recap, данные — server.js recap) ----
+  // Каждая история — один факт: крупное число со счётом или постер, заголовок в две строки (факт и пояснение).
+  // Листаются сами (полоска сверху), нажатием справа и слева или стрелками; удержание ставит на паузу
+  const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+  const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  const MONTHS_IN = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
+  const DAYS = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+  const DAYS_IN = ['В воскресенье', 'В понедельник', 'Во вторник', 'В среду', 'В четверг', 'В пятницу', 'В субботу'];
+  const monthKey = t => new Date(t + 3 * 3600e3).toISOString().slice(0, 7); // по Москве, как на сервере
+  const prevMonthKey = () => { const d = new Date(Date.now() + 3 * 3600e3); d.setUTCDate(0); return d.toISOString().slice(0, 7); };
+  const fmtN = (v, d = 0) => v.toFixed(d).replace('.', ',');
+  const times = n => `${n} ${plural(n, 'раз', 'раза', 'раз')}`;
+  let rc = null; // { data, slides, i }
+
+  function rcSlides(d) {
+    const m = Number(d.month.slice(5)) - 1, S = [];
+    const name = pid => d.names?.[pid] || 'Без имени';
+    const who = pid => `<figure class="rc-who">${avaHtml(pid, name(pid), prof(pid), avatarFor(pid), 'rc-ava')}<figcaption>${nick(pid, name(pid))}</figcaption></figure>`;
+    const poster = c => `<span class="rc-poster" style="${posterStyle(c)}">${c.poster ? '' : initial(c.title)}</span>`;
+    const q = c => `«${esc(c.title)}»`;
+    // num — число со счётом (d знаков после запятой), big — крупная надпись без счёта, art — картинка справа
+    const card = (h1, h2, { num, dec = 0, unit = '', big = '', art = '' } = {}) => `<div class="rc-layout${art ? '' : ' solo'}"><div class="rc-text">`
+      + (num != null ? `<b class="rc-num" data-v="${num}" data-d="${dec}">${fmtN(num, dec)}</b>` : big ? `<b class="rc-big">${big}</b>` : '')
+      + (unit ? `<span class="rc-unit">${unit}</span>` : '')
+      + `<h2 class="rc-h"><span><i>${h1}</i></span>${h2 ? `<span class="m"><i>${h2}</i></span>` : ''}</h2></div>`
+      + (art ? `<div class="rc-art">${art}</div>` : '') + '</div>';
+    // фон истории: тон постера (подставится, когда посчитается), цвет ника человека или спокойный тёмный из палитры
+    const pal = ['#2B2163', '#5A1E3E', '#173F55', '#4F3415', '#1D4B33', '#3D1F5C'];
+    let pi = 0;
+    const calm = () => pal[pi++ % pal.length];
+    const tone = pid => { const c = authorColor(pid); return c ? `color-mix(in srgb, ${c} 40%, #0B0A10)` : `hsl(${hue(name(pid))} 42% 24%)`; };
+    const add = (html, bg, posterUrl = '') => S.push({ html, bg, poster: posterUrl });
+    const films = n => `${n} ${plural(n, 'фильм', 'фильма', 'фильмов')}`;
+
+    // открывающая: месяц крупно и переключатель месяцев (список месяцев — от новых к старым)
+    const at = d.months.indexOf(d.month), older = d.months[at + 1], newer = d.months[at - 1];
+    add(`<div class="rc-intro">
+      <div class="rc-month"><button class="rc-mbtn" type="button" data-rc-month="${esc(older || '')}" ${older ? '' : 'disabled'} aria-label="Месяц раньше">‹</button><span>${MONTHS[m]} ${d.month.slice(0, 4)}</span><button class="rc-mbtn" type="button" data-rc-month="${esc(newer || '')}" ${newer ? '' : 'disabled'} aria-label="Месяц позже">›</button></div>
+      <h1 class="rc-title"><span><i>Итоги</i></span><span><i>${MONTHS_GEN[m]}</i></span></h1>
+      <p class="rc-sub">${esc(state.name)}</p></div>`, '#1A1433');
+    if (!d.count && !d.spins) {
+      add(card(`В ${MONTHS_IN[m]} колесо отдыхало`, 'Фильмов в этом месяце не выбирали'), calm());
+      return S;
+    }
+    const hrs = Math.round(d.minutes / 60);
+    if (d.count) add(card(plural(d.count, 'фильм посмотрели', 'фильма посмотрели', 'фильмов посмотрели'), [hrs && `${hrs} ${plural(hrs, 'час', 'часа', 'часов')} кино`, d.spins && `${d.spins} ${plural(d.spins, 'прокрут', 'прокрута', 'прокрутов')} колеса`].filter(Boolean).join(', '), { num: d.count }), calm());
+    if (d.films.length >= 3) add(`<div class="rc-wall-wrap"><h2 class="rc-h"><span><i>Вот что мы смотрели</i></span><span class="m"><i>${films(d.count)} в ${MONTHS_IN[m]}</i></span></h2>
+      <div class="rc-wall">${d.films.slice(0, 24).map((f, i) => `<span class="rc-poster" style="${posterStyle(f)};--i:${i}">${f.poster ? '' : initial(f.title)}</span>`).join('')}</div></div>`, calm());
+    if (d.king) add(card(d.king.pids.length > 1 ? 'Короли колеса' : 'Король колеса', `${d.king.pids.length > 1 ? 'У каждого фильмы' : 'Фильмы'} выпадали ${times(d.king.n)} из ${d.count}`,
+      { art: `<div class="rc-pair">${d.king.pids.slice(0, 3).map(who).join('')}</div>` }), tone(d.king.pids[0]));
+    if (d.best) add(card('Фильм месяца', `${q(d.best)}, оценка от ${d.best.n} ${plural(d.best.n, 'человека', 'человек', 'человек')}`, { num: d.best.avg, dec: 1, art: poster(d.best) }), calm(), d.best.poster);
+    if (d.split) add(card('Самый спорный', `${esc(name(d.split.lo.pid))} поставил(а) ${d.split.lo.score}, а ${esc(name(d.split.hi.pid))} ${d.split.hi.score}`,
+      { big: `${d.split.lo.score} и ${d.split.hi.score}`, art: poster(d.split) }), calm(), d.split.poster);
+    if (d.worst) add(card('Провал месяца', `${q(d.worst)}, оценка от ${d.worst.n} ${plural(d.worst.n, 'человека', 'человек', 'человек')}`, { num: d.worst.avg, dec: 1, art: poster(d.worst) }), calm(), d.worst.poster);
+    if (d.taste) add(card('Лучший вкус', 'У фильмов этого человека самые высокие оценки', { num: d.taste.avg, dec: 1, art: who(d.taste.pid) }), tone(d.taste.pid));
+    if (d.critic) add(card('Строгий критик и добряк', 'Средняя оценка, которую они ставили',
+      { art: `<div class="rc-duo">${[d.critic, d.kind].map(x => `<div>${who(x.pid)}<b class="rc-score">${fmtN(x.avg, 1)}</b></div>`).join('')}</div>` }), calm());
+    if (d.rater) add(card('Главный оценщик', `Оценил(а) ${films(d.rater.n)} из ${d.count}`, { num: d.rater.n, art: who(d.rater.pid) }), tone(d.rater.pid));
+    if (d.twins) add(card('Кино-близнецы', `Оценки расходятся в среднем на ${fmtN(d.twins.diff, 1)} балла`, { num: d.twins.diff, dec: 1, art: `<div class="rc-pair">${who(d.twins.a)}${who(d.twins.b)}</div>` }), calm());
+    if (d.rivals) add(card('Антиподы', `Оценки расходятся в среднем на ${fmtN(d.rivals.diff, 1)} балла`, { num: d.rivals.diff, dec: 1, art: `<div class="rc-pair">${who(d.rivals.a)}${who(d.rivals.b)}</div>` }), calm());
+    if (d.genre) add(card('Жанр месяца', `${films(d.genre.n)} из ${d.count}`, { big: esc(d.genre.name[0].toUpperCase() + d.genre.name.slice(1)) }), calm());
+    if (d.era) {
+      const gap = Number(d.era.new.year) - Number(d.era.old.year);
+      add(card('Машина времени', `Между самым старым и самым новым фильмом месяца`, { num: gap, unit: plural(gap, 'год', 'года', 'лет'),
+        art: `<div class="rc-years">${[d.era.old, d.era.new].map(c => `<figure>${poster(c)}<b>${esc(c.year)}</b></figure>`).join('')}</div>` }), calm(), d.era.old.poster);
+    }
+    if (d.longest) add(card('Марафон', `${q(d.longest)}, самый длинный фильм месяца`, { big: fmtRuntime(d.longest.runtime), art: poster(d.longest) }), calm(), d.longest.poster);
+    if (d.waited) add(card('Долгожитель', `Столько ${q(d.waited)} ждал на колесе, прежде чем выпасть`, { num: d.waited.days, unit: plural(d.waited.days, 'день', 'дня', 'дней'), art: poster(d.waited) }), calm(), d.waited.poster);
+    if (d.voted) add(card('Голос народа', `За ${q(d.voted)} было больше всех голосов, когда он выпал`, { num: d.voted.n, unit: plural(d.voted.n, 'голос', 'голоса', 'голосов'), art: poster(d.voted) }), calm(), d.voted.poster);
+    if (d.runnerUp) add(card('Вечно второй', `${q(d.runnerUp)} дошёл до финала и проиграл`, { num: d.runnerUp.n, unit: plural(d.runnerUp.n, 'раз', 'раза', 'раз'), art: poster(d.runnerUp) }), calm(), d.runnerUp.poster);
+    if (d.firstOut) add(card('Первый на вылет', `${q(d.firstOut)} вылетал из колеса первым`, { num: d.firstOut.n, unit: plural(d.firstOut.n, 'раз', 'раза', 'раз'), art: poster(d.firstOut) }), calm(), d.firstOut.poster);
+    if (d.late) add(card('Ночной сеанс', `Так поздно выбрали ${q(d.late)}`, { big: d.late.time, art: poster(d.late) }), '#14183A', d.late.poster);
+    if (d.weekday) add(card('Любимый день', `${DAYS_IN[d.weekday.day]} выбирали ${times(d.weekday.n)}`, { big: DAYS[d.weekday.day] }), calm());
+    if (d.spinner) add(card('Рука на кнопке', 'Чаще всех жал(а) «Крутить»', { num: d.spinner.n, unit: plural(d.spinner.n, 'раз', 'раза', 'раз'), art: who(d.spinner.pid) }), tone(d.spinner.pid));
+    if (d.reacts) {
+      add(card('Болельщики', `Больше всех болел(а) ${esc(name(d.reacts.fan.pid))}, ${d.reacts.fan.n} ${plural(d.reacts.fan.n, 'реакция', 'реакции', 'реакций')}`,
+        { num: d.reacts.total, unit: plural(d.reacts.total, 'реакция', 'реакции', 'реакций'), art: `<span class="rc-emoji">${RX[d.reacts.kind] || $('[data-rx="crow"] svg')?.outerHTML || ''}</span>` }), calm());
+      if (d.reacts.crows >= 3) add(card('КАР!', 'Столько раз за месяц прилетала ворона', { num: d.reacts.crows, art: `<span class="rc-emoji">${$('[data-rx="crow"] svg')?.outerHTML || ''}</span>` }), '#101014');
+    }
+    if (d.chat) add(card('Болтун месяца', `${d.chat.n} из ${d.chat.total} сообщений в чате`, { num: d.chat.n, unit: plural(d.chat.n, 'сообщение', 'сообщения', 'сообщений'), art: who(d.chat.pid) }), tone(d.chat.pid));
+    if (d.music) add(card('Саундтрек месяца', `«${esc(d.music.track.title)}» играл ${times(d.music.track.n)}`,
+      { num: d.music.plays, unit: plural(d.music.plays, 'трек сыграл', 'трека сыграло', 'треков сыграло'),
+        art: `<figure class="rc-track"><img src="${esc(pimg(`https://i.ytimg.com/vi/${d.music.track.vid}/hqdefault.jpg`))}" alt="">${d.music.dj ? `<figcaption>Чаще всех музыку ставил(а) ${esc(d.music.dj.name)}</figcaption>` : ''}</figure>` }), calm());
+    if (d.youtube >= 2) add(card('Ролики вместо кино', 'Столько раз колесо выбрало видео с YouTube', { num: d.youtube }), '#4A1414');
+    add(card(`До встречи в ${MONTHS_IN[(m + 1) % 12]}`, 'Колесо уже ждёт новые фильмы'), '#1A1433');
+    return S;
+  }
+  // число набегает до значения за 1,3 с с замедлением к концу
+  function countUp(el) {
+    const v = Number(el.dataset.v), dec = Number(el.dataset.d), t0 = performance.now();
+    if (reduceMotion) return;
+    (function step(now) {
+      const k = Math.min(1, (now - t0) / 1300);
+      el.textContent = fmtN(v * (1 - (1 - k) ** 3), dec);
+      if (k < 1 && el.isConnected) requestAnimationFrame(step);
+    })(t0);
+  }
+  function rcShow(i) {
+    const s = rc?.slides[i];
+    if (!s) return;
+    rc.i = i;
+    const box = $('#recapModal');
+    $('#rcStage').innerHTML = `<section class="rc-slide">${s.html}</section>`;
+    box.style.setProperty('--rc-bg', s.bg);
+    if (s.poster) posterHue(pimg(s.poster)).then(h => { if (rc?.i === i && h != null) box.style.setProperty('--rc-bg', `hsl(${h} 55% 26%)`); });
+    $$('#rcBars i').forEach((b, k) => { b.className = k < i ? 'done' : k === i ? 'on' : ''; });
+    const bar = $('#rcBars i.on b');
+    bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = ''; // та же история заново (сменили месяц) — полоска с нуля
+    $$('#rcStage .rc-num').forEach(countUp);
+  }
+  async function openRecap(month) {
+    let data;
+    try { data = await api(`/rooms/${roomId}/recap${month ? `?m=${encodeURIComponent(month)}` : ''}`); }
+    catch (e) { toast(e.message, true); return; }
+    rc = { data, slides: rcSlides(data), i: 0 };
+    $('#rcBars').innerHTML = rc.slides.map(() => '<i><b></b></i>').join('');
+    ls.set('recapSeen', prevMonthKey()); // плашка «Итоги …» в шапке больше не нужна
+    $('#recapChip').hidden = true;
+    if ($('#recapModal').hidden) openModal('#recapModal');
+    rcShow(0);
+  }
+  $('#recapBtn').addEventListener('click', () => openRecap());
+  $('#recapChip').addEventListener('click', () => openRecap());
+  $('#rcNext').addEventListener('click', () => (rc && rc.i < rc.slides.length - 1 ? rcShow(rc.i + 1) : closeModal('#recapModal')));
+  $('#rcPrev').addEventListener('click', () => rc && rcShow(Math.max(0, rc.i - 1)));
+  $('#rcBars').addEventListener('animationend', e => { if (rc && e.target.closest('i.on') && rc.i < rc.slides.length - 1) rcShow(rc.i + 1); });
+  $('#rcStage').addEventListener('click', e => { const b = e.target.closest('[data-rc-month]'); if (b && b.dataset.rcMonth) openRecap(b.dataset.rcMonth); });
+  // удержание — пауза, как в историях
+  $('#recapModal').addEventListener('pointerdown', () => $('#recapModal').classList.add('hold'));
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => $('#recapModal').addEventListener(t, () => $('#recapModal').classList.remove('hold')));
+  document.addEventListener('keydown', e => {
+    if ($('#recapModal').hidden || !rc) return;
+    if (e.key === 'ArrowRight') $('#rcNext').click();
+    else if (e.key === 'ArrowLeft') $('#rcPrev').click();
+  });
 
   // ---- Kodik: смотрим выпавший фильм прямо на сайте ----
   // Плеер встраиваем страницей find-player: Kodik сам подписывает домен, ключ не нужен.
@@ -1255,6 +1415,11 @@ function initRoom(roomId) {
     const spinning = Boolean(spinningSid || state.spin);
     // колесо стоит и серии нет — управление на месте (и при первом заходе въезжает шторками)
     if (!spinning && !state.series) setCine(false);
+    // первая неделя месяца, в прошлом что-то выпадало, а итоги ещё не открывали: в шапке сцены плашка «Итоги октября»
+    const pm = prevMonthKey();
+    const chip = new Date(Date.now() + 3 * 3600e3).getUTCDate() <= 7 && ls.get('recapSeen', '') !== pm && state.history.some(h => monthKey(h.at) === pm);
+    $('#recapChip').hidden = !chip;
+    if (chip) $('#recapChip').textContent = `Итоги ${MONTHS_GEN[Number(pm.slice(5)) - 1]}`;
     const active = activeFilms();
     const W = chanceWeights(active);
     const total = active.reduce((s, f) => s + W.get(f.id), 0);
