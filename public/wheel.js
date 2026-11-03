@@ -122,7 +122,15 @@ class Wheel {
     this.anim = { from, to, dur, k, wind: Math.min(wind, dur / 4), back, start: performance.now() - elapsedMs, done };
   }
 
-  setAngle(a) { if (!this.anim) this.rot = a; }
+  setAngle(a) {
+    if (this.anim) return;
+    this.rot = a;
+    this.restLabels();
+  }
+  // подписи на левой половине переворачиваются, чтобы читаться: считаем по углу, на котором колесо стоит
+  restLabels() {
+    if (Math.abs(((this.rot - (this.labelRot || 0)) % 1 + 1) % 1) > 1e-6) { this.labelRot = this.rot; this.dirty = true; }
+  }
 
   // остановка: сектор под стрелкой на миг приподнимается над колесом (app.js landFx)
   land() { this.landAt = performance.now(); }
@@ -154,7 +162,10 @@ class Wheel {
       if (Math.abs(d) > 0.001) { it.w += d * Math.min(1, dt * (it.dying ? 2.6 : 4.5)); tweening = true; }
       else it.w = it.target;
     }
-    if (tweening) this.dirty = true;
+    // перетекание весов: кэш с постерами и подписями пересобирается не чаще 30 раз в секунду, на глаз это так же плавно
+    if (tweening && now - (this.builtAt || 0) > 30) this.dirty = true;
+    if (!tweening && this.tweened) this.dirty = true; // последний кадр перетекания — точные размеры
+    this.tweened = tweening;
     const before = this.items.length;
     this.items = this.items.filter(i => i.target > 0 || i.w > 0.002);
     if (this.items.length !== before) this.dirty = true;
@@ -168,7 +179,7 @@ class Wheel {
       } else {
         const t = Math.min(1, Math.max(0, (el - a.wind) / (a.dur - a.wind)));
         this.rot = a.from - a.back + (a.to - a.from + a.back) * Wheel.ease(t, a.k);
-        if (t >= 1) { this.anim = null; this.mood = null; this.rot %= 1; a.done?.(); }
+        if (t >= 1) { this.anim = null; this.mood = null; this.rot %= 1; this.restLabels(); a.done?.(); }
       }
     } else if (this.idleSpeed) this.rot += this.idleSpeed * dt;
     this.speed = this.anim && dt > 0 ? Math.abs(this.rot - prevRot) / dt : 0;
@@ -182,7 +193,7 @@ class Wheel {
       this.onCurrent(this.items[idx] || null);
     }
 
-    if (this.dirty) { this.buildCache(); this.dirty = false; this.stale = true; }
+    if (this.dirty) { this.buildCache(); this.builtAt = now; this.dirty = false; this.stale = true; }
     // в покое кадр не меняется: перерисовываем, только когда колесо крутится, сектор приподнят после остановки
     // или что-то поменялось (угол, сектор под стрелкой, цвет, размер, секторы)
     const sig = `${this.rot}|${idx}|${this.tint}|${this.cv.width}`;
@@ -206,6 +217,8 @@ class Wheel {
     const total = this.total;
     if (!total) return;
     const segs = this.colors.seg;
+    const lr = (this.labelRot || 0) * Math.PI * 2;
+    const dpr = S / (this.cv?.clientWidth || S); // раз на сборку, а не на каждую подпись
     let acc = 0;
     this.items.forEach((it, i) => {
       const a0 = -Math.PI / 2 + (acc / total) * Math.PI * 2;
@@ -263,12 +276,11 @@ class Wheel {
       if (arcH < S / 90) return;
       const fs = Math.min(R * 0.072, arcH * 0.62);
       // узкий сектор: мелкую подпись не прочитать, остаётся постер (название всё равно видно над колесом)
-      const dpr = S / (this.cv?.clientWidth || S);
       // порог и в CSS-пикселях, и в реальных: при отдалении страницы буквы физически мельче
       if (fs / dpr < 10.5 || fs < 9) return;
       g.save();
       g.translate(c, c); g.rotate(mid);
-      const flip = Math.cos(mid) < -0.01;
+      const flip = Math.cos(mid + lr) < -0.01;
       if (flip) g.rotate(Math.PI);
       g.font = `700 ${fs}px Manrope, sans-serif`;
       g.fillStyle = '#fff';

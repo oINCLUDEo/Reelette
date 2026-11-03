@@ -83,6 +83,7 @@ function openModal(m) {
   const el = modalEl(m);
   clearTimeout(el._t);
   if (!modalStack.includes(el)) { el._ret = document.activeElement; modalStack.push(el); }
+  if (!el.hasAttribute('role')) { el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); }
   el.hidden = false;
   syncInert();
   requestAnimationFrame(() => { if (!el.contains(document.activeElement)) { const c = el.querySelector('.modal-card') || el; c.tabIndex = -1; c.focus({ preventScroll: true }); } });
@@ -140,7 +141,10 @@ document.addEventListener('click', e => {
   if (m && (e.target === m || e.target.closest('[data-close]')) && m.id !== 'nameModal' && !m.hasAttribute('data-fixed')) closeModal(m);
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') $$('.modal.open').forEach(m => { if (m.id !== 'nameModal' && !m.hasAttribute('data-fixed')) closeModal(m); });
+  if (e.key !== 'Escape') return;
+  // только верхнее окно: из карточки фильма открыли трейлер — Escape закрывает трейлер, карточка остаётся
+  const top = modalStack[modalStack.length - 1];
+  if (top && top.id !== 'nameModal' && !top.hasAttribute('data-fixed')) closeModal(top);
 });
 
 // Индикатор в переключателях подстраивается под ширину выбранной кнопки.
@@ -296,6 +300,8 @@ function initRoom(roomId) {
 
   let state = null;
   let spinningSid = null;
+  let doneSid = null; // последний доведённый до конца прокрут
+  const TICK_FRAMES = [{ transform: 'translateX(-50%)' }, { transform: 'translateX(-50%) rotate(-14deg)', offset: 0.4 }, { transform: 'translateX(-50%)' }];
   let curSpin = null; // прокрут, который сейчас крутится у нас (сообщение о нём бывает раньше состояния)
   let serverOffset = 0;
   let es = null;
@@ -309,8 +315,9 @@ function initRoom(roomId) {
 
   // ---- звук щелчка ----
   function tick() {
+    // перезапуск анимации через WAAPI: снять и вернуть класс значило бы читать раскладку (offsetWidth) на каждом секторе
     const p = $('#pointer');
-    p.classList.remove('tick', 'flare'); void p.offsetWidth; p.classList.add('tick');
+    if (!reduceMotion) p.animate(TICK_FRAMES, { duration: 140, easing: 'ease-out', });
     if (settings.sound) Sfx.tick();
   }
 
@@ -651,8 +658,9 @@ function initRoom(roomId) {
       c.classList.toggle('on', i === focus);
     });
     const at = (t, fn) => pdTimers.push(setTimeout(fn, Math.max(0, t)));
+    let focusId = null;
     const tint = f => (f.poster ? posterHue(pimg(f.poster)) : Promise.resolve(hue(f.title)))
-      .then(h => el.style.setProperty('--pd-c', `hsl(${h ?? hue(f.title)} 70% 46%)`)); // серый постер — тон по названию
+      .then(h => { if (focusId === f.id && !el.hidden) el.style.setProperty('--pd-c', `hsl(${h ?? hue(f.title)} 70% 46%)`); }); // серый постер — тон по названию
     place(-1);
     el.classList.remove('on', 'walk');
     // парад появляется вместе с вылетом постеров: тёмная сцена проявляется под уходящей заставкой, постеры летят из колеса
@@ -669,6 +677,7 @@ function initRoom(roomId) {
     five.forEach((f, i) => at(walk + i * step, () => {
       el.classList.add('walk');
       place(i);
+      focusId = f.id;
       tint(f);
       const pid = personOf(f), name = f.addedBy || 'Без имени';
       $('#pdPlate').innerHTML = `<b>${esc(f.title)}</b><span>${nick(pid, name)}</span>`;
@@ -928,7 +937,9 @@ function initRoom(roomId) {
       profilesMap = state.profiles || profilesMap;
       document.title = `${state.name} — Reelette`;
       remember();
-      if (state.spin && state.spin.sid !== spinningSid) runSpin(state.spin);
+      if (state.spin && state.spin.sid !== spinningSid && state.spin.sid !== doneSid) runSpin(state.spin);
+      // прокрут кончился или отменён, а клиент это пропустил (переподключение, перезапуск сервера): сброс, как при отмене, без тоста
+      else if (!state.spin && spinningSid) dropSpin();
       if (!state.spin && !spinningSid) { syncWheel(); wheel.setAngle(state.angle); }
       // серию остановили между прокрутами: музыка прокрута больше не нужна
       if (!state.spin && !state.series && !spinningSid) musicOff();
@@ -941,17 +952,8 @@ function initRoom(roomId) {
     } else if (msg.type === 'result') {
       showResult(msg);
     } else if (msg.type === 'cancel') {
-      stopCountdown();
-      endDrama();
-      musicOff();
-      wheel.anim = null;
-      wheel.mood = null;
-      spinningSid = null;
-      curSpin = null;
-      wheel.setAngle(state.angle);
-      syncWheel();
+      dropSpin();
       toast(msg.by ? `${msg.by} отменил(а) прокрут` : 'Прокрут отменён');
-      render();
     } else if (msg.type === 'music-skip') {
       toast(`«${msg.title}» нельзя проиграть на сайте, включаю следующий`, true);
     } else if (msg.type === 'deleted') {
@@ -959,6 +961,23 @@ function initRoom(roomId) {
       ls.set('rooms', ls.get('rooms', []).filter(r => r.id !== roomId));
       messageModal('<h2>Комнату удалили. <span class="m">Её больше нет на сервере.</span></h2><a class="btn btn-primary" href="/">На главную</a>');
     }
+  }
+
+  // прокрут прерван: заставки, отсчёт, музыка и отложенное окно победителя убираются, колесо встаёт на серверный угол
+  function dropSpin() {
+    stopCountdown();
+    endDrama();
+    musicOff();
+    clearTimeout(finalTimer); clearTimeout(winSfxTimer);
+    wheel.anim = null;
+    wheel.mood = null;
+    spinningSid = null;
+    curSpin = null;
+    wheel.setAngle(state.angle);
+    syncWheel();
+    setCine(false);
+    $('#now').classList.remove('fast');
+    render();
   }
 
   function remember() {
@@ -1086,6 +1105,7 @@ function initRoom(roomId) {
   }
 
   function runSpin(spin) {
+    clearTimeout(finalTimer); clearTimeout(winSfxTimer); // окно и фанфара прошлого финала не всплывают поверх нового прокрута
     spinningSid = spin.sid;
     curSpin = spin;
     const byId = new Map(state.films.map(f => [f.id, f]));
@@ -1103,7 +1123,7 @@ function initRoom(roomId) {
       const title = -elapsed > 5500;
       if (title) showChapter(spin.chapter, CHAPTER_SUB[spin.chapter], 'top', true);
       showParade(spin, -elapsed, title ? 1500 : 150);
-    } else if (spin.chapter && -elapsed > 1500) showChapter(spin.chapter, CHAPTER_SUB[spin.chapter] || '', spin.left > 5 ? 'mid' : 'top');
+    } else if (spin.chapter && -elapsed > 3450) showChapter(spin.chapter, CHAPTER_SUB[spin.chapter] || '', spin.left > 5 ? 'mid' : 'top');
     if (elapsed < 0) {
       if (!spin.chapter) musicOff(); // перед стартом тишина и отсчёт; на главе музыка серии не прерывается
       if (spin.stage === 'final') showFinale(spin);
@@ -1125,6 +1145,7 @@ function initRoom(roomId) {
     wheel.spin(spin, state.angle, elapsed, () => {
       if (live) landFx();
       $('#now').classList.remove('fast'); // короткий прокрут мог встать, не дойдя до медленного хода
+      doneSid = spin.sid; // сервер закрывает прокрут чуть позже: его state с этим же spin не перезапускает колесо
       spinningSid = null;
       curSpin = null;
       clearInterval(heartTimer); heartTimer = null;
@@ -1183,11 +1204,11 @@ function initRoom(roomId) {
   }
 
   // ---- результат ----
-  let finalTimer = null;
+  let finalTimer = null, winSfxTimer = null;
   function showResult(msg) {
     const f = msg.film;
     if (!f) return;
-    if (msg.mode !== 'elimination' && settings.music) setTimeout(() => Sfx.win(), msg.mode === 'final' ? 1700 : 0);
+    if (msg.mode !== 'elimination' && settings.music) { clearTimeout(winSfxTimer); winSfxTimer = setTimeout(() => Sfx.win(), msg.mode === 'final' ? 1700 : 0); }
     if (msg.mode === 'elimination') {
       if (settings.sound) Sfx.out();
       flashOut(f);
@@ -1590,7 +1611,7 @@ function initRoom(roomId) {
       </div>`;
     };
     queueMicrotask(() => { seenFilms = new Set(state.films.map(f => f.id)); });
-    $('#filmList').innerHTML = ordered.map(g => {
+    setHTML($('#filmList'), ordered.map(g => {
       const gShare = total ? g.films.reduce((a, f) => a + (W.get(f.id) || 0), 0) / total : 0;
       const ava = avatarOf(g.pid);
       const closed = collapsed.has(g.pid), off = isOff(g.pid);
@@ -1610,16 +1631,17 @@ function initRoom(roomId) {
         </div>
         <div class="g-body"><div>${g.films.map(filmRow).join('')}</div></div>
       </div>`;
-    }).join('');
+    }).join(''));
+    // разметка не изменилась (тик отсчёта, музыка) — список не пересобирается: setHTML
 
     $('#histCount').textContent = state.history.length ? String(state.history.length) : '';
-    $('#historyList').innerHTML = state.history.length
+    setHTML($('#historyList'), state.history.length
       ? state.history.slice(0, 50).map((h, i) => {
         const a = avgRating(h);
         const canRate = personOf(h.film) !== myPid() && !h.ratings?.[myPid()];
         return `<div class="hist" data-h="${i}"><i style="${posterStyle(h.film)}"></i><div><b>${esc(h.film.title)}</b><span>${timeAgo(h.at)}</span></div>${canRate ? '<em class="rate-me">Оценить</em>' : ''}${a !== null ? `<em class="score">${a.toFixed(1).replace('.', ',')}</em>` : ''}</div>`;
       }).join('')
-      : '<p class="note">Пока ничего. Победители будут появляться здесь.</p>';
+      : '<p class="note">Пока ничего. Победители будут появляться здесь.</p>');
 
     const btn = $('#spinBtn');
     const counting = countdown !== null;
@@ -3400,7 +3422,7 @@ function initRoom(roomId) {
   }
   $('#spinBtn').addEventListener('click', spin);
   document.addEventListener('keydown', e => {
-    if (e.code !== 'Space' || e.target.closest('input, textarea, button') || anyModalOpen()) return;
+    if (e.code !== 'Space' || e.repeat || e.target.closest('input, textarea, select, button, a, [role="button"], [tabindex]') || anyModalOpen()) return;
     e.preventDefault(); spin();
   });
 
