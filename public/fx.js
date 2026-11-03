@@ -21,6 +21,11 @@
 
   function frame(now) {
     requestAnimationFrame(frame);
+    // музыка прокрута играет только на прокруте (киношный режим): в остальное время спектр не читаем
+    if (!document.body.classList.contains('cine')) {
+      if (level.bass > 0.001 || level.mid > 0.001) { level.bass *= 0.9; level.mid *= 0.9; window.setBackdropFx?.({ level: level.bass, mid: level.mid, beat: 0 }); }
+      return;
+    }
     const an = window.Sfx?.analyser?.();
     const { bass, mid } = an ? bands(an) : { bass: 0, mid: 0 };
     // сильная доля: бас заметно выше своего среднего за последние ~0,7 с

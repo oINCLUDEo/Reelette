@@ -414,7 +414,7 @@ function initRoom(roomId) {
     }, Math.max(60, 500 - (performance.now() - ambAt)));
   }
   // ---- цвет фильма под стрелкой красит комнату (как у CIRO): свет вокруг колеса, подсветка сектора и лампы,
-  // а на медленном ходу и акцент интерфейса (style.css #room.fc). Колесо, комната и постер — одного тона ----
+  // а на медленном ходу и акцент интерфейса (style.css body.fc). Колесо, комната и постер — одного тона ----
   let paintId, paintTimer = null, paintAt = 0;
   function paintFilm(it, ui) {
     const id = it?.id ?? null;
@@ -432,7 +432,7 @@ function initRoom(roomId) {
     wheel.tint = h == null ? null : `hsl(${h} 85% 62%)`;
     if (h != null) $('#roomBg .tug').style.setProperty('--tug', `hsl(${h} 85% 52% / .6)`);
     if (!ui) return;
-    const room = $('#room');
+    const room = document.body; // на body: окна вне комнаты тоже в цвете фильма
     if (h == null) { room.classList.remove('fc'); return; } // серый постер: акцент темы
     room.style.setProperty('--fa', `hsl(${h} 80% 58%)`);
     room.style.setProperty('--fa-hi', `hsl(${h} 90% 76%)`);
@@ -1257,7 +1257,7 @@ function initRoom(roomId) {
       ${win ? `<div class="win-flood"><i></i>${bg}${tk ? '<div class="win-trailer"><div id="winTrailer"></div></div>' : ''}</div>` : bg}
       ${win && ap.banner && ap.banner !== 'none' ? `<div class="win-banner bn-box bn-${esc(ap.banner)}"></div>` : ''}
       <div class="win-inner">
-        ${f.poster ? `<img src="${esc(pimg(f.poster))}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"></div>`}
+        ${f.poster ? `<img src="${esc(pimg(f.poster))}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"><span>${esc(f.title)}</span></div>`}
         <div>
           <div class="win-label">${label}</div>
           <div class="win-title">${esc(f.title)}</div>
@@ -1511,7 +1511,10 @@ function initRoom(roomId) {
   // Смена режима (колесо, караоке, игра) — с анимированным переходом, если браузер умеет View Transitions.
   let lastMode = null;
   let vtBusy = false;
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // меняется на лету: человек включил «уменьшить движение» в системе, пока комната открыта
+  const rmQuery = matchMedia('(prefers-reduced-motion: reduce)');
+  let reduceMotion = rmQuery.matches;
+  rmQuery.addEventListener?.('change', e => { reduceMotion = e.matches; });
   function render() {
     if (!state) return;
     const mode = state.quiz ? 'quiz' : state.karaoke ? 'karaoke' : 'wheel';
@@ -2226,7 +2229,7 @@ function initRoom(roomId) {
   const RX = { clap: '👏', fire: '🔥', laugh: '😂', love: '😍', wow: '😮', skull: '💀', party: '🎉' };
   function crowFly(pid, name) {
     const layer = $('#reactLayer');
-    if (!layer) return;
+    if (!layer || reduceMotion) return; // пролёт через весь экран — только украшение
     const W = layer.clientWidth, H = layer.clientHeight;
     const ltr = Math.random() < 0.5;
     const y0 = H * (0.12 + Math.random() * 0.3);
@@ -3024,7 +3027,7 @@ function initRoom(roomId) {
     const votes = f.votes || [];
     const votersLine = votes.length ? `<div class="voters-line">Хотят посмотреть: ${votes.map(v => `<button class="person" data-person="${esc(v.id)}" data-name="${esc(v.name)}">${esc(v.name)}</button>`).join(', ')}${!fromHistory ? ` <span class="m">около +${votePoints(f)}% колеса</span>` : ''}</div>` : '';
     $('#filmDetail').innerHTML = `<div class="detail">
-      ${f.poster ? `<img src="${esc(pimg(f.poster))}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"></div>`}
+      ${f.poster ? `<img src="${esc(pimg(f.poster))}" alt="">` : `<div class="noposter" style="${posterStyle(f)}"><span>${esc(f.title)}</span></div>`}
       <div>
         <h2>${esc(f.title)}</h2>
         ${f.original ? `<div class="orig">${esc(f.original)}</div>` : ''}

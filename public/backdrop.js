@@ -167,6 +167,12 @@
     requestAnimationFrame(loop);
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    for (const s of scenes) if (s.vis) draw(s, reduce ? 10 : now / 1000, reduce ? 0 : dt);
+    for (const s of scenes) {
+      if (!s.vis) continue;
+      // без движения кадр статичен: перерисовываем пару раз в секунду, только чтобы догнать смену цвета
+      if (reduce && now - (s.drawnAt || 0) < 400) continue;
+      s.drawnAt = now;
+      draw(s, reduce ? 10 : now / 1000, reduce ? 0 : dt);
+    }
   })(last);
 })();
