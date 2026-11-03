@@ -194,12 +194,12 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px va
 
 /* =====================================================================
    Комната «Сеанс». Сетка 12 колонок: поля 24, интервалы 24, модуль 8.
-   Фон — размытый постер фильма под стрелкой. Поверх стеклянная панель фильмов (колонки 1–3)
+   Фон — размытый постер фильма под стрелкой. Поверх плоская панель фильмов (колонки 1–3)
    и сцена (4–12): «под стрелкой» по линии колонки 4, колесо в колонках 7–12, статус и реакции на его оси.
    Ряды: 56 управление · гибкий (колесо) · 44 статус · 52 реакции, между рядами 16.
-   Скругления концентричные: панель 28 → внутри с отступом 8 элементы 20 → капсулы кнопок 18–22.
+   Управление плоское и с прямыми углами, по мотивам Notturno и ALCHE — правила в блоке «HUD комнаты» ниже.
    ===================================================================== */
-#room { --m: 24px; --g: 24px; --fill: rgba(255,255,255,.08); --glass: color-mix(in srgb, var(--sheetB) 42%, transparent); --glass-bd: rgba(255,255,255,.14);
+#room { --m: 24px; --g: 24px; --fill: rgba(255,255,255,.08); --glass: rgba(9, 9, 13, .86); --glass-bd: rgba(255,255,255,.12);
   /* вторичный текст над постером и стеклом: прозрачный белый, как подписи у Apple, а не серый из темы — иначе тонет в цветном фоне */
   --tx2: color-mix(in srgb, var(--tx) 78%, transparent); --tx3: color-mix(in srgb, var(--tx) 55%, transparent);
   transition: --fa .7s var(--ease), --fa-hi .7s var(--ease), --fa-glow .7s var(--ease); }
@@ -230,12 +230,11 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 body[data-stage="semi"] .room-bg .tug { opacity: .5; }
 body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .layout { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: 56px minmax(0, 1fr) 44px 52px; column-gap: var(--g); row-gap: 16px; height: 100dvh; max-width: 2200px; margin-inline: auto; padding: 16px var(--m) var(--m); }
-/* стекло — у панели фильмов и у управления сцены: только над цветным фоном */
-.films-panel, #room .glass { background: var(--glass); border: 1px solid var(--glass-bd); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.1); }
-#room .ghost.glass:hover { background: color-mix(in srgb, var(--sheetB) 30%, rgba(255,255,255,.14)); }
+/* панель фильмов и управление сцены — ровная тёмная заливка с волосяной рамкой, без размытия и тени (класс .glass остался от стекла) */
+.films-panel, #room .glass { background: var(--glass); border: 1px solid var(--glass-bd); }
 
 /* панель фильмов: сверху комната, в середине список, внизу музыка */
-.films-panel { grid-column: 1 / 4; grid-row: 1 / -1; display: flex; flex-direction: column; gap: 8px; min-height: 0; padding: 8px; border-radius: 28px; transition: opacity .8s var(--ease), filter .8s var(--ease); }
+.films-panel { grid-column: 1 / 4; grid-row: 1 / -1; display: flex; flex-direction: column; gap: 8px; min-height: 0; padding: 8px; border-radius: 28px; transition: opacity .8s var(--ease), filter .8s var(--ease), translate .8s var(--ease); }
 .side-head { flex: none; display: flex; align-items: center; gap: 2px; height: 48px; padding-left: 10px; }
 .side-head .brand svg, .m-top .brand svg { width: 26px; height: 26px; }
 /* название комнаты открывает настройки: заголовок со стрелкой, без рамки */
@@ -289,7 +288,8 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .ava img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .people .ava { cursor: pointer; transition: transform .25s var(--spring); }
 .people .ava:hover { transform: translateY(-2px); z-index: 2; }
-.ava[data-tip]:hover::after { content: attr(data-tip); position: absolute; top: 40px; left: 50%; transform: translateX(-50%); background: var(--s2); border: 1px solid var(--bd); padding: 5px 10px; border-radius: 9px; font: 600 12.5px var(--f-ui); white-space: nowrap; z-index: 5; }
+/* подпись — белая плашка, как текстовые блоки у Notturno */
+.ava[data-tip]:hover::after { content: attr(data-tip); position: absolute; top: 40px; left: 50%; transform: translateX(-50%); background: #fff; color: #0A0A0F; padding: 5px 10px; font: 600 12.5px var(--f-ui); white-space: nowrap; z-index: 5; }
 #room .people .ava-more { background: var(--s3); font-size: 11px; cursor: pointer; }
 .people-wrap { display: none; }
 .people-count { gap: 6px; padding: 0 10px; }
@@ -716,10 +716,9 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .stage-actions .ghost { height: 40px; padding: 0 20px; border-radius: 20px; font-size: 14px; font-weight: 600; }
 #stopBtn:hover { border-color: color-mix(in srgb, var(--bad) 55%, transparent); }
 
-/* реакции и «Написать всем»: стеклянная капсула на оси колеса */
+/* реакции и «Написать всем»: плоская полоса на оси колеса */
 .react-bar { position: relative; z-index: 9; display: flex; align-items: center; gap: 2px; height: 52px; padding: 4px; border-radius: 26px;
-  background: var(--glass); border: 1px solid var(--glass-bd); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.1);
-  transition: opacity .8s var(--ease); }
+  background: var(--glass); border: 1px solid var(--glass-bd); }
 .react-bar button { position: relative; width: 44px; height: 44px; border-radius: 22px; font-size: 22px; display: grid; place-items: center; transition: background .2s, transform .3s var(--spring); }
 .react-bar button:hover { background: var(--fill); transform: translateY(-2px) scale(1.08); }
 .react-bar button.pop { animation: rxPop .35s var(--spring); }
@@ -734,6 +733,50 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .chat-form { display: flex; margin-left: 6px; padding-left: 8px; border-left: 1px solid rgba(255,255,255,.14); }
 .chat-form input { width: 220px; height: 44px; padding: 0 18px; font-size: 14px; border-radius: 22px; background: var(--fill); border-color: transparent; transition: width .3s var(--ease), border-color .2s, box-shadow .2s; }
 .chat-form input:focus { width: 280px; }
+
+/* ---------- HUD комнаты: плоский и резкий, по мотивам Notturno и ALCHE ----------
+   Без стекла и скруглений: панели — ровная тёмная заливка с волосяной рамкой, углы прямые.
+   Наведение — белая плашка въезжает шторкой слева, а уходит вправо; подпись прокатывается вверх (.tr),
+   кнопка чуть тянется за курсором (app.js, магнит). На прокруте управление уходит за края (body.cine).
+   Круглыми остаются колесо с его кнопкой, аватарки и точки голосов */
+#room :is(.films-panel, .room-title, #modeSeg, #modeSeg button, .seg-ind, .tabs-ind, .auto-check, .auto-check .box, .nav-group, .nav-btn, .people-count,
+  .pop-menu, .menu-item, .throw-row button, .np, .np-empty, .np .art, .np-replay, .yt-thumb, .nav-icon, .q-btn i, .nav-unmute, .yt-panel.open, .our-track, .our-track i,
+  .yt-res, .yt-res-main, .yt-res img, .yt-add input, .yt-add-row .btn, .q-item, .q-item img, .lp-tabs, .lp-tabs button, .search-box input, #addBtn, .my-votes,
+  .group-head, .g-person, .g-off, .mod-chip, .film, .film-poster, .vote-btn, .stepper, .stepper button, .hist, .hist i, .hist em, .rate-box, .rate-film i,
+  .rate-scale button, .rate-list span, .rate-list b, .rate-line, .rate-line i, .stage-actions .ghost, .react-bar, .react-bar button, .chat-form input, .wheel-empty .btn),
+#quickResults, #quickResults :is(.res, .res i, .res .plus) { border-radius: 0; }
+#room .seg-ind, #room .tabs-ind { box-shadow: none; }
+#room .yt-panel.open { background: rgba(9, 9, 13, .97); -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* шторка на наведении */
+#room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .nav-btn, .people-count, .menu-item, .stage-actions .ghost, .react-bar > button:not(.armed-chip), #addBtn, .np-replay, .room-title) { position: relative; isolation: isolate; }
+#room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .nav-btn, .people-count, .menu-item, .stage-actions .ghost, .react-bar > button:not(.armed-chip), #addBtn, .np-replay, .room-title)::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; background: var(--btn); transform: scaleX(0); transform-origin: right; transition: transform .45s cubic-bezier(.7, 0, .2, 1); pointer-events: none; }
+#room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .nav-btn, .people-count, .menu-item, .stage-actions .ghost, .react-bar > button:not(.armed-chip), #addBtn, .np-replay, .room-title):is(:hover, :focus-visible, [aria-expanded="true"])::before { transform: scaleX(1); transform-origin: left; }
+#room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .nav-btn, .people-count, .menu-item, .stage-actions .ghost, .react-bar > button:not(.armed-chip), #addBtn, .np-replay, .room-title):is(:hover, :focus-visible, [aria-expanded="true"]) { color: var(--btn-tx); }
+#room :is(.menu-item, .room-title):is(:hover, :focus-visible) :is(svg, small) { color: inherit; }
+#room .room-title:is(:hover, :focus-visible)::after { background: var(--btn-tx); }
+/* подпись прокатывается: уходит вверх, снизу въезжает её копия — тень текста на 1,6 строки ниже (обёртку ставит app.js) */
+.tr { display: inline-block; overflow: hidden; vertical-align: top; }
+.tr > span { display: inline-block; text-shadow: 0 1.6em currentColor; transition: transform .5s cubic-bezier(.7, 0, .2, 1); }
+:is(button, label):is(:hover, :focus-visible) .tr > span { transform: translateY(-1.6em); }
+/* переключатель «До победителя» — прямоугольная дорожка с квадратным бегунком */
+#room .auto-check .box::after { border-radius: 0; box-shadow: none; }
+
+/* киношный режим (body.cine, app.js setCine): на прокруте управление уходит за края, остаётся колесо, как продукт у CIRO.
+   Движение мышью или касание возвращает его на пару секунд (body.peek), фокус клавиатуры тоже держит.
+   Уходит быстро и разом, возвращается шторками по очереди: режим, инструменты, реакции */
+.stage-top, .react-bar { clip-path: inset(-12px); }
+.stage-top, .tools, .react-bar { transition: opacity .8s var(--ease), translate .7s cubic-bezier(.16, 1, .3, 1), clip-path .7s cubic-bezier(.16, 1, .3, 1); }
+.tools { transition-delay: .08s; }
+.react-bar { transition-delay: 0s, .16s, .16s; }
+body.cine:not(.peek) :is(.stage-top, .tools, .react-bar):not(:focus-within) { transition-duration: .45s; transition-delay: 0s; transition-timing-function: cubic-bezier(.7, 0, .84, 0); pointer-events: none; }
+body.cine:not(.peek) .stage-top:not(:focus-within) { translate: 0 -24px; clip-path: inset(-12px -12px 100% -12px); }
+body.cine:not(.peek) .tools:not(:focus-within) { translate: 0 calc(-100% - 24px); opacity: 0; }
+body.cine:not(.peek) .react-bar:not(:focus-within) { translate: 0 24px; clip-path: inset(100% -12px -12px -12px); }
+/* панель фильмов отступает и притихает (на этапах выбывания её и так приглушает data-stage) */
+@media (min-width: 1024px) {
+  body.cine:not(.peek):not([data-stage]) .films-panel:not(:hover) { opacity: .6; translate: -8px 0; }
+}
 
 /* ---------- заставки на весь экран: этапы выбывания и финал (по мотивам сайта Notturno, app.js showChapter / showFinale) ----------
    Плоская заливка поднимается снизу рваным краем из «щетины» (маска inkEdge), заголовок собирается из шести полос
@@ -941,8 +984,10 @@ body[data-stage="final"] .current span { background: linear-gradient(180deg, var
 
 /* ---------- уведомления ---------- */
 .toasts { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
-.toast { max-width: min(92vw, 520px); padding: 11px 18px; border-radius: 16px; background: color-mix(in srgb, var(--s2) 94%, transparent); border: 1px solid var(--bd); font-weight: 600; font-size: 14px; text-align: center; animation: rise .45s var(--ease); box-shadow: 0 16px 44px rgba(0,0,0,.45); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
-.toast.bad { border-color: color-mix(in srgb, var(--bad) 60%, transparent); }
+/* уведомление — белая плашка, выезжает шторкой слева, как текстовые блоки у Notturno; ошибка — красная */
+.toast { max-width: min(92vw, 520px); padding: 11px 18px; background: #fff; color: #0A0A0F; font-weight: 600; font-size: 14px; text-align: center; animation: toastIn .55s cubic-bezier(.16, 1, .3, 1); box-shadow: 0 16px 44px rgba(0,0,0,.35); }
+.toast.bad { background: var(--bad); color: #fff; }
+@keyframes toastIn { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
 
 /* что нового */
 .news-card { width: min(520px, 100%); gap: 16px; }

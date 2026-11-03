@@ -25,7 +25,7 @@
     const ctx = cv.getContext('2d');
     const anchor = cv.closest('.sheet, .stage')?.querySelector('.wheel-box');
     // data-clear: холст прозрачный и лежит поверх фона из постера (комната), иначе заливает свой фон (главная)
-    const s = { cv, ctx, anchor, clear: cv.hasAttribute('data-clear'), dust: [], waves: [], kick: 0, w: 0, h: 0, dpr: 1, boost: 0, vis: true };
+    const s = { cv, ctx, anchor, clear: cv.hasAttribute('data-clear'), dust: [], kick: 0, flash: 0, w: 0, h: 0, dpr: 1, boost: 0, vis: true };
     const resize = () => {
       s.dpr = Math.min(1.5, devicePixelRatio || 1);
       s.w = cv.clientWidth; s.h = cv.clientHeight;
@@ -70,8 +70,9 @@
     s.cx += (cx - s.cx) * ease; s.cy += (cy - s.cy) * ease; s.R += (R - s.R) * ease; s.ring += (ringT - s.ring) * ease;
     cx = s.cx; cy = s.cy; R = s.R;
     const r0 = R * 1.04;
-    // под музыку кольцо дышит басом
-    const k = (1 + 0.06 * Math.sin(t * 0.9)) * (1 + b * 0.7) * (1 + fx.level * 1.1);
+    // под музыку кольцо дышит басом; на старте, остановке и ударе сердца коротко вспыхивает (flash гаснет за ~0,6 с)
+    const k = (1 + 0.06 * Math.sin(t * 0.9)) * (1 + b * 0.7) * (1 + fx.level * 1.1) * (1 + s.flash * 0.6);
+    s.flash *= Math.exp(-dt * 4);
     // цвет света перетекает к тону постера за ~1 с, а не прыгает
     const want = s.clear && tint ? tint : colors;
     if (!s.col) s.col = { ring: [...want.ring], glow: [...want.glow] };
@@ -103,17 +104,7 @@
     ctx.globalAlpha = 1;
     }
 
-    // волны от колеса на сильных долях
-    for (const wv of s.waves) {
-      wv.age += dt * 1.15;
-      const e = 1 - wv.age;
-      if (e <= 0) continue;
-      const rr = r0 * (1.02 + (1 - e * e) * 0.95);
-      ctx.beginPath(); ctx.arc(cx, cy, rr, 0, 6.283);
-      ctx.strokeStyle = rgba(col.glow, 0.22 * e * wv.s); ctx.lineWidth = 18 * e + 4; ctx.stroke();
-      ctx.strokeStyle = rgba(col.ring, 0.7 * e * e * wv.s); ctx.lineWidth = 2.2 * e + 0.6; ctx.stroke();
-    }
-    s.waves = s.waves.filter(wv => wv.age < 1);
+    // расходящихся колец-волн нет: на долях и толчках свет вспыхивает (flash), а пыль разлетается от колеса (kick)
     const kick = s.kick;
     s.kick = 0;
 
@@ -143,13 +134,14 @@
   window.setBackdropActive = on => { target = typeof on === 'number' ? on : on ? 1 : 0; }; // число — сила, в финале ярче
   // оттенок 0–360 или null; кольцо светлее и насыщеннее самого постера, иначе тёмные постеры гасят свет
   window.setBackdropTint = h => { tint = h == null ? null : { ring: hsl(h, 0.75, 0.76), glow: hsl(h, 0.7, 0.56) }; };
-  // толчок света: волна от колеса и разлёт пыли. Сильные доли музыки, а ещё старт и остановка прокрута, сердцебиение финала (app.js)
+  // толчок: свет вокруг колеса вспыхивает, пыль разлетается. Старт и остановка прокрута, сердцебиение финала (app.js)
   window.setBackdropPulse = v => {
-    if (!reduce) for (const s of scenes) { s.waves.push({ age: 0, s: v }); s.kick = Math.max(s.kick, v); }
+    if (!reduce) for (const s of scenes) { s.flash = Math.max(s.flash, v); s.kick = Math.max(s.kick, v); }
   };
+  // сильные доли музыки прокрута: только разлёт пыли, кольцо и так дышит басом (fx.level)
   window.setBackdropFx = v => {
     fx = v;
-    if (v.beat) window.setBackdropPulse(v.beat);
+    if (v.beat && !reduce) for (const s of scenes) s.kick = Math.max(s.kick, v.beat);
   };
 
   let last = performance.now();

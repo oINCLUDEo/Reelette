@@ -330,13 +330,20 @@ function initRoom(roomId) {
   });
 
   // ---- «под стрелкой»: год, длительность, жанры и кто добавил ----
+  let nowId = null;
   function updateNow(it) {
     const f = it && state ? state.films.find(x => x.id === it.id) : null;
-    if (!f) { setHTML($('#nowBy'), ''); $('#nowMeta').textContent = ''; return; }
+    if (!f) { nowId = null; setHTML($('#nowBy'), ''); $('#nowMeta').textContent = ''; return; }
     $('#nowMeta').textContent = [f.year, f.runtime && fmtRuntime(f.runtime), (f.genres || []).slice(0, 2).join(', ')].filter(Boolean).join(', ');
     // без аватарки: цветное кольцо рамки выпирало за левый край текста и спорило с названием
     const pid = personOf(f), name = f.addedBy || 'Без имени', nv = (f.votes || []).length;
     setHTML($('#nowBy'), `Добавил(а) <button class="person" data-person="${esc(pid)}" data-name="${esc(name)}">${esc(name)}</button>${nv ? `, ${nv} ${plural(nv, 'голос', 'голоса', 'голосов')}` : ''}`);
+    // сменился фильм, а колесо медленное или стоит: строки под названием выезжают шторкой по очереди, как текстовые блоки у Notturno
+    if (f.id === nowId) return;
+    nowId = f.id;
+    if (!reduceMotion && (!wheel.anim || wheel.speed < 1.2)) {
+      [$('#nowMeta'), $('#nowBy')].forEach((el, i) => el.animate([{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], { duration: 520, delay: 60 + i * 70, easing: 'cubic-bezier(.16, 1, .3, 1)', fill: 'backwards' }));
+    }
   }
 
   // ---- фон комнаты: размытый постер фильма под стрелкой, два слоя сменяют друг друга плавно ----
@@ -498,6 +505,29 @@ function initRoom(roomId) {
   function setStage(stage) {
     if (stage) document.body.dataset.stage = stage; else delete document.body.dataset.stage;
   }
+  // ---- киношный режим (style.css body.cine): на прокруте управление уходит за края, остаётся колесо.
+  // Заметное движение мыши (больше 30 px) или касание возвращает его на 2 с; пока курсор над ним или открыто меню, не прячем ----
+  let peekTimer = null, mx = 0, my = 0, ax = 0, ay = 0;
+  function setCine(on) {
+    if (on && !document.body.classList.contains('cine')) { ax = mx; ay = my; } // дрожь руки после клика по «Крутить» не считается
+    document.body.classList.toggle('cine', on);
+    if (!on) { clearTimeout(peekTimer); document.body.classList.remove('peek'); }
+  }
+  function peek() {
+    if (!document.body.classList.contains('cine')) return;
+    document.body.classList.add('peek');
+    clearTimeout(peekTimer);
+    peekTimer = setTimeout(function hide() {
+      if (document.querySelector('.stage-top:hover, .tools:hover, .react-bar:hover, .films-panel:hover, .pop-menu:not([hidden])')) peekTimer = setTimeout(hide, 800);
+      else document.body.classList.remove('peek');
+    }, 2000);
+  }
+  document.addEventListener('pointermove', e => {
+    mx = e.clientX; my = e.clientY;
+    if (Math.hypot(mx - ax, my - ay) > 30) { ax = mx; ay = my; peek(); }
+  }, { passive: true });
+  document.addEventListener('pointerdown', peek, { passive: true });
+  document.body.classList.add('cine'); // управление въезжает шторками, когда комната загрузилась (render снимает cine)
   // ---- заставки на весь экран: этап выбывания и финал (по мотивам сайта Notturno) ----
   // Заливка поднимается снизу рваным чернильным краем, заголовок собирается из полос со смазом,
   // на сборке разлетаются осколки, потом всё уезжает вверх и открывает колесо.
@@ -968,6 +998,7 @@ function initRoom(roomId) {
     } else {
       musicOn(spin.stage);
       launchAt(spin, elapsed);
+      setCine(true);
     }
     if (spin.stage === 'final') {
       heartTimer = setInterval(() => {
@@ -994,6 +1025,8 @@ function initRoom(roomId) {
       setTimeout(() => { if (!spinningSid && !(state.series && spin.stage !== 'final')) setStage(null); }, spin.stage === 'final' ? 1700 : 0);
       setAmbient(wheel.items[wheel.currentIndex()]);
       paintFilm(wheel.items[wheel.currentIndex()], true);
+      // в серии управление не возвращается между прокрутами, иначе прыгало бы каждые несколько секунд
+      if (!state.series || spin.stage === 'final') setCine(false);
       render();
     });
     render();
@@ -1009,6 +1042,7 @@ function initRoom(roomId) {
         if (!quiet) beep(true);
         musicOn(spin.stage);
         launchAt(spin);
+        setCine(true);
         render();
         return;
       }
@@ -1219,6 +1253,8 @@ function initRoom(roomId) {
     $('#roomTitle').textContent = $('#roomTitleM').textContent = state.name;
     syncProvider();
     const spinning = Boolean(spinningSid || state.spin);
+    // колесо стоит и серии нет — управление на месте (и при первом заходе въезжает шторками)
+    if (!spinning && !state.series) setCine(false);
     const active = activeFilms();
     const W = chanceWeights(active);
     const total = active.reduce((s, f) => s + W.get(f.id), 0);
@@ -3102,6 +3138,31 @@ function initRoom(roomId) {
   });
 
   $('#resetBtn').addEventListener('click', () => api(`/rooms/${roomId}/reset`, { method: 'POST' }).catch(e => toast(e.message, true)));
+
+  // ---- поведение кнопок HUD (по мотивам навигации ALCHE и Notturno, style.css «HUD комнаты») ----
+  // подпись прокатывается при наведении: содержимое кнопки — в обёртку .tr, узлы переносятся, а не пересоздаются (счётчики во вкладках находятся по id)
+  $$('#modeSeg button, #lpTabs button, #autoWrap .check-text, #resetBtn').forEach(el => {
+    const tr = document.createElement('span'), inner = document.createElement('span');
+    tr.className = 'tr';
+    inner.append(...el.childNodes);
+    tr.append(inner);
+    el.append(tr);
+  });
+  // магнит: кнопка тянется за курсором на 2–3 px и отпускает пружиной (свойство translate — не мешает их transform)
+  const MAG = '.nav-btn, .people-count, .auto-check, .stage-actions .ghost, .react-bar > button, #addBtn, .np-replay';
+  let magEl = null;
+  const magTo = (el, x, y, duration, easing) => el.animate([{ translate: `${x.toFixed(1)}px ${y.toFixed(1)}px` }], { duration, easing, fill: 'forwards' });
+  const magOff = () => { if (magEl) magTo(magEl, 0, 0, 600, 'cubic-bezier(.34, 1.56, .64, 1)'); magEl = null; };
+  $('#room').addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse' || reduceMotion) return;
+    const el = e.target.closest(MAG);
+    if (el !== magEl) magOff();
+    if (!el) return;
+    magEl = el;
+    const r = el.getBoundingClientRect();
+    magTo(el, ((e.clientX - r.left) / r.width - 0.5) * 6, ((e.clientY - r.top) / r.height - 0.5) * 4, 200, 'ease-out');
+  });
+  $('#room').addEventListener('pointerleave', magOff);
 
   $('#inviteBtn').addEventListener('click', async () => {
     const url = location.origin + '/r/' + roomId;
