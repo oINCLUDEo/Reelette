@@ -196,8 +196,9 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px va
    Комната «Сеанс». Сетка 12 колонок: поля 24, интервалы 24, модуль 8.
    Фон — размытый постер фильма под стрелкой. Поверх стеклянная панель фильмов (колонки 1–3)
    и сцена (4–12): «под стрелкой» по линии колонки 4, колесо в колонках 7–12, статус и реакции на его оси.
-   Ряды: 64 шапка сцены · гибкий (колесо) · 80 подвал (статус и реакции), между рядами 16. Высоты подобраны так,
-   что середина шапки на одной линии с названием комнаты в панели, а середина подвала — с музыкой внизу панели.
+   Ряды: 72 шапка сцены · гибкий (колесо) · 80 подвал (статус и реакции), между рядами 16. Высоты подобраны так,
+   что середина шапки на одной линии с названием комнаты в панели (шапка панели 56 + отступ 8), а середина подвала —
+   с музыкой внизу панели; капсулы в шапке и подвале отстоят от краёв листа и от линий на одинаковые 14px.
    Скругления концентричные: панель 28 → внутри с отступом 8 элементы 20 → капсулы кнопок 18–22.
    Стекло — по мотивам Liquid Glass из iOS 26: тёмная прозрачная заливка, сквозь неё проступает цвет фона, по кромке блик.
    ===================================================================== */
@@ -231,7 +232,8 @@ body[data-stage="final"] .room-bg::after { opacity: 1; }
 .room-bg .tug { inset: 0; background: radial-gradient(42% 62% at var(--vx) 50%, var(--tug), transparent 72%); opacity: 0; transition: opacity 1.2s var(--ease), --tug .8s var(--ease); }
 body[data-stage="semi"] .room-bg .tug { opacity: .5; }
 body[data-stage="final"] .room-bg .tug { opacity: .95; }
-.layout { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: 64px minmax(0, 1fr) 80px; column-gap: var(--g); row-gap: 16px; height: 100dvh; max-width: 2200px; margin-inline: auto; padding: 16px var(--m) var(--m); }
+/* на экранах 16:9 (Full HD, 2K, 4K) раскладка во всю ширину, без пустых полос по бокам; шире 16:9 (21:9) — по центру */
+.layout { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: 72px minmax(0, 1fr) 80px; column-gap: var(--g); row-gap: 16px; height: 100dvh; max-width: max(2200px, calc(100dvh * 16 / 9)); margin-inline: auto; padding: 16px var(--m) var(--m); }
 /* стекло — у панели фильмов, управления сцены и реакций: только над цветным фоном */
 .films-panel, #room .glass, .react-bar { position: relative; background: var(--glass); border: 1px solid var(--glass-bd); -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%); box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08); }
 /* кромка-блик, как у Liquid Glass: ярче у верхнего левого и нижнего правого угла, к бокам гаснет. Рамка из градиента — маской по контуру */
@@ -267,33 +269,38 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .wheel-area { grid-column: 4 / -1; grid-row: 2; }
 .quiz, .karaoke { grid-column: 1 / -1; grid-row: 2; }
 /* подвал сцены: статус и кнопки серии слева, реакции и чат справа */
-.stage-foot { grid-column: 1 / 4; grid-row: 3; }
-.react-bar { grid-column: 4 / -1; grid-row: 3; justify-self: center; }
+.stage-foot { grid-column: 1 / 5; grid-row: 3; }
+.react-bar { grid-column: 5 / -1; grid-row: 3; justify-self: center; }
 .stage-rule { display: none; }
 /* Широкий экран: сцена — второй стеклянный лист рядом с панелью фильмов (те же скругления, верх и низ на одних линиях).
-   Внутри шапка и подвал отделены волосяными линиями, свет вокруг колеса не выходит за края листа.
+   Поля листа по бокам — 24, как интервал сетки. Левые края одни: текст названия, статуса и подпись «Обычный»
+   на одной вертикали (+22 от края листа). Колесо отступает от краёв ещё на 24, свет вокруг него выходит за лист.
+   Внутри шапка и подвал отделены волосяными линиями.
    Управление внутри листа — с заливкой, как элементы панели фильмов: стекло внутри стекла не видит фона (backdrop root) */
 @media (min-width: 1280px) {
-  .stage { padding-inline: 16px; border-radius: 28px; overflow: hidden; background: var(--glass); border: 1px solid var(--glass-bd); -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%); box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08); }
+  .side-head { height: 56px; }
+  .stage { padding-inline: 24px; border-radius: 28px; background: var(--glass); border: 1px solid var(--glass-bd); -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%); box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08); }
   .stage::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none; z-index: 7;
     background: linear-gradient(135deg, rgba(255,255,255,.5), rgba(255,255,255,.1) 28%, transparent 50%, rgba(255,255,255,.08) 72%, rgba(255,255,255,.32));
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
-  .stage > .backdrop { left: 0; top: 0; width: 100%; height: 100%; }
-  .stage-rule { display: block; grid-column: 1 / -1; height: 1px; margin-inline: -16px; background: rgba(255,255,255,.08); position: relative; z-index: 1; }
+  #room .wheel-area { padding: 16px 24px; }
+  .stage-rule { display: block; grid-column: 1 / -1; height: 1px; margin-inline: -24px; background: rgba(255,255,255,.08); position: relative; z-index: 1; }
   .stage-rule.t { grid-row: 1; align-self: end; }
   .stage-rule.b { grid-row: 3; align-self: start; }
-  /* длинный статус обрезается многоточием, кнопки серии рядом с ним остаются видны */
+  /* статус — на вертикали названия, длинный переносится на вторую строку; кнопки серии рядом с ним остаются видны */
   #room .stage-foot { justify-content: flex-start; min-width: 0; }
-  #room .stage-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .react-bar { justify-self: end; }
+  #room .stage-status:not(.prog):not(:empty) { min-width: 0; padding-left: 22px; white-space: normal; line-height: 18px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  /* реакции справа; поле чата сжимается, если подвал узкий */
+  #room .react-bar { justify-self: end; min-width: 0; max-width: 100%; }
+  #room .chat-form { flex: 0 1 260px; min-width: 112px; }
+  #room .chat-form input, #room .chat-form input:focus { width: 100%; }
   #room .stage :is(.glass, .react-bar) { background: var(--fill); border-color: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
   #room .stage :is(.glass, .react-bar)::after { display: none; }
 }
-/* до 1600 реакции с полем чата в подвал не влезают рядом со статусом: поле уже */
+/* до 1600 подвал узкий: кнопки реакций компактнее */
 @media (min-width: 1280px) and (max-width: 1599px) {
-  #room .chat-form input { width: 150px; }
-  #room .chat-form input:focus { width: 190px; }
+  #room .react-bar > button { width: 40px; height: 40px; font-size: 20px; }
 }
 
 /* режим и «До победителя» — стеклянные капсулы */
@@ -683,10 +690,20 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .now-left b span { display: inline-block; } /* строчный элемент не сдвигается transform-ом */
 #nowLeft::after { width: min(100%, 240px); margin-top: 12px; } /* сама полоска — общее правило со строкой под колесом (ниже по файлу) */
 @media (prefers-reduced-motion: no-preference) { .now-left:not([hidden]) { animation: riseIn .6s var(--ease); } }
+/* полка (app.js renderShelf, по мотивам ряда банок CIRO): с топ-5 до финала оставшиеся фильмы стоят карточками в ряд
+   под «Осталось» вместо полоски пути, каждая под своим наклоном. Карточка фильма под стрелкой приподнята, выпрямлена
+   и в цвете, остальные приглушены; выбывшая выпадает, кувыркаясь, остальные смыкаются */
+#nowLeft.has-shelf::after { display: none; }
+.shelf { position: relative; display: flex; gap: 10px; margin-top: 18px; }
+.shelf:empty { display: none; }
+.sh-card { width: clamp(40px, 2.6vw, 56px); aspect-ratio: 2 / 3; flex: none; border-radius: 7px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 16px var(--f-head); color: rgba(255,255,255,.7);
+  transform: rotate(var(--rz)); filter: brightness(.55) saturate(.6); box-shadow: 0 10px 22px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.12);
+  transition: transform .45s var(--spring), filter .3s var(--ease), box-shadow .3s var(--ease); }
+.sh-card.on { transform: translateY(-10px) scale(1.18); filter: none; box-shadow: 0 16px 30px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.3), 0 0 24px var(--glow); }
 
-/* колесо вписывается в свободное место своих колонок, но не больше 960px */
+/* колесо вписывается в свободное место своих колонок, но не больше 1200px (на 2560×1440 — около 1170px) */
 .wheel-area { min-width: 0; min-height: 0; container-type: size; display: grid; place-items: center; }
-.wheel-box { position: relative; width: min(100cqw, 100cqh, 960px); aspect-ratio: 1; container-type: inline-size; }
+.wheel-box { position: relative; width: min(100cqw, 100cqh, 1200px); aspect-ratio: 1; container-type: inline-size; }
 .wheel-box canvas { width: 100%; height: 100%; display: block; }
 /* выбывший постер выскакивает из-под стрелки и падает за край экрана (app.js hitWheel) */
 /* карточка в 3D: лицо — постер с бликом глянца, оборот — тёмный картон; у каждой стороны своя тень */
@@ -830,6 +847,45 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .takeover.play .tk-slice { animation: tkSlice 3.2s both; animation-delay: calc(var(--i) * 30ms); }
 .takeover.play .tk-sub { animation: tkSub 3.2s both; }
 .takeover.play .tk-shard { animation: tkBurst 1.3s .85s cubic-bezier(.16, 1, .3, 1) both; }
+/* топ-5: та же заставка за 2 с — под ней начинается «Парад пятёрки» */
+.takeover.quick.play :is(.tk-flood, .tk-slice, .tk-sub) { animation-duration: 2s; }
+.takeover.quick.play .tk-shard { animation-delay: .5s; }
+
+/* ---------- «Парад пятёрки» (app.js showParade), по мотивам ряда банок CIRO ----------
+   Постеры висят дугой в воздухе, каждый под своим наклоном и чуть покачивается; дальние развёрнуты к центру и уходят вглубь.
+   Тот, что в центре, выпрямлен, приподнят и стоит под кольцевой лампой в луче света на светящейся подставке, под ним табличка;
+   остальные гаснут. Фон — тёмная сцена со светом цвета постера (--pd-c перетекает от постера к постеру) */
+@property --pd-c { syntax: "<color>"; inherits: true; initial-value: #E3261C; }
+.parade { --cw: clamp(110px, min(14vw, 24vh), 280px); --cy: 46%; position: fixed; inset: 0; z-index: 55; overflow: hidden; pointer-events: none; transition: --pd-c .7s var(--ease); }
+.parade::before { content: ""; position: absolute; inset: 0; background: #07060B; opacity: 0; transition: opacity .9s var(--ease); }
+.parade.on::before { opacity: .94; }
+.parade > i { position: absolute; opacity: 0; transition: opacity .6s var(--ease); }
+.pd-glow { inset: 0; background: radial-gradient(40% 46% at 50% calc(var(--cy) + 8%), var(--pd-c), transparent 72%); }
+.parade.walk .pd-glow { opacity: .55; }
+/* лампа-кольцо над центром и луч от неё вниз */
+.pd-lamp { left: 50%; top: calc(var(--cy) - var(--cw) * .75 - 64px); width: calc(var(--cw) * .9); height: 14px; translate: -50% 0; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.8); box-shadow: 0 0 26px rgba(255,255,255,.55), inset 0 0 10px rgba(255,255,255,.4); }
+.pd-beam { left: 50%; top: calc(var(--cy) - var(--cw) * .75 - 58px); width: calc(var(--cw) * 1.7); height: calc(var(--cw) * 1.5 + 130px); translate: -50% 0;
+  background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.04) 70%, transparent); clip-path: polygon(37% 0, 63% 0, 100% 100%, 0 100%); }
+.pd-pedestal { left: 50%; top: calc(var(--cy) + var(--cw) * .75 + 22px); width: calc(var(--cw) * 1.4); height: calc(var(--cw) * .22); translate: -50% -50%; border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--pd-c) 60%, #fff), color-mix(in srgb, var(--pd-c) 60%, transparent) 55%, transparent); filter: blur(3px); }
+.parade.walk :is(.pd-lamp, .pd-beam, .pd-pedestal) { opacity: 1; }
+.pd-row { position: absolute; left: 50%; top: var(--cy); perspective: 1400px; transform-style: preserve-3d; }
+.pd-card { position: absolute; left: 0; top: 0; width: var(--cw); aspect-ratio: 2 / 3; --tilt: var(--rz); --sc: 1; --lift: 0px;
+  transform: translate(-50%, -50%) translateX(calc(var(--d, 0) * var(--cw) * 1.14)) translateY(var(--lift)) translateZ(calc(var(--a, 0) * -120px)) rotateY(calc(var(--d, 0) * -16deg)) rotateZ(var(--tilt)) scale(var(--sc));
+  transition: transform .8s cubic-bezier(.65, 0, .35, 1), filter .6s var(--ease); }
+.pd-card.on { --tilt: 0deg; --sc: 1.16; --lift: -12px; }
+.parade.walk .pd-card:not(.on) { filter: brightness(.4) saturate(.5); }
+.pd-face { position: absolute; inset: 0; border-radius: 14px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 36px var(--f-head); font-style: normal; color: rgba(255,255,255,.7);
+  box-shadow: 0 30px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.14); animation: pdBob 3.2s ease-in-out infinite; animation-delay: calc(var(--i) * -.6s); }
+.pd-face::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(135deg, rgba(255,255,255,.28), transparent 42%); }
+@keyframes pdBob { 50% { transform: translateY(-8px); } }
+/* табличка под подставкой: название и автор выезжают из маски при каждой смене */
+.pd-plate { position: absolute; left: 50%; top: calc(var(--cy) + var(--cw) * .75 + 52px); width: min(80vw, 560px); translate: -50% 0; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.pd-plate > * { max-width: 100%; animation: pdPlate .6s var(--ease) both; }
+.pd-plate b { font: 800 clamp(22px, 2.4vw, 34px)/1.1 var(--f-head); letter-spacing: -.03em; text-wrap: balance; }
+.pd-plate span { font: 600 16px/1.3 var(--f-ui); color: rgba(255,255,255,.85); animation-delay: .08s; }
+@keyframes pdPlate { from { opacity: 0; transform: translateY(14px); filter: blur(6px); } }
 @keyframes tkFlood {
   0% { transform: translateY(100%); animation-timing-function: cubic-bezier(.22, 1, .36, 1); }
   25% { transform: translateY(0); animation-timing-function: linear; }
@@ -1122,12 +1178,15 @@ body[data-stage="final"] .current span { background: linear-gradient(180deg, var
 .rc-text { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .solo .rc-text { align-items: center; }
 /* крупное число со свечением (как у Apple): заливка от белого к прозрачному, мягкое свечение */
-.rc-num, .rc-big { background: linear-gradient(180deg, #fff 35%, rgba(255,255,255,.6)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 40px rgba(255,255,255,.25)); padding-bottom: .04em; }
+/* заливка градиентом закрашивает текст только внутри рамки элемента, а при сжатом интервале последняя цифра
+   вылезает за неё и обрезается: рамка шире текста на запас, отрицательные поля возвращают его на место */
+.rc-num, .rc-big { background: linear-gradient(180deg, #fff 35%, rgba(255,255,255,.6)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 40px rgba(255,255,255,.25));
+  padding: .08em .16em .1em .06em; margin: -.08em -.16em -.1em -.06em; }
 .rc-num { font: 800 clamp(96px, 15vw, 220px)/.92 var(--f-ui); letter-spacing: -.07em; font-variant-numeric: tabular-nums; }
 .rc-big { font: 800 clamp(56px, 8.5vw, 128px)/.95 var(--f-head); letter-spacing: -.05em; text-wrap: balance; }
 .rc-unit { margin-top: 6px; font: 700 clamp(20px, 2.2vw, 30px)/1.15 var(--f-head); letter-spacing: -.02em; color: rgba(255,255,255,.86); }
 .rc-h { margin-top: clamp(16px, 3vh, 28px); font: 800 clamp(30px, 3.6vw, 52px)/1.08 var(--f-head); letter-spacing: -.04em; }
-.rc-h > span { display: block; overflow: hidden; padding-bottom: .08em; margin-bottom: -.08em; }
+.rc-h > span { display: block; overflow: hidden; padding: 0 .08em .08em; margin: 0 -.08em -.08em; } /* маска шире строки: сжатые буквы по краям не обрезаются */
 .rc-h > span > i, .rc-title > span > i { display: block; font-style: normal; animation: rcUp .9s var(--ease) both; }
 .rc-h > .m { margin-top: 12px; font: 600 clamp(16px, 1.5vw, 21px)/1.4 var(--f-ui); letter-spacing: 0; color: rgba(255,255,255,.74); text-wrap: pretty; }
 .rc-h > .m > i { animation-delay: .12s; }
@@ -1159,17 +1218,11 @@ body[data-stage="final"] .current span { background: linear-gradient(180deg, var
 .rc-wall-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .rc-wall { margin-top: 28px; width: min(960px, 100%); display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
 .rc-wall .rc-poster { width: 100%; border-radius: 10px; font-size: 24px; box-shadow: 0 14px 30px rgba(0,0,0,.4); animation: rcRise .7s var(--ease) both; animation-delay: calc(.2s + var(--i) * 40ms); }
-/* открывающая: месяц крупно, над ним переключатель */
+/* открывающая: «Итоги октября» крупно, под ними название комнаты */
 .rc-intro { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.rc-month { position: relative; z-index: 3; display: flex; align-items: center; gap: 4px; height: 44px; padding: 4px; border-radius: 22px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); font: 700 15px var(--f-ui); }
-.rc-month span { display: inline-block; min-width: 132px; }
-.rc-month span::first-letter { text-transform: uppercase; }
-.rc-mbtn { width: 36px; height: 36px; border-radius: 18px; font-size: 22px; line-height: 1; transition: background .2s; }
-.rc-mbtn:hover:not(:disabled) { background: rgba(255,255,255,.14); }
-.rc-mbtn:disabled { opacity: .3; cursor: default; }
-.rc-title { margin: 28px 0 0; font: 800 clamp(72px, 13vw, 200px)/.88 var(--f-head); letter-spacing: -.06em; }
-.rc-title > span { display: block; overflow: hidden; padding-bottom: .06em; }
-.rc-title > span + span > i { animation-delay: .1s; background: linear-gradient(180deg, #fff 30%, rgba(255,255,255,.55)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.rc-title { margin: 0; font: 800 clamp(72px, 13vw, 200px)/.88 var(--f-head); letter-spacing: -.06em; }
+.rc-title > span { display: block; overflow: hidden; padding: 0 .1em .06em; margin: 0 -.1em; }
+.rc-title > span + span > i { animation-delay: .1s; padding: 0 .1em; margin: 0 -.1em; background: linear-gradient(180deg, #fff 30%, rgba(255,255,255,.55)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .rc-sub { margin-top: 20px; font: 600 18px var(--f-ui); color: rgba(255,255,255,.74); }
 @media (max-width: 760px) {
   .rc-layout { grid-template-columns: minmax(0, 1fr); }

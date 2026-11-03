@@ -302,7 +302,7 @@ function initRoom(roomId) {
   let provider = 'none';
   // серия «до победителя» по умолчанию включена: на выбывании колесо само крутит до финала
   // дуэль убрана: кто выбирал её последней, тот попадает в обычный режим
-  const settings = { mode: ls.get('mode', 'normal') === 'elimination' ? 'elimination' : 'normal', duration: ls.get('dur', 12), auto: ls.get('auto', true), sound: ls.get('sound', true), showOut: ls.get('showOut', true), flyChat: ls.get('flyChat', true), music: ls.get('music', false), delay: 0 };
+  const settings = { mode: ls.get('mode', 'normal') === 'elimination' ? 'elimination' : 'normal', duration: ls.get('dur', 12), auto: ls.get('auto', true), sound: ls.get('sound', true), showOut: ls.get('showOut', false), flyChat: ls.get('flyChat', true), music: ls.get('music', false), delay: 0 };
   let people = [];
   let countdown = null; // секунд до старта, пока идёт отсчёт
   let countdownTimer = null;
@@ -323,8 +323,11 @@ function initRoom(roomId) {
       $('#now').classList.toggle('fast', !slow);
       if (!outShown) { setCurrent(it ? it.title : ' '); if (slow) updateNow(it); }
       // строка фильма под стрелкой: подсветка переходит с прошлой на новую, без перебора всего списка
-      $$('.film.hot').forEach(el => el.classList.remove('hot'));
-      if (it) $(`.film[data-id="${CSS.escape(it.id)}"]`)?.classList.add('hot');
+      $$('.film.hot, #shelf .sh-card.on').forEach(el => el.classList.remove('hot', 'on'));
+      if (it) {
+        $(`.film[data-id="${CSS.escape(it.id)}"]`)?.classList.add('hot');
+        $(`#shelf .sh-card[data-id="${CSS.escape(it.id)}"]`)?.classList.add('on');
+      }
       // стрелка светится цветом автора фильма под ней (style.css .pointer)
       if (it?.color) $('#pointer').style.setProperty('--pg', it.color); else $('#pointer').style.removeProperty('--pg');
       // фон и акцент интерфейса перекрашиваются под фильм у стрелки, когда колесо уже медленное: на быстром ходу смена мельтешила бы.
@@ -349,6 +352,43 @@ function initRoom(roomId) {
     if (!reduceMotion && (!wheel.anim || wheel.speed < 1.2)) {
       [$('#nowMeta'), $('#nowBy')].forEach((el, i) => el.animate([{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], { duration: 520, delay: 60 + i * 70, easing: 'cubic-bezier(.16, 1, .3, 1)', fill: 'backwards' }));
     }
+  }
+
+  // ---- полка (style.css .shelf, по мотивам ряда банок CIRO): с топ-5 до финала оставшиеся фильмы стоят маленькими
+  // карточками в ряд, каждая под своим наклоном; карточка фильма под стрелкой приподнята, выпрямлена и в цвете.
+  // Выбывший выпадает из ряда, остальные пружиной смыкаются (FLIP); при первом показе карточки поднимаются по одной ----
+  function renderShelf(list) {
+    const box = $('#shelf'), ids = list.map(f => f.id).join(',');
+    if (box.dataset.ids === ids) return;
+    box.dataset.ids = ids;
+    $('#nowLeft').classList.toggle('has-shelf', list.length > 0);
+    const keep = new Set(list.map(f => f.id)), cards = [...box.children], anim = !reduceMotion && Boolean(box.offsetParent);
+    const before = new Map(cards.map(c => [c.dataset.id, c.getBoundingClientRect()]));
+    const br = box.getBoundingClientRect();
+    for (const c of cards) {
+      if (keep.has(c.dataset.id) || c.classList.contains('drop')) continue;
+      if (!anim || !list.length) { c.remove(); continue; }
+      // выбывший вынимается из ряда на своём месте и падает, кувыркаясь
+      const r = before.get(c.dataset.id);
+      Object.assign(c.style, { position: 'absolute', left: `${r.left - br.left}px`, top: `${r.top - br.top}px` });
+      c.classList.add('drop');
+      c.animate([{ translate: '0 0', rotate: '0deg', opacity: 1 }, { translate: '0 90px', rotate: `${hue(c.dataset.id) % 2 ? 28 : -28}deg`, opacity: 0 }],
+        { duration: 700, easing: 'cubic-bezier(.5, 0, .75, 0)', fill: 'forwards' }).onfinish = () => c.remove();
+    }
+    const have = new Set(cards.map(c => c.dataset.id));
+    list.forEach((f, i) => {
+      if (have.has(f.id)) return;
+      box.insertAdjacentHTML('beforeend', `<span class="sh-card" data-id="${esc(f.id)}" style="${posterStyle(f)};--rz:${(hue(f.title) % 13) - 6}deg" title="${esc(f.title)}">${f.poster ? '' : initial(f.title)}</span>`);
+      if (anim) box.lastElementChild.animate([{ opacity: 0, translate: '0 24px', filter: 'blur(8px)' }, { opacity: 1, translate: '0 0', filter: 'blur(0)' }],
+        { duration: 700, delay: i * 70, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' });
+    });
+    if (anim) for (const c of box.children) {
+      const r0 = before.get(c.dataset.id);
+      if (!r0 || c.classList.contains('drop')) continue;
+      const dx = r0.left - c.getBoundingClientRect().left;
+      if (Math.abs(dx) > 0.5) c.animate([{ translate: `${dx.toFixed(1)}px 0` }, { translate: '0 0' }], { duration: 650, easing: 'cubic-bezier(.34, 1.4, .64, 1)' });
+    }
+    if (wheel.curId) box.querySelector(`.sh-card[data-id="${CSS.escape(wheel.curId)}"]`)?.classList.add('on');
   }
 
   // ---- фон комнаты: размытый постер фильма под стрелкой, два слоя сменяют друг друга плавно ----
@@ -573,10 +613,12 @@ function initRoom(roomId) {
   // 3,2 с анимации плюс разнос полос; прячем, когда доиграла последняя полоса, иначе конец обрывается
   const CHAPTER_SUB = { 'Топ-15': 'осталось пятнадцать фильмов', 'Топ-5': 'осталось пять фильмов' };
   let tkTimer = null;
-  function showChapter(text, sub, tone) {
+  // quick — короткая (2 с) заставка: у топ-5 после неё идёт «Парад пятёрки»
+  function showChapter(text, sub, tone, quick = false) {
     const el = $('#takeover');
     clearTimeout(tkTimer);
     el.classList.remove('play');
+    el.classList.toggle('quick', quick);
     el.dataset.tone = tone;
     el.hidden = false;
     inkMask(el);
@@ -585,12 +627,79 @@ function initRoom(roomId) {
     shards($('#tkShards'));
     void el.offsetWidth;
     el.classList.add('play');
-    tkTimer = setTimeout(hideChapter, 3450);
+    tkTimer = setTimeout(hideChapter, quick ? 2150 : 3450);
   }
   function hideChapter() {
     clearTimeout(tkTimer);
     $('#takeover').hidden = true;
     $('#takeover').classList.remove('play');
+  }
+  // ---- «Парад пятёрки» (style.css .parade, по мотивам ряда банок CIRO). После короткой заставки «Топ-5» пятёрка
+  // вылетает из своих секторов и выстраивается дугой в воздухе, каждый постер под своим наклоном. «Камера» проходит
+  // вдоль ряда: постер по очереди выезжает в центр, выпрямляется и встаёт под лампу на светящуюся подставку
+  // с табличкой «название и автор», фон перетекает в его цвет, остальные гаснут. Перед стартом все ныряют обратно в колесо.
+  // left — сколько мс до старта колеса (сервер даёт паузу 7 с), from — когда постерам вылетать ----
+  let pdTimers = [];
+  function showParade(spin, left, from) {
+    hideParade();
+    const byId = new Map(state.films.map(f => [f.id, f]));
+    const five = spin.snapshot.map(x => byId.get(x.id)).filter(Boolean);
+    const end = left - 250, dive = end - 650, walk = from + 950;
+    const step = (dive - 150 - walk) / five.length;
+    if (reduceMotion || five.length < 2 || step < 350) return; // зашли слишком поздно — не успеть
+    const el = $('#parade');
+    $('#pdRow').innerHTML = five.map((f, i) => `<span class="pd-card" data-id="${esc(f.id)}" style="--i:${i};--rz:${(hue(f.title) % 15) - 7}deg"><i class="pd-face" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</i></span>`).join('');
+    const cards = $$('#pdRow .pd-card');
+    // focus — индекс постера в центре; -1 — общий план без выделения
+    const place = focus => cards.forEach((c, i) => {
+      const d = i - (focus < 0 ? (five.length - 1) / 2 : focus);
+      c.style.setProperty('--d', d.toFixed(2));
+      c.style.setProperty('--a', Math.abs(d).toFixed(2));
+      c.classList.toggle('on', i === focus);
+    });
+    const at = (t, fn) => pdTimers.push(setTimeout(fn, Math.max(0, t)));
+    const tint = f => (f.poster ? posterHue(pimg(f.poster)) : Promise.resolve(hue(f.title)))
+      .then(h => el.style.setProperty('--pd-c', `hsl(${h ?? hue(f.title)} 70% 46%)`)); // серый постер — тон по названию
+    place(-1);
+    el.classList.remove('on', 'walk');
+    // парад появляется вместе с вылетом постеров: тёмная сцена проявляется под уходящей заставкой, постеры летят из колеса
+    at(from, () => { el.hidden = false; el.classList.add('on'); });
+    at(from, () => cards.forEach((c, i) => {
+      const p = wheelPoint(c.dataset.id), r = c.getBoundingClientRect();
+      if (!p || !r.width) return;
+      c.animate([
+        { translate: `${(p.x - r.left - r.width / 2).toFixed(0)}px ${(p.y - r.top - r.height / 2).toFixed(0)}px`, scale: Math.max(0.08, p.w * 0.1 / r.width).toFixed(3), opacity: 0 },
+        { opacity: 1, offset: 0.25 },
+        { translate: '0px 0px', scale: 1, opacity: 1 },
+      ], { duration: 950, delay: i * 80, easing: 'cubic-bezier(.34, 1.2, .64, 1)', fill: 'backwards' });
+    }));
+    five.forEach((f, i) => at(walk + i * step, () => {
+      el.classList.add('walk');
+      place(i);
+      tint(f);
+      const pid = personOf(f), name = f.addedBy || 'Без имени';
+      $('#pdPlate').innerHTML = `<b>${esc(f.title)}</b><span>${nick(pid, name)}</span>`;
+    }));
+    at(dive, () => {
+      el.classList.remove('walk');
+      $('#pdPlate').innerHTML = '';
+      cards.forEach((c, i) => {
+        const p = wheelPoint(c.dataset.id), r = c.getBoundingClientRect();
+        if (!p || !r.width) return;
+        c.animate([
+          { translate: '0px 0px', scale: 1, opacity: 1 },
+          { translate: `${(p.x - r.left - r.width / 2).toFixed(0)}px ${(p.y - r.top - r.height / 2).toFixed(0)}px`, scale: Math.max(0.08, p.w * 0.1 / r.width).toFixed(3), opacity: 0 },
+        ], { duration: 600, delay: i * 40, easing: 'cubic-bezier(.5, 0, .75, 0)', fill: 'forwards' });
+      });
+      el.classList.remove('on');
+    });
+    at(end, hideParade);
+  }
+  function hideParade() {
+    pdTimers.forEach(clearTimeout);
+    pdTimers = [];
+    $('#parade').hidden = true;
+    $('#parade').classList.remove('on', 'walk');
   }
   // точка на экране: середина сектора фильма на колесе, без id — сектор под стрелкой
   function wheelPoint(id) {
@@ -781,6 +890,7 @@ function initRoom(roomId) {
   function endDrama() {
     clearInterval(heartTimer); heartTimer = null;
     hideChapter();
+    hideParade();
     hideFinale();
     setStage(null);
   }
@@ -995,7 +1105,12 @@ function initRoom(roomId) {
     setStage(spin.stage);
     // глава этапа (топ-15, топ-5): сервер дал под неё паузу перед стартом, колесо трогается, когда она отыграла.
     // Зашедший посреди паузы главу не видит, если от неё остались крохи
-    if (spin.chapter && -elapsed > 1500) showChapter(spin.chapter, CHAPTER_SUB[spin.chapter] || '', spin.left > 5 ? 'mid' : 'top');
+    if (spin.chapter === 'Топ-5') {
+      // топ-5: короткая заставка, под ней «Парад пятёрки»; зашедший посреди паузы видит только парад
+      const title = -elapsed > 5500;
+      if (title) showChapter(spin.chapter, CHAPTER_SUB[spin.chapter], 'top', true);
+      showParade(spin, -elapsed, title ? 1500 : 150);
+    } else if (spin.chapter && -elapsed > 1500) showChapter(spin.chapter, CHAPTER_SUB[spin.chapter] || '', spin.left > 5 ? 'mid' : 'top');
     if (elapsed < 0) {
       if (!spin.chapter) musicOff(); // перед стартом тишина и отсчёт; на главе музыка серии не прерывается
       if (spin.stage === 'final') showFinale(spin);
@@ -1186,8 +1301,6 @@ function initRoom(roomId) {
   // ---- итоги месяца: истории на весь экран, как Wrapped (style.css .recap, данные — server.js recap) ----
   // Каждая история — один факт: крупное число со счётом или постер, заголовок в две строки (факт и пояснение).
   // Листаются сами (полоска сверху), нажатием справа и слева или стрелками; удержание ставит на паузу
-  const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
-  const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
   const MONTHS_IN = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
   const DAYS = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
   const DAYS_IN = ['В воскресенье', 'В понедельник', 'Во вторник', 'В среду', 'В четверг', 'В пятницу', 'В субботу'];
@@ -1217,11 +1330,8 @@ function initRoom(roomId) {
     const add = (html, bg, posterUrl = '') => S.push({ html, bg, poster: posterUrl });
     const films = n => `${n} ${plural(n, 'фильм', 'фильма', 'фильмов')}`;
 
-    // открывающая: месяц крупно и переключатель месяцев (список месяцев — от новых к старым)
-    const at = d.months.indexOf(d.month), older = d.months[at + 1], newer = d.months[at - 1];
-    add(`<div class="rc-intro">
-      <div class="rc-month"><button class="rc-mbtn" type="button" data-rc-month="${esc(older || '')}" ${older ? '' : 'disabled'} aria-label="Месяц раньше">‹</button><span>${MONTHS[m]} ${d.month.slice(0, 4)}</span><button class="rc-mbtn" type="button" data-rc-month="${esc(newer || '')}" ${newer ? '' : 'disabled'} aria-label="Месяц позже">›</button></div>
-      <h1 class="rc-title"><span><i>Итоги</i></span><span><i>${MONTHS_GEN[m]}</i></span></h1>
+    // открывающая: «Итоги октября» крупно (итоги всегда за прошедший месяц, server.js)
+    add(`<div class="rc-intro"><h1 class="rc-title"><span><i>Итоги</i></span><span><i>${MONTHS[m]}</i></span></h1>
       <p class="rc-sub">${esc(state.name)}</p></div>`, '#1A1433');
     if (!d.count && !d.spins) {
       add(card(`В ${MONTHS_IN[m]} колесо отдыхало`, 'Фильмов в этом месяце не выбирали'), calm());
@@ -1290,17 +1400,15 @@ function initRoom(roomId) {
     if (s.poster) posterHue(pimg(s.poster)).then(h => { if (rc?.i === i && h != null) box.style.setProperty('--rc-bg', `hsl(${h} 55% 26%)`); });
     $$('#rcBars i').forEach((b, k) => { b.className = k < i ? 'done' : k === i ? 'on' : ''; });
     const bar = $('#rcBars i.on b');
-    bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = ''; // та же история заново (сменили месяц) — полоска с нуля
+    bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = ''; // та же история заново (открыли итоги ещё раз) — полоска с нуля
     $$('#rcStage .rc-num').forEach(countUp);
   }
-  async function openRecap(month) {
+  async function openRecap() {
     let data;
-    try { data = await api(`/rooms/${roomId}/recap${month ? `?m=${encodeURIComponent(month)}` : ''}`); }
+    try { data = await api(`/rooms/${roomId}/recap`); }
     catch (e) { toast(e.message, true); return; }
     rc = { data, slides: rcSlides(data), i: 0 };
     $('#rcBars').innerHTML = rc.slides.map(() => '<i><b></b></i>').join('');
-    ls.set('recapSeen', prevMonthKey()); // плашка «Итоги …» в шапке больше не нужна
-    $('#recapChip').hidden = true;
     if ($('#recapModal').hidden) openModal('#recapModal');
     rcShow(0);
   }
@@ -1309,7 +1417,6 @@ function initRoom(roomId) {
   $('#rcNext').addEventListener('click', () => (rc && rc.i < rc.slides.length - 1 ? rcShow(rc.i + 1) : closeModal('#recapModal')));
   $('#rcPrev').addEventListener('click', () => rc && rcShow(Math.max(0, rc.i - 1)));
   $('#rcBars').addEventListener('animationend', e => { if (rc && e.target.closest('i.on') && rc.i < rc.slides.length - 1) rcShow(rc.i + 1); });
-  $('#rcStage').addEventListener('click', e => { const b = e.target.closest('[data-rc-month]'); if (b && b.dataset.rcMonth) openRecap(b.dataset.rcMonth); });
   // удержание — пауза, как в историях
   $('#recapModal').addEventListener('pointerdown', () => $('#recapModal').classList.add('hold'));
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => $('#recapModal').addEventListener(t, () => $('#recapModal').classList.remove('hold')));
@@ -1415,11 +1522,11 @@ function initRoom(roomId) {
     const spinning = Boolean(spinningSid || state.spin);
     // колесо стоит и серии нет — управление на месте (и при первом заходе въезжает шторками)
     if (!spinning && !state.series) setCine(false);
-    // первая неделя месяца, в прошлом что-то выпадало, а итоги ещё не открывали: в шапке сцены плашка «Итоги октября»
+    // первая неделя месяца и в прошлом что-то выпадало: в шапке сцены плашка «Итоги октября», после просмотра тоже остаётся
     const pm = prevMonthKey();
-    const chip = new Date(Date.now() + 3 * 3600e3).getUTCDate() <= 7 && ls.get('recapSeen', '') !== pm && state.history.some(h => monthKey(h.at) === pm);
+    const chip = new Date(Date.now() + 3 * 3600e3).getUTCDate() <= 7 && state.history.some(h => monthKey(h.at) === pm);
     $('#recapChip').hidden = !chip;
-    if (chip) $('#recapChip').textContent = `Итоги ${MONTHS_GEN[Number(pm.slice(5)) - 1]}`;
+    if (chip) $('#recapChip').textContent = `Итоги ${MONTHS[Number(pm.slice(5)) - 1]}`;
     const active = activeFilms();
     const W = chanceWeights(active);
     const total = active.reduce((s, f) => s + W.get(f.id), 0);
@@ -1560,6 +1667,8 @@ function initRoom(roomId) {
       roll(n, String(active.length), Number(n.textContent) > active.length ? 'down' : 'up');
       $('#nowLeftOf').textContent = String(elimTotal);
     }
+    // полка: с топ-5 до финала оставшиеся фильмы стоят карточками под «Осталось» вместо полоски
+    renderShelf(showLeft && active.length >= 2 && active.length <= 5 ? active : []);
     $('#stageStatus').style.setProperty('--p', progP);
     // серию остановили между прокрутами: этап выбывания больше не держим (после финала его снимает таймер окна победителя)
     if (!spinning && !state.series && document.body.dataset.stage && document.body.dataset.stage !== 'final') setStage(null);

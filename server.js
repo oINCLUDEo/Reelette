@@ -356,9 +356,10 @@ function elimPace(n) {
 }
 
 // Главы выбывания: на первом прокруте топ-15 и топ-5 (внутри серии) перед стартом пауза под заставку
-// на весь экран (клиент — showChapter), колесо трогается, когда она отыграла
+// на весь экран (клиент — showChapter), колесо трогается, когда она отыграла.
+// У топ-5 после заставки ещё «Парад пятёрки» (клиент — showParade): пятёрку представляют по одному
 const CHAPTERS = { 15: 'Топ-15', 5: 'Топ-5' };
-const CHAPTER_INTRO = 3.6; // с
+const CHAPTER_INTRO = { 'Топ-15': 3.6, 'Топ-5': 7 }; // с
 
 function startSpin(r, { mode, duration, auto, by, delay }) {
   const list = activeFilms(r);
@@ -367,7 +368,7 @@ function startSpin(r, { mode, duration, auto, by, delay }) {
   const pace = mode === 'elimination' ? elimPace(list.length) : null;
   duration = pace ? pace.duration : Math.min(60, Math.max(0, num(duration, 12))); // 0 — сразу результат, без вращения
   const chapter = (mode === 'elimination' && r.eliminated.length && CHAPTERS[list.length]) || '';
-  delay = Math.max(pace?.intro || 0, chapter ? CHAPTER_INTRO : 0, Math.min(15, Math.max(0, Math.round(num(delay, 0)))));
+  delay = Math.max(pace?.intro || 0, CHAPTER_INTRO[chapter] || 0, Math.min(15, Math.max(0, Math.round(num(delay, 0)))));
   const rt = runtime(r);
   // обычный режим: сектор = шанс победить; выбывание: сектор = шанс вылететь, стрелка выбивает именно по нему
   let W = chanceWeights(r, list);
@@ -1931,14 +1932,12 @@ async function api(req, res, url) {
     return err ? json(res, 400, { error: err }) : json(res, 200, { ok: true });
   }
 
-  // итоги месяца (app.js openRecap); без ?m= — текущий месяц, а в первую неделю нового — прошлый
+  // итоги месяца (app.js openRecap) — всегда за прошедший месяц: текущий ещё не закончился
   if (sub === 'recap' && m === 'GET') {
-    const now = monthOf(Date.now());
-    const months = [...new Set([now, ...r.history.map(h => monthOf(h.at)), ...Object.keys(r.stats || {})])].sort().reverse();
-    const prev = months.find(x => x < now);
-    const want = url.searchParams.get('m');
-    const month = months.includes(want) ? want : new Date(Date.now() + MSK).getUTCDate() <= 7 && prev ? prev : now;
-    return json(res, 200, { month, months, ...recap(r, month) });
+    const d = new Date(Date.now() + MSK);
+    d.setUTCDate(0); // последний день прошлого месяца
+    const month = d.toISOString().slice(0, 7);
+    return json(res, 200, { month, ...recap(r, month) });
   }
 
   if (sub === 'reset' && m === 'POST') {

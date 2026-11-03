@@ -283,7 +283,7 @@
           <h2 class="current" id="current"><span id="currentTitle">&nbsp;</span></h2>
           <p class="now-meta" id="nowMeta"></p>
           <div class="now-by" id="nowBy"></div>
-          <div class="now-left" id="nowLeft" hidden><span>Осталось <b><span id="nowLeftN"></span></b> из <b id="nowLeftOf"></b></span></div>
+          <div class="now-left" id="nowLeft" hidden><span>Осталось <b><span id="nowLeftN"></span></b> из <b id="nowLeftOf"></b></span><div class="shelf" id="shelf" aria-hidden="true"></div></div>
         </section>
         <div class="wheel-area">
         <div class="wheel-box" id="wheelBox">
@@ -312,6 +312,12 @@
 
   <button class="sheet-scrim" id="sheetScrim" type="button" hidden aria-label="Свернуть список фильмов"></button>
   <!-- заставка этапа выбывания на весь экран: «Топ-10», «Топ-5», «Полуфинал» (app.js showChapter) -->
+  <!-- «Парад пятёрки» после короткой заставки «Топ-5»: постеры вылетают из колеса в ряд и по одному встают под лампу (app.js showParade) -->
+  <div class="parade" id="parade" hidden aria-hidden="true">
+    <i class="pd-glow"></i><i class="pd-beam"></i><i class="pd-lamp"></i><i class="pd-pedestal"></i>
+    <div class="pd-row" id="pdRow"></div>
+    <div class="pd-plate" id="pdPlate"></div>
+  </div>
   <div class="takeover" id="takeover" hidden aria-hidden="true">
     <i class="tk-flood"></i>
     <div class="tk-in"><div class="tk-title" id="tkTitle"></div><div class="tk-sub" id="tkSub"></div></div>
@@ -438,7 +444,7 @@
     <section class="ctl" id="spinCtl">
       <div class="ctl-head">Прокрут</div>
       <div class="grp">
-        <label class="check row" id="showOutWrap"><input type="checkbox" role="switch" id="showOutOn" checked><span class="box"></span><span class="check-text">Показывать выбывших <button type="button" class="hint" data-hint="Окно с выбывшим фильмом, когда на колесе осталось пять фильмов и меньше. Раньше выбывший фильм просто зачёркивается над колесом. Настройка только у вас." aria-label="Подсказка: показывать выбывших">?</button></span></label>
+        <label class="check row" id="showOutWrap"><input type="checkbox" role="switch" id="showOutOn"><span class="box"></span><span class="check-text">Показывать выбывших <button type="button" class="hint" data-hint="Окно с выбывшим фильмом, когда на колесе осталось пять фильмов и меньше. По умолчанию выключено: оставшиеся фильмы и так стоят на полке под названием, выбывший из неё выпадает. Настройка только у вас." aria-label="Подсказка: показывать выбывших">?</button></span></label>
         <div class="row field" id="delayField">
           <span class="label">Отсчёт перед прокрутом</span>
           <div class="seg" id="delaySeg">
