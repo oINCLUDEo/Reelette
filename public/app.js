@@ -207,9 +207,9 @@ function showNews(entries, title) {
     fresh = returning ? entries.filter(e => e.id.slice(0, 10) === entries[0].id.slice(0, 10)) : [];
   } else fresh = entries.filter(e => newsKey(e.id) > seen);
   if (!fresh.length) { ls.set('newsSeen', latest); return; }
-  // не перебиваем другие окна (например, ввод имени): ждём, пока они закроются
+  // не перебиваем другие окна (например, ввод имени) и прокрут с серией: ждём, пока окна закроются и колесо встанет
   const show = () => {
-    if (anyModalOpen()) return setTimeout(show, 1500);
+    if (anyModalOpen() || document.body.classList.contains('cine') || document.body.dataset.stage) return setTimeout(show, 1500);
     showNews(fresh, 'Что нового');
     ls.set('newsSeen', latest);
   };
