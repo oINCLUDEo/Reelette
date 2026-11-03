@@ -323,13 +323,14 @@
     <div class="tk-in"><div class="tk-title" id="tkTitle"></div><div class="tk-sub" id="tkSub"></div></div>
     <div class="tk-shards" id="tkShards"></div>
   </div>
-  <!-- финал — дуэль: экран по диагонали в цветах двух финалистов, отсчёт на стыке (app.js showFinale, clash) -->
+  <!-- финал — дуэль под софитами: двое финалистов в свете своих цветов, отсчёт на черте между ними (app.js showFinale, clash) -->
   <div class="finale" id="finale" hidden aria-live="polite">
-    <div class="fn-split" aria-hidden="true"><i class="fn-seam"></i><i class="fn-side a"></i><i class="fn-side b"></i></div>
+    <i class="fn-stage" aria-hidden="true"></i>
     <div class="fn-in">
       <h2 class="fn-h"><span class="fn-t"></span><span class="fn-s">Колесо выбьет один из двух</span><span class="tk-shards" id="fnShards"></span></h2>
       <div class="fn-duel">
         <i class="fn-flash" aria-hidden="true"></i>
+        <i class="fn-blade" aria-hidden="true"></i>
         <div class="fn-pair" id="finalePair"></div>
         <b class="fn-count" id="finaleCount"></b>
       </div>

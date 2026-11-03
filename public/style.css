@@ -665,17 +665,15 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
   .now .current span { -webkit-line-clamp: 3; }
   .now-left { align-self: start; justify-self: stretch; }
 }
-/* за названием — ореол цвета фильма */
-.current { position: relative; margin: 0; max-width: 100%; font: 800 clamp(34px, 3.1vw, 48px)/1.08 var(--f-head); letter-spacing: -.045em; text-shadow: 0 2px 30px rgba(0,0,0,.25), 0 0 46px color-mix(in srgb, var(--acc) 34%, transparent); }
+/* без ореола: у названия line-clamp с overflow: hidden, и размытая тень обрезалась краем блока — под текстом проступал прямоугольник */
+.current { position: relative; margin: 0; max-width: 100%; font: 800 clamp(34px, 3.1vw, 48px)/1.08 var(--f-head); letter-spacing: -.045em; text-shadow: 0 1px 2px rgba(0,0,0,.2); }
 .current span { position: relative; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; transition: color .3s; }
 /* сразу после выбывания название зачёркивается */
-.current span::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: max(3px, .07em); border-radius: 2px; background: var(--bad); transform: scaleX(0); transform-origin: left; transition: transform .45s var(--ease); }
-.current:not(.out) span::after { transition: none; }
-#current.out span, #current .was-out { color: var(--tx3); background: none; -webkit-text-fill-color: currentColor; filter: none; }
-.current.out span::after { transform: scaleX(1); }
-/* барабан: старое значение уходит вверх, новое поднимается снизу (app.js roll). Копия старого лежит поверх на время ухода */
+/* зачёркивание по каждой строке (линия по середине блока у названия в две строки читалась как подчёркивание) */
+.current span { text-decoration: line-through transparent; text-decoration-thickness: max(3px, .07em); transition: color .3s, text-decoration-color .3s; }
+#current.out span, #current .was-out { color: var(--tx3); background: none; -webkit-text-fill-color: currentColor; filter: none; text-decoration-color: var(--bad); }
+/* смена названия (app.js roll): старое гаснет с размытием, новое проявляется следом. Копия старого лежит поверх на время ухода */
 #room .roll-old { position: absolute; margin: 0; pointer-events: none; }
-#current .was-out::after { transform: scaleX(1); transition: none; }
 /* подзаголовок: мета и «Добавил(а)» — две строки одного стиля; на цветном постере крупнее и с тенью, иначе тонет */
 .now-meta, .now-by, .now-left > span { font: 500 17px/24px var(--f-ui); color: var(--tx2); text-shadow: 0 1px 16px rgba(0,0,0,.5); }
 .now-meta { margin-top: 12px; min-height: 24px; transition: opacity .3s var(--ease); }
@@ -905,65 +903,75 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
   100% { opacity: 1; transform: translateY(-84vh); }
 }
 
-/* ---------- финал: дуэль двух финалистов перед последним прокрутом (app.js showFinale, clash, hideFinale) ----------
-   Экран раскалывается по диагонали на два цвета — тона постеров финалистов (как у CIRO: фон заливает цвет фильма).
-   Стык — рваный шов: щетина одной половины врезается в щетину другой (маска inkEdge). Постеры смотрят друг на друга в 3D,
-   под каждым — фильм и ник автора. Между ними огромный отсчёт: на каждой секунде карточки бросаются друг на друга,
-   на стыке вспышка и осколки, экран вздрагивает, и с каждой секундой сильнее.
-   На нуле половины разъезжаются, как двери, открывают колесо, а постеры улетают в свои сектора */
-.finale { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; text-align: center; pointer-events: none; overflow: hidden; }
-/* половины в повёрнутом на 10° слое, который больше экрана: углы не открываются. --e — ширина шва */
-.fn-split { position: absolute; inset: -30vmax; transform: rotate(10deg); --e: 12vmin; }
-.fn-split i { position: absolute; top: 0; bottom: 0; }
-/* шов: тёмная полоса под щетиной, видна в просветах между волосками */
-.fn-seam { left: calc(50% - var(--e) / 2); width: var(--e); background: #0B0A10; opacity: 0; transition: opacity .4s var(--ease); }
-.fn-side { transition: transform .8s cubic-bezier(.16, 1, .3, 1), background-color .6s var(--ease); }
-.fn-side.a { left: 0; right: calc(50% - var(--e) / 2); background-color: var(--ca, #A50E1C); transform: translateX(-100%);
-  -webkit-mask: linear-gradient(#000 0 0) left / calc(100% - var(--e) + 1px) 100% no-repeat, var(--seam-a) right / var(--e) 100% no-repeat;
-  mask: linear-gradient(#000 0 0) left / calc(100% - var(--e) + 1px) 100% no-repeat, var(--seam-a) right / var(--e) 100% no-repeat; }
-.fn-side.b { right: 0; left: calc(50% - var(--e) / 2); background-color: var(--cb, #1D3FB8); transform: translateX(100%);
-  -webkit-mask: var(--seam-b) left / var(--e) 100% no-repeat, linear-gradient(#000 0 0) right / calc(100% - var(--e) + 1px) 100% no-repeat;
-  mask: var(--seam-b) left / var(--e) 100% no-repeat, linear-gradient(#000 0 0) right / calc(100% - var(--e) + 1px) 100% no-repeat; }
-.finale.on .fn-side { transform: none; }
-.finale.on .fn-seam { opacity: 1; transition-delay: .35s; }
-/* двери: разгон с места и уход за край */
-.finale.out .fn-side { transition: transform .75s cubic-bezier(.7, 0, .2, 1); }
-.finale.out .fn-side.a { transform: translateX(-100%); }
-.finale.out .fn-side.b { transform: translateX(100%); }
-.finale.out .fn-seam { opacity: 0; transition: opacity .2s; }
-.finale.out .fn-h, .finale.out .fn-count, .finale.out figcaption { opacity: 0; transition: opacity .3s var(--ease); }
-.fn-in { position: relative; display: flex; flex-direction: column; align-items: center; gap: clamp(20px, 4.4vh, 48px); }
+/* ---------- финал: дуэль под софитами (app.js showFinale, clash, hideFinale) ----------
+   Та же сцена, что у «Парада пятёрки»: тёмный зал, свет цвета постера. Двое финалистов стоят вполоборота друг к другу,
+   над каждым включается свой софит (по очереди, с дрожью, как прожекторы на стадионе), под каждым — пятно света на полу
+   и отражение. Между ними тонкая световая черта, на ней огромный отсчёт: на каждой секунде карточки бросаются к черте,
+   свет вспыхивает, с каждой секундой сильнее. На нуле софиты гаснут, постеры улетают в свои сектора, зал открывает колесо */
+.finale { --cw: min(32vh, 26vw); position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; text-align: center; pointer-events: none; overflow: hidden; }
+.fn-stage { position: absolute; inset: 0; background: radial-gradient(60% 50% at 50% 100%, #14121C, #07060B 70%); opacity: 0; transition: opacity .6s var(--ease); }
+/* цветной свет финалистов разливается с двух сторон и смешивается в середине: без жёсткого шва */
+.fn-stage::before, .fn-stage::after { content: ""; position: absolute; inset: 0; opacity: .5; }
+.fn-stage::before { background: radial-gradient(42% 60% at 22% 62%, var(--ca, #A50E1C), transparent 70%); }
+.fn-stage::after { background: radial-gradient(42% 60% at 78% 62%, var(--cb, #1D3FB8), transparent 70%); }
+.finale.on .fn-stage { opacity: .97; }
+.finale.out .fn-stage { opacity: 0; transition: opacity .55s var(--ease) .15s; }
+.fn-in { position: relative; display: flex; flex-direction: column; align-items: center; gap: clamp(18px, 4vh, 44px); }
 .fn-h { position: relative; display: flex; flex-direction: column; align-items: center; } /* осколки заголовка разлетаются от него */
-.fn-t { font: 800 clamp(64px, 9vw, 150px)/.9 var(--f-head); filter: drop-shadow(0 12px 40px rgba(0,0,0,.3)); }
+.fn-t { font: 800 clamp(52px, 7vw, 120px)/.9 var(--f-head); }
 /* до сборки полосы невидимы (иначе на пару кадров мелькает готовое слово); после — держатся видимыми */
 .fn-t .tk-slice { opacity: 0; }
 .finale.on .fn-t .tk-slice { animation: tkSliceIn .8s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(.25s + var(--i) * 35ms); }
 @keyframes tkSliceIn { from { opacity: 0; transform: translateX(var(--dx)) scaleX(1.12); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
 .finale.on .fn-h .tk-shard { animation: tkBurst 1.2s .55s cubic-bezier(.16, 1, .3, 1) both; }
-.fn-s { margin-top: 8px; font: 600 17px/24px var(--f-ui); color: rgba(255,255,255,.86); text-shadow: 0 1px 14px rgba(0,0,0,.3); opacity: 0; transition: opacity .5s var(--ease) .6s; }
+.fn-s { margin-top: 10px; font: 600 17px/24px var(--f-ui); color: rgba(255,255,255,.7); opacity: 0; transition: opacity .5s var(--ease) .6s; }
 .finale.on .fn-s { opacity: 1; }
-/* --cw — ширина карточки; отсчёт и вспышка стоят на высоте середины постеров */
-.fn-duel { --cw: min(30vh, 33vw); position: relative; }
-.fn-pair { position: relative; display: flex; justify-content: center; gap: clamp(72px, 20vw, 400px); }
-.fn-pair figure { margin: 0; width: var(--cw); display: flex; flex-direction: column; align-items: center; gap: 16px; }
-/* постеры развёрнуты друг к другу; рывки на отсчёте — app.js clash (те же углы в ключевых кадрах) */
-.fn-poster { position: relative; width: 100%; aspect-ratio: 2 / 3; border-radius: 18px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 40px var(--f-head); color: rgba(255,255,255,.7);
-  transform: perspective(900px) rotateY(20deg); box-shadow: 0 40px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.16); }
-.fn-pair figure:last-child .fn-poster { transform: perspective(900px) rotateY(-20deg); }
+.finale.out .fn-h, .finale.out .fn-count, .finale.out .fn-blade, .finale.out figcaption { opacity: 0; transition: opacity .3s var(--ease); }
+.fn-duel { position: relative; }
+.fn-pair { position: relative; display: flex; justify-content: center; gap: clamp(120px, 22vw, 420px); }
+.fn-pair figure { position: relative; margin: 0; width: var(--cw); display: flex; flex-direction: column; align-items: center; gap: 18px; --c: var(--ca, #A50E1C); }
+.fn-pair figure:last-child { --c: var(--cb, #1D3FB8); }
+/* софит: конус света сверху на постер, тонированный его цветом; включается с дрожью, первым — левый */
+.fn-beam { position: absolute; left: 50%; bottom: calc(100% - var(--cw) * 1.5); width: calc(var(--cw) * 1.8); height: 130vh; translate: -50% 0; pointer-events: none;
+  filter: blur(10px); opacity: 0; mix-blend-mode: screen;
+  -webkit-mask: linear-gradient(transparent, #000 25%, #000 88%, transparent); mask: linear-gradient(transparent, #000 25%, #000 88%, transparent); }
+/* сам конус — в ::before: размытие родителя ложится поверх обрезки, и края луча мягкие */
+.fn-beam::before { content: ""; position: absolute; inset: 0; clip-path: polygon(45% 0, 55% 0, 100% 100%, 0 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,.06), color-mix(in srgb, var(--c) 25%, rgba(255,255,255,.12)) 75%, color-mix(in srgb, var(--c) 35%, rgba(255,255,255,.18))); }
+.finale.on .fn-beam { animation: fnLight .9s .55s steps(1, end) both; }
+.finale.on figure:last-child .fn-beam { animation-delay: .8s; }
+@keyframes fnLight { 0% { opacity: 0; } 12% { opacity: .7; } 22% { opacity: .1; } 34% { opacity: .9; } 42% { opacity: .35; } 55%, 100% { opacity: 1; } }
+.finale.out .fn-beam { animation: none; opacity: 0; transition: opacity .12s; }
+.finale.out figure:first-child .fn-beam { transition-delay: .14s; }
+/* пятно света на полу под постером */
+.fn-floor { position: absolute; left: 50%; top: calc(var(--cw) * 1.5 - var(--cw) * .14); width: calc(var(--cw) * 1.7); height: calc(var(--cw) * .32); translate: -50% 0; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 55%, #fff), color-mix(in srgb, var(--c) 55%, transparent) 50%, transparent); filter: blur(4px); opacity: 0; transition: opacity .5s var(--ease); }
+.finale.on .fn-floor { opacity: .9; transition-delay: 1s; }
+.finale.out .fn-floor { opacity: 0; transition: opacity .15s; }
+/* постеры смотрят друг на друга; рывки на отсчёте — app.js clash (те же углы в ключевых кадрах) */
+.fn-poster { position: relative; z-index: 1; width: 100%; aspect-ratio: 2 / 3; border-radius: 18px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 40px var(--f-head); color: rgba(255,255,255,.7);
+  transform: perspective(900px) rotateY(14deg); box-shadow: 0 40px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.16);
+  -webkit-box-reflect: below 6px linear-gradient(transparent 72%, rgba(255,255,255,.16)); }
+.fn-pair figure:last-child .fn-poster { transform: perspective(900px) rotateY(-14deg); }
 /* глянец по диагонали, как у падающей карточки */
 .fn-poster::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(135deg, rgba(255,255,255,.3), transparent 42%); }
-.fn-pair figcaption { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; }
+.fn-pair figcaption { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; margin-top: calc(var(--cw) * .2); }
 .fn-pair figcaption b { max-width: 100%; font: 800 clamp(16px, 1.5vw, 24px)/1.15 var(--f-head); letter-spacing: -.02em; text-wrap: balance; text-shadow: 0 2px 16px rgba(0,0,0,.35); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.fn-by { display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 100%; font: 600 15px/20px var(--f-ui); color: rgba(255,255,255,.92); }
+.fn-by { display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 100%; font: 600 15px/20px var(--f-ui); color: rgba(255,255,255,.85); }
 .fn-ava { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; object-fit: cover; font: 800 12px var(--f-head); color: #fff; }
-.fn-count { position: absolute; left: 50%; top: calc(var(--cw) * .75); translate: -50% -50%; font: 800 min(26vh, 19vw)/1 var(--f-head); letter-spacing: -.06em; color: #fff; font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 50px rgba(255,255,255,.5), 0 14px 40px rgba(0,0,0,.35); }
+/* световая черта между финалистами: на неё бросаются карточки, на ней стоит отсчёт */
+.fn-blade { position: absolute; left: 50%; top: calc(var(--cw) * -.1); width: 2px; height: calc(var(--cw) * 1.7); translate: -50% 0; border-radius: 2px;
+  background: linear-gradient(transparent, rgba(255,255,255,.9) 30%, rgba(255,255,255,.9) 70%, transparent); box-shadow: 0 0 18px rgba(255,255,255,.6);
+  transform: scaleY(0); transition: transform .9s cubic-bezier(.16, 1, .3, 1) .9s; }
+.finale.on .fn-blade { transform: none; }
+.fn-count { position: absolute; z-index: 2; left: 50%; top: calc(var(--cw) * .75); translate: -50% -50%; font: 800 min(24vh, 16vw)/1 var(--f-head); letter-spacing: -.06em; color: #fff; font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 50px rgba(255,255,255,.45), 0 14px 40px rgba(0,0,0,.45); }
 .fn-count:empty { visibility: hidden; }
 /* цифра врезается в экран: из большой размытой в чёткую */
 .fn-count.beat { animation: fnSlam .6s cubic-bezier(.16, 1, .3, 1); }
 @keyframes fnSlam { from { transform: scale(1.9); opacity: 0; filter: blur(14px); } 45% { opacity: 1; } to { transform: none; filter: blur(0); } }
-/* вспышка на стыке в момент удара — под карточками */
-.fn-flash { position: absolute; left: 50%; top: calc(var(--cw) * .75); width: 80vmin; height: 80vmin; translate: -50% -50%; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,255,255,.9), rgba(255,255,255,.22) 45%, transparent); opacity: 0; pointer-events: none; }
+/* вспышка на черте в момент удара — под карточками */
+.fn-flash { position: absolute; left: 50%; top: calc(var(--cw) * .75); width: 70vmin; height: 70vmin; translate: -50% -50%; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,255,255,.85), rgba(255,255,255,.18) 45%, transparent); opacity: 0; pointer-events: none; }
 /* выбывание: с каждым этапом всё, кроме колеса, отступает сильнее; наведённая панель возвращается */
 body[data-stage="mid"] .films-panel { opacity: .85; }
 body[data-stage="top"] .films-panel, body[data-stage="top"] .tools > *, body[data-stage="top"] .stage-top > * { opacity: .7; }
@@ -2050,7 +2058,6 @@ body.karaoke-on #room .quiz { align-self: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .current span::after { transition: none; }
   .films-panel { transition: none; }
   /* без движения: заставки просто проявляются и гаснут, заливка стоит на месте, осколков нет */
   .takeover.play { animation: tkFade 3.2s linear both; }
@@ -2059,7 +2066,8 @@ body.karaoke-on #room .quiz { align-self: center; }
   .tk-shard { display: none; }
   .finale { opacity: 0; transition: opacity .3s; }
   .finale.on { opacity: 1; }
-  .finale .fn-side.a, .finale .fn-side.b { transform: none; transition: none; }
+  .finale.on .fn-beam { animation: none; opacity: 1; }
+  .fn-blade { transform: none; transition: none; }
   #autoWrap:not([hidden]), .fn-count.beat { animation: none; }
 }
 @keyframes tkFade { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }

@@ -347,7 +347,7 @@ function pickWeighted(list, weights) {
 // Темп выбывания: пока фильмов много, колесо крутится быстро, с каждым порогом дольше, финал самый долгий.
 // n — сколько фильмов на колесе перед прокрутом; pause — пауза серии после прокрута; intro — заставка «Финал» перед ним.
 function elimPace(n) {
-  if (n <= 2) return { stage: 'final', duration: 20, turns: 15, pause: 0, intro: 4 };
+  if (n <= 2) return { stage: 'final', duration: 20, turns: 15, pause: 0, intro: 5 };
   if (n === 3) return { stage: 'semi', duration: 14, turns: 11, pause: 3 };
   if (n <= 5) return { stage: 'top', duration: 10, turns: 8, pause: 3 };
   if (n <= 10) return { stage: 'mid', duration: 6.5, turns: 5, pause: 2 };
@@ -359,7 +359,7 @@ function elimPace(n) {
 // на весь экран (клиент — showChapter), колесо трогается, когда она отыграла.
 // У топ-5 после заставки ещё «Парад пятёрки» (клиент — showParade): пятёрку представляют по одному
 const CHAPTERS = { 15: 'Топ-15', 5: 'Топ-5' };
-const CHAPTER_INTRO = { 'Топ-15': 3.6, 'Топ-5': 7 }; // с
+const CHAPTER_INTRO = { 'Топ-15': 3.6, 'Топ-5': 10.5 }; // с; у топ-5 под паузой «Парад пятёрки»: по 1,2 с на фильм
 
 function startSpin(r, { mode, duration, auto, by, delay }) {
   const list = activeFilms(r);
