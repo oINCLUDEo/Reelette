@@ -476,7 +476,7 @@ function initRoom(roomId) {
     h.classList.toggle('out', out);
     roll(el, text, wasOut && !out ? 'drop' : 'up');
   }
-  // смена названия: старое уходит вверх и гаснет с размытием, новое поднимается следом (drop — зачёркнутое выбывшее
+  // смена значения: старое уходит вверх и гаснет с размытием, новое поднимается следом (down — счёт вниз, drop — зачёркнутое выбывшее
   // уходит вниз). Одно сменяет другое почти без нахлёста: два чётких названия друг на друге читались как баг.
   // Когда смены идут чаще, чем успевает анимация (быстрый прокрут), текст меняется сразу.
   function roll(el, text, how = 'up') {
@@ -494,7 +494,7 @@ function initRoom(roomId) {
     Object.assign(old.style, { left: `${el.offsetLeft}px`, top: `${el.offsetTop}px`, width: `${el.offsetWidth}px` });
     el.after(old);
     el.textContent = text;
-    const s = how === 'drop' ? 1 : -1;
+    const s = how === 'up' ? -1 : 1; // down (счёт вниз) и drop уходят вниз
     old.animate([{ transform: 'none', opacity: 1, filter: 'blur(0)' }, { transform: `translateY(${s * 0.3}em)`, opacity: 0, filter: 'blur(6px)' }],
       { duration: dur * 0.5, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' }).onfinish = () => old.remove();
     el.animate([{ transform: `translateY(${-s * 0.3}em)`, opacity: 0, filter: 'blur(6px)' }, { transform: 'none', opacity: 1, filter: 'blur(0)' }],
