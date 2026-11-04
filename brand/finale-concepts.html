@@ -121,6 +121,27 @@ section.concept { display: flex; flex-direction: column; gap: 18px; }
 .silver .big { font-size: 9cqw; background: linear-gradient(100deg, #8a8a8a 0%, #f2f2f2 22%, #9a9a9a 34%, #ffffff 50%, #8f8f8f 64%, #e2e2e2 80%, #7a7a7a 100%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 .6cqw 1.6cqw rgba(0,0,0,.6)); }
 .mini-count { left: 50%; top: 54%; translate: -50% -50%; font: 700 7cqw/1 var(--f-head); color: #fff; opacity: 0; text-shadow: 0 0 3cqw var(--blue-glow); z-index: 6; }
 
+
+/* ---------- Новый финал: пролёт по кругу всех фильмов вечера → строки → «Финал» → постеры ложатся на колесо ---------- */
+.v2 .orbit { inset: 0; perspective: 70cqw; perspective-origin: 50% 42%; }
+.v2 .ring { position: absolute; left: 50%; top: 50%; transform-style: preserve-3d; }
+.v2 .ring .poster { position: absolute; width: 12cqw; translate: -50% -50%; backface-visibility: hidden; transition: none; }
+.v2 .ring .poster.fin { box-shadow: 0 0 0 .2cqw var(--blue), 0 0 4cqw var(--blue-glow), 0 2cqw 4cqw rgba(0,0,0,.6); }
+.v2 .lines { left: 8cqw; top: 50%; translate: 0 -50%; display: flex; flex-direction: column; gap: 1.2cqw; z-index: 6; }
+.v2 .lines div { font: 700 4.6cqw/1 var(--f-head); color: var(--silver); opacity: 0; clip-path: inset(0 100% 0 0); }
+.v2 .lines div:last-child { color: #fff; }
+.v2 .lines div:last-child b { color: var(--blue-hi); font-weight: 700; }
+.v2 .ftitle { inset: 0; display: grid; place-items: center; align-content: center; gap: 2cqw; opacity: 0; z-index: 7; }
+.v2 .ftitle .big { font-size: 13cqw; }
+/* концовка: колесо в перспективе, на нём стоят финалисты; камера опускается сверху, постеры ложатся в свои половины */
+.v2 .table { inset: 0; perspective: 80cqw; perspective-origin: 50% 30%; opacity: 0; }
+.v2 .disc { position: absolute; left: 50%; top: 54%; width: 46cqw; aspect-ratio: 1; translate: -50% -50%; transform-style: preserve-3d; border-radius: 50%; }
+.v2 .disc-face { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, transparent 0 13%, #0b0b0c 13.4% 14.6%, transparent 15%), conic-gradient(#26272e 0 25%, #1d1e24 0 50%, #26272e 0 75%, #1d1e24 0); box-shadow: 0 0 0 1.6cqw #0e0e10, 0 0 0 1.8cqw rgba(226,226,226,.15), 0 0 8cqw var(--blue-glow); }
+.v2 .disc-face::after { content: ""; position: absolute; inset: 41%; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #fff, #c9ccd8); box-shadow: 0 0 3cqw var(--blue-glow); }
+.v2 .disc .poster { position: absolute; left: 50%; top: 50%; width: 11.5cqw; transform-origin: 50% 100%; }
+.v2 .pin { left: 50%; top: 5.5%; translate: -50% 0; width: 3cqw; height: 4cqw; background: var(--silver); clip-path: polygon(0 0, 100% 0, 50% 100%); z-index: 8; opacity: 0; filter: drop-shadow(0 0 1cqw var(--blue-glow)); }
+.v2 .lamp { left: 50%; top: 54%; width: 1cqw; height: 1cqw; border-radius: 50%; background: #3a3a40; translate: -50% -50%; z-index: 8; opacity: 0; }
+.older { margin: 0 0 -40px; font: 700 15px var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--silver-2); }
 footer { color: var(--silver-2); font-size: 15px; max-width: 66ch; }
 @media (max-width: 560px) { .play { right: 10px; bottom: 10px; height: 34px; font-size: 13px; } }
 @media (prefers-reduced-motion: reduce) { .grain, .scratch { display: none; } }
@@ -131,11 +152,27 @@ footer { color: var(--silver-2); font-size: 15px; max-width: 66ch; }
 <div class="wrap">
   <header>
     <div class="mark"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#E2E2E2" stroke-width="3"/><path d="M16 3v26M3 16h26M6.8 6.8l18.4 18.4M25.2 6.8 6.8 25.2" stroke="#E2E2E2" stroke-width="1.6"/><circle cx="16" cy="16" r="4.5" fill="#465DFF"/></svg>Reelette</div>
-    <h1>Финал: три интро</h1>
-    <p>Перед последним прокрутом на экране двое финалистов. Каждый вариант длится около 8 секунд и заканчивается стартом колеса. Постеры здесь нарисованы вместо картинок, в комнате будут настоящие. Нажмите «Смотреть», со звуком эффект сильнее.</p>
+    <h1>Финал Reelette</h1>
+    <p>Наверху новый финал, собранный из того, что понравилось в первых вариантах: пролёт из «Студии», построчные надписи из «Трейлера» и «Финал» из «Ракорда». Концовка новая. Первые варианты ниже, для сравнения. Постеры здесь нарисованы вместо картинок, в комнате будут настоящие. Звук пока синтезирован прямо в браузере: это заглушка до звуков из ElevenLabs и Epidemic Sound.</p>
     <button class="sound" id="sound" type="button" aria-pressed="false">Звук выключен</button>
   </header>
 
+  <section class="concept" id="final2">
+    <div class="c-head"><h2><small>Новый финал</small>Пролёт, строки, колесо</h2><span class="len">9,5 с</span></div>
+    <div class="screen v2" data-scene="final2">
+      <div class="orbit"><div class="ring"></div></div>
+      <div class="lines"><div>Двенадцать фильмов.</div><div>Десять выбыли.</div><div>Остались <b>двое</b>.</div></div>
+      <div class="ftitle"><div class="cap">последний прокрут</div><div class="big">Финал</div></div>
+      <div class="table"><div class="disc"><div class="disc-face"></div><div class="poster pA"><span>Интерстеллар</span></div><div class="poster pB"><span>Однажды в Голливуде</span></div></div></div>
+      <i class="pin"></i><i class="lamp" data-l="0"></i><i class="lamp" data-l="1"></i><i class="lamp" data-l="2"></i>
+      <canvas class="grain"></canvas><i class="vignette"></i><i class="flash"></i><i class="progress"></i>
+      <button class="play" type="button"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>Смотреть</button>
+    </div>
+    <p class="lead">Камера облетает по кругу все фильмы вечера. Выбывшие серые и по одному падают вниз, финалисты подсвечены синим и остаются. На тёмном экране построчно проявляется «Двенадцать фильмов. Десять выбыли. Остались двое.», как в трейлере. Потом «Финал» собирается из широкой размытой надписи, как в ракорде. В конце камера опускается на само колесо, постеры финалистов ложатся в свои половины, три лампы на ободе загораются по очереди, и колесо срывается с места. Это и есть старт прокрута, без отдельной заставки.</p>
+    <ul class="beats"><li><b>0–3,4 с</b>облёт по кругу, выбывшие падают</li><li><b>3,4–5,6 с</b>три строки по одной</li><li><b>5,6–7 с</b>«Финал»</li><li><b>7–9,5 с</b>камера на колесо, постеры ложатся, 3 лампы, старт</li></ul>
+  </section>
+
+  <h2 class="older">Первые варианты</h2>
   <section class="concept" id="leader">
     <div class="c-head"><h2><small>Вариант А</small>Ракорд</h2><span class="len">8 с</span></div>
     <div class="screen" data-scene="leader">
@@ -237,6 +274,56 @@ footer { color: var(--silver-2); font-size: 15px; max-width: 66ch; }
   const hide = (el, d = 200) => A(el, [{ opacity: 1 }, { opacity: 0 }], { duration: d });
   const set = (el, o) => el && el.animate([{ opacity: o }, { opacity: o }], { duration: 1, fill: 'forwards' });
   const flash = (scr, v = 1, d = 380) => A($('.flash', scr), [{ opacity: v }, { opacity: 0 }], { duration: d, easing: 'ease-out' });
+
+
+  // ---------- Новый финал ----------
+  (() => {
+    const s = $('[data-scene="final2"]'), ring = $('.ring', s);
+    const all = ['Начало', 'Интерстеллар', 'Паразиты', 'Дюна', 'Оппенгеймер', 'Однажды в Голливуде', 'Достать ножи', 'Ла-Ла Ленд', 'Аватар', 'Джокер', 'Матрица', 'Престиж'];
+    const fin = { 'Интерстеллар': 'pA', 'Однажды в Голливуде': 'pB' };
+    const n = all.length, R = 34; // радиус круга, cqw
+    ring.innerHTML = all.map((t, i) => `<div class="poster ${fin[t] ? fin[t] + ' fin' : 'dim'}" style="transform: rotateY(${(i * 360 / n).toFixed(1)}deg) translateZ(${R}cqw)"><span>${t}</span></div>`).join('');
+    const grain = $('.grain', s), g = grain.getContext('2d'); let gl = null;
+    const grainOn = on => { cancelAnimationFrame(gl); if (!on || reduce) return; grain.width = 240; grain.height = 135; const img = g.createImageData(240, 135); const loop = () => { for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255 | 0; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 30; } g.putImageData(img, 0, 0); gl = requestAnimationFrame(loop); }; loop(); };
+    const lines = $$('.lines div', s), discEl = $('.disc', s), [pa, pb] = $$('.disc .poster', s);
+    // постеры на колесе: каждый в своей половине, стоят вертикально к камере
+    const stand = (sx) => `translate(-50%, -100%) translateX(${sx}cqw) translateY(3cqw) rotateX(-90deg)`;
+    const lie = (sx) => `translate(-50%, -100%) translateX(${sx}cqw) translateY(3cqw) rotateX(0deg)`;
+    const reset = () => {
+      grainOn(false);
+      $$('.orbit, .ftitle, .table, .pin, .lamp, .grain', s).forEach(e => set(e, 0));
+      lines.forEach(l => A(l, [{ opacity: 0, clipPath: 'inset(0 100% 0 0)' }, { opacity: 0, clipPath: 'inset(0 100% 0 0)' }], { duration: 1 }));
+      $$('.ring .poster', s).forEach(p => p.getAnimations().forEach(a => a.cancel()));
+    };
+    const plan = [
+      // облёт: круг из всех фильмов вечера вращается и наплывает; выбывшие по одному падают вниз
+      [0, () => { set($('.orbit', s), 1); grainOn(true); set(grain, .3);
+        A(ring, [{ transform: 'translateZ(-30cqw) rotateX(-10deg) rotateY(0deg)' }, { transform: 'translateZ(-4cqw) rotateX(-4deg) rotateY(-300deg)' }], { duration: 3400, easing: 'cubic-bezier(.45,0,.2,1)' });
+        $$('.ring .poster.dim', s).forEach((p, k) => A(p, [{ opacity: 1, filter: 'brightness(1)' }, { opacity: 1, filter: 'brightness(.6) grayscale(1)', offset: .4 }, { opacity: 0, filter: 'brightness(.3) grayscale(1)', translate: '-50% 40cqw' }], { duration: 1400, delay: 500 + k * 200, easing: 'cubic-bezier(.5,0,.8,.4)' }));
+        Sfx.noise(3.2, .3, 1600, true); }],
+      [3.2, () => hide($('.orbit', s), 400)],
+      // три строки трейлера, одна под другой: каждая вычерчивается слева направо
+      ...[3.5, 4.2, 4.9].map((t, i) => [t, () => { A(lines[i], [{ opacity: 1, clipPath: 'inset(0 100% 0 0)', translate: '-1cqw 0' }, { opacity: 1, clipPath: 'inset(0 0% 0 0)', translate: '0 0' }], { duration: 650, easing: 'cubic-bezier(.16,1,.3,1)' }); Sfx.noise(.35, .14, 4200); if (i === 2) Sfx.boom(.45); }]),
+      [5.6, () => { lines.forEach(l => A(l, [{ opacity: 1 }, { opacity: 0 }], { duration: 250 })); }],
+      // «Финал», как в ракорде: из широкой размытой надписи в плотную
+      [5.75, () => { flash(s, .7, 420); const t = $('.ftitle', s); show(t, 300); A($('.big', t), [{ letterSpacing: '.45em', filter: 'blur(1.2cqw)' }, { letterSpacing: '-.02em', filter: 'blur(0)' }], { duration: 1300 }); Sfx.braam(.5); }],
+      // концовка: камера опускается на колесо, финалисты стоят на нём
+      [7.0, () => { hide($('.ftitle', s), 300); set($('.table', s), 1); grainOn(false); hide(grain, 300);
+        A(discEl, [{ transform: 'rotateX(74deg) scale(1.25)' }, { transform: 'rotateX(0deg) scale(1)' }], { duration: 1500, easing: 'cubic-bezier(.6,0,.2,1)' });
+        A(pa, [{ transform: stand(-10.5) }, { transform: stand(-10.5), offset: .35 }, { transform: lie(-10.5) }], { duration: 1500, easing: 'cubic-bezier(.6,0,.2,1)' });
+        A(pb, [{ transform: stand(10.5) }, { transform: stand(10.5), offset: .35 }, { transform: lie(10.5) }], { duration: 1500, easing: 'cubic-bezier(.6,0,.2,1)' });
+        Sfx.noise(1.4, .2, 900, true); }],
+      [8.2, () => show($('.pin', s), 200)],
+      // три лампы у оси загораются по очереди — отсчёт без цифр
+      ...[0, 1, 2].map(i => [8.0 + i * .35, () => { const l = $(`[data-l="${i}"]`, s); l.style.translate = `calc(-50% + ${(i - 1) * 2.2}cqw) calc(-50% - 9cqw)`; set(l, 1); A(l, [{ background: '#3a3a40', boxShadow: 'none' }, { background: '#fff', boxShadow: '0 0 1.4cqw #8C9BFF' }], { duration: 120 }); Sfx.beep(i === 2 ? 1400 : 1000, .08, .16); }]),
+      [9.05, () => { A(discEl, [{ transform: 'rotate(0deg)' }, { transform: 'rotate(-900deg)' }], { duration: 2600, easing: 'cubic-bezier(.5,0,.3,1)' }); flash(s, .35, 300); Sfx.boom(.8); }],
+    ];
+    const r = runner(s, 9.5, plan, reset);
+    // стоп-кадр: постеры лежат на колесе
+    set($('.table', s), 1); set($('.pin', s), 1);
+    pa.style.transform = lie(-10.5); pb.style.transform = lie(10.5);
+    io(s, r);
+  })();
 
   // ---------- А. Ракорд ----------
   (() => {
