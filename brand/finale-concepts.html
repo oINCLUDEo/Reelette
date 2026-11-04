@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Финал Reelette</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alan+Sans:wght@500;700&family=Carlito:wght@400;700&display=swap">
+<style>
+/* Раскладка: одна колонка «зал»: над каждым экраном 16:9 — название приёма, под ним — что происходит по секундам.
+   Цвета и шрифты — из гайдлайна ulya: Deep Black, Laser Blue, Light Silver; Alan Sans — латинский знак REELETTE; у него нет кириллицы, поэтому русские заголовки до файлов Lack набраны Carlito Bold */
+:root {
+  --black: #141414; --black-2: #1C1C1E; --black-3: #262628; --line: rgba(226,226,226,.12);
+  --blue: #465DFF; --blue-hi: #8C9BFF; --blue-glow: rgba(70,93,255,.55);
+  --silver: #E2E2E2; --silver-2: rgba(226,226,226,.66);
+  --f-head: "Alan Sans", "Carlito", system-ui, sans-serif;
+  --f-ui: "Carlito", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+@property --a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--black); color: var(--silver); font: 400 17px/1.5 var(--f-ui);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 80px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+header { display: flex; flex-direction: column; gap: 18px; }
+.mark { display: flex; align-items: center; gap: 12px; font: 700 22px/1 var(--f-head); letter-spacing: .02em; text-transform: uppercase; }
+.mark svg { width: 30px; height: 30px; }
+h1 { margin: 0; font: 700 clamp(38px, 6vw, 72px)/1 var(--f-head); letter-spacing: -.02em; text-wrap: balance; }
+header p { margin: 0; max-width: 62ch; color: var(--silver-2); }
+.sound { align-self: flex-start; display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 18px; border-radius: 99px; border: 1px solid var(--line); background: var(--black-2); color: var(--silver); font: 700 15px var(--f-ui); cursor: pointer; }
+.sound[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+.sound:focus-visible, .play:focus-visible { outline: 2px solid var(--silver); outline-offset: 3px; }
+
+section.concept { display: flex; flex-direction: column; gap: 18px; }
+.c-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.c-head h2 { margin: 0; font: 700 clamp(26px, 3.4vw, 38px)/1.1 var(--f-head); letter-spacing: -.01em; }
+.c-head h2 small { display: block; margin-bottom: 6px; font: 700 13px/1 var(--f-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--blue-hi); }
+.c-head .len { font: 700 14px var(--f-ui); color: var(--silver-2); font-variant-numeric: tabular-nums; }
+.lead { margin: 0; max-width: 66ch; color: var(--silver-2); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 24px; }
+.beats li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; font-size: 15px; color: var(--silver-2); }
+.beats b { color: var(--silver); font-variant-numeric: tabular-nums; }
+
+/* экран: 16:9, всё внутри в cqw — сцена масштабируется вместе с ним */
+.screen { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 18px; overflow: hidden; background: #050506; container-type: inline-size; isolation: isolate; box-shadow: 0 0 0 1px var(--line), 0 40px 80px rgba(0,0,0,.45); }
+.screen > * { position: absolute; }
+.play { position: absolute; z-index: 50; right: 16px; bottom: 16px; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 12px; border-radius: 99px; border: 0; background: rgba(20,20,20,.72); color: var(--silver); font: 700 15px var(--f-ui); cursor: pointer; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.play svg { width: 18px; height: 18px; }
+.play:hover { background: var(--blue); color: #fff; }
+.progress { left: 0; bottom: 0; z-index: 49; height: 3px; width: 100%; background: var(--blue); transform-origin: left; transform: scaleX(0); }
+
+/* постеры-заглушки: у настоящих будут картинки */
+.poster { width: 18cqw; aspect-ratio: 2 / 3; border-radius: 1.1cqw; overflow: hidden; display: flex; align-items: flex-end; padding: 1.3cqw; box-shadow: 0 2cqw 4cqw rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.12); }
+.poster span { font: 700 1.7cqw/1.05 var(--f-head); color: #fff; text-wrap: balance; text-shadow: 0 .2cqw 1cqw rgba(0,0,0,.5); }
+.pA { background: radial-gradient(60% 40% at 50% 38%, rgba(255,255,255,.9) 0 6%, rgba(255,200,140,.55) 9%, transparent 26%), radial-gradient(120% 70% at 50% 40%, #1b2a5c, #05060c 70%); }
+.pB { background: linear-gradient(180deg, #ff9a5a 0%, #e2456b 38%, #3a1e5c 70%, #120a1c 100%); }
+.dim { background: linear-gradient(160deg, #2a2a2e, #101012); }
+
+.cap { font: 700 1.1cqw/1 var(--f-ui); letter-spacing: .3em; text-transform: uppercase; color: var(--silver-2); }
+
+/* ---------- А. Ракорд: проекционный ракорд с отсчётом, вспышки финалистов между кадрами, плёнка ---------- */
+.lead-ring { left: 50%; top: 50%; width: 44cqw; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; opacity: 0; }
+.lead-ring i { position: absolute; inset: 0; border-radius: 50%; }
+.lead-ring .r1 { border: .35cqw solid var(--silver); }
+.lead-ring .r2 { inset: 9%; border: .2cqw solid rgba(226,226,226,.55); }
+.lead-ring .sweep { inset: 0; background: conic-gradient(from 0deg, rgba(70,93,255,.85) var(--a, 0deg), transparent 0); mix-blend-mode: screen; }
+.cross { inset: 0; opacity: 0; }
+.cross::before, .cross::after { content: ""; position: absolute; background: rgba(226,226,226,.35); }
+.cross::before { left: 50%; top: 0; bottom: 0; width: .15cqw; }
+.cross::after { top: 50%; left: 0; right: 0; height: .15cqw; }
+.lead-n { left: 50%; top: 50%; translate: -50% -50%; font: 700 26cqw/1 var(--f-head); color: var(--silver); opacity: 0; font-variant-numeric: tabular-nums; }
+.cut { inset: 0; opacity: 0; background-size: cover; }
+.cut .poster { position: absolute; left: 50%; top: 50%; width: 34cqw; translate: -50% -50%; }
+.grain { inset: -10%; z-index: 40; pointer-events: none; opacity: .0; mix-blend-mode: screen; }
+.scratch { top: 0; bottom: 0; width: .12cqw; background: rgba(255,255,255,.55); opacity: 0; z-index: 41; }
+.vignette { inset: 0; z-index: 39; pointer-events: none; background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0,0,0,.8)); }
+.title-card { inset: 0; display: grid; place-items: center; align-content: center; gap: 2.4cqw; opacity: 0; }
+.big { font: 700 12cqw/.9 var(--f-head); letter-spacing: -.02em; text-transform: uppercase; color: var(--silver); }
+.vs { display: flex; align-items: center; gap: 2.6cqw; font: 700 2cqw var(--f-head); }
+.vs i { font-style: normal; color: var(--blue); }
+.duo { inset: 0; display: flex; align-items: center; justify-content: center; gap: 22cqw; opacity: 0; }
+.duo .poster { width: 21cqw; }
+.duo-x { left: 50%; top: 50%; translate: -50% -50%; font: 700 6cqw var(--f-head); color: var(--blue); opacity: 0; text-shadow: 0 0 3cqw var(--blue-glow); }
+.flash { inset: 0; z-index: 45; background: #fff; opacity: 0; pointer-events: none; }
+
+/* ---------- Б. Трейлер: шторки 2.39:1, анаморфный блик Laser Blue, карточки с текстом, жёсткие склейки ---------- */
+.bar { left: 0; right: 0; height: 0; z-index: 30; background: #000; }
+.bar.t { top: 0; } .bar.b { bottom: 0; }
+.flare { left: -10%; top: 50%; width: 120%; height: .25cqw; translate: 0 -50%; z-index: 25; opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(70,93,255,.0) 10%, rgba(140,155,255,.9) 46%, #fff 50%, rgba(140,155,255,.9) 54%, rgba(70,93,255,0) 90%, transparent);
+  box-shadow: 0 0 2cqw .5cqw var(--blue-glow), 0 0 8cqw 2cqw rgba(70,93,255,.25); }
+.card { inset: 0; display: grid; place-items: center; text-align: center; font: 700 4.4cqw/1 var(--f-head); letter-spacing: .32em; text-transform: uppercase; color: var(--silver); opacity: 0; padding-left: .32em; }
+.shot { inset: 0; opacity: 0; overflow: hidden; }
+.shot .bgblur { position: absolute; inset: -10%; filter: blur(3cqw) brightness(.55) saturate(1.2); }
+.shot .poster { position: absolute; left: 22%; top: 50%; translate: -50% -50%; width: 22cqw; }
+.shot .name { position: absolute; left: 40%; top: 50%; translate: 0 -50%; display: flex; flex-direction: column; gap: 1.2cqw; }
+.shot .name b { font: 700 5cqw/1 var(--f-head); color: #fff; letter-spacing: -.02em; }
+.shot .name span { font: 400 1.6cqw/1 var(--f-ui); color: var(--silver-2); }
+.split { inset: 0; display: grid; grid-template-columns: 1fr 1fr; opacity: 0; }
+.split > div { position: relative; overflow: hidden; }
+.split .bgblur { position: absolute; inset: -10%; filter: blur(2.5cqw) brightness(.45); }
+.split .seam { position: absolute; left: 50%; top: 0; bottom: 0; width: .2cqw; translate: -50% 0; background: #fff; box-shadow: 0 0 2cqw var(--blue), 0 0 6cqw var(--blue-glow); z-index: 3; }
+.trailer-title { inset: 0; display: grid; place-items: center; z-index: 5; opacity: 0; }
+.trailer-title .big { background: linear-gradient(100deg, var(--silver) 40%, #fff 50%, var(--silver) 60%) 0 0 / 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; }
+.count { left: 50%; top: 50%; translate: -50% -50%; z-index: 26; font: 700 22cqw/1 var(--f-head); color: #fff; opacity: 0; text-shadow: 0 0 4cqw var(--blue-glow); font-variant-numeric: tabular-nums; }
+
+/* ---------- В. Студия: коридор из выбывших постеров, камера летит к двум финалистам под лучом, «ФИНАЛ» серебром ---------- */
+.space { inset: 0; perspective: 60cqw; perspective-origin: 50% 46%; overflow: hidden; }
+.dolly { position: absolute; left: 50%; top: 50%; transform-style: preserve-3d; }
+.dolly .poster { position: absolute; width: 12cqw; translate: -50% -50%; }
+.floor { left: -50%; right: -50%; top: 62%; bottom: -60%; background: radial-gradient(50% 40% at 50% 0%, rgba(70,93,255,.28), transparent 70%), linear-gradient(#0b0b0d, #050506); transform: perspective(40cqw) rotateX(62deg); transform-origin: top; opacity: 0; }
+.beam { left: 50%; top: -10%; width: 46cqw; height: 80%; translate: -50% 0; opacity: 0; filter: blur(1.2cqw); mix-blend-mode: screen;
+  background: linear-gradient(180deg, rgba(140,155,255,.05), rgba(70,93,255,.35)); clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%); }
+.pair { inset: 0; display: flex; justify-content: center; align-items: center; gap: 16cqw; perspective: 60cqw; opacity: 0; padding-top: 14cqw; }
+.pair .poster { width: 17cqw; -webkit-box-reflect: below .6cqw linear-gradient(transparent 70%, rgba(255,255,255,.2)); }
+.pair .poster:first-child { transform: rotateY(24deg); }
+.pair .poster:last-child { transform: rotateY(-24deg); }
+.presents { left: 0; right: 0; top: 7%; text-align: center; opacity: 0; }
+.silver { left: 0; right: 0; top: 3%; text-align: center; opacity: 0; }
+.silver .big { font-size: 9cqw; background: linear-gradient(100deg, #8a8a8a 0%, #f2f2f2 22%, #9a9a9a 34%, #ffffff 50%, #8f8f8f 64%, #e2e2e2 80%, #7a7a7a 100%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 .6cqw 1.6cqw rgba(0,0,0,.6)); }
+.mini-count { left: 50%; top: 54%; translate: -50% -50%; font: 700 7cqw/1 var(--f-head); color: #fff; opacity: 0; text-shadow: 0 0 3cqw var(--blue-glow); z-index: 6; }
+
+footer { color: var(--silver-2); font-size: 15px; max-width: 66ch; }
+@media (max-width: 560px) { .play { right: 10px; bottom: 10px; height: 34px; font-size: 13px; } }
+@media (prefers-reduced-motion: reduce) { .grain, .scratch { display: none; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#E2E2E2" stroke-width="3"/><path d="M16 3v26M3 16h26M6.8 6.8l18.4 18.4M25.2 6.8 6.8 25.2" stroke="#E2E2E2" stroke-width="1.6"/><circle cx="16" cy="16" r="4.5" fill="#465DFF"/></svg>Reelette</div>
+    <h1>Финал: три интро</h1>
+    <p>Перед последним прокрутом на экране двое финалистов. Каждый вариант длится около 8 секунд и заканчивается стартом колеса. Постеры здесь нарисованы вместо картинок, в комнате будут настоящие. Нажмите «Смотреть», со звуком эффект сильнее.</p>
+    <button class="sound" id="sound" type="button" aria-pressed="false">Звук выключен</button>
+  </header>
+
+  <section class="concept" id="leader">
+    <div class="c-head"><h2><small>Вариант А</small>Ракорд</h2><span class="len">8 с</span></div>
+    <div class="screen" data-scene="leader">
+      <div class="cut" data-cut="A"><div class="poster pA"><span>Интерстеллар</span></div></div>
+      <div class="cut" data-cut="B"><div class="poster pB"><span>Однажды в Голливуде</span></div></div>
+      <div class="lead-ring"><i class="r1"></i><i class="r2"></i><i class="sweep"></i></div>
+      <div class="cross"></div>
+      <div class="lead-n">5</div>
+      <div class="title-card"><div class="cap">последний прокрут</div><div class="big">Финал</div><div class="vs">Интерстеллар <i>×</i> Однажды в Голливуде</div></div>
+      <div class="duo"><div class="poster pA"><span>Интерстеллар</span></div><div class="poster pB"><span>Однажды в Голливуде</span></div></div>
+      <div class="duo-x">×</div>
+      <i class="scratch" style="left:31%"></i><i class="scratch" style="left:72%"></i>
+      <canvas class="grain"></canvas><i class="vignette"></i><i class="flash"></i>
+      <i class="progress"></i>
+      <button class="play" type="button"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>Смотреть</button>
+    </div>
+    <p class="lead">Экран превращается в киноплёнку перед сеансом: ракорд с кольцами и синим лучом отсчитывает 5, 4, 3, 2. Между цифрами на два кадра мелькают финалисты, по очереди. На единице вспышка, титр «Финал», потом оба постера выезжают навстречу друг другу.</p>
+    <ul class="beats"><li><b>0–4 с</b>отсчёт ракорда, вспышки постеров, зерно и царапины</li><li><b>4–6 с</b>вспышка, титр «Финал» и имена</li><li><b>6–8 с</b>постеры навстречу, знак «×», старт колеса</li></ul>
+  </section>
+
+  <section class="concept" id="trailer">
+    <div class="c-head"><h2><small>Вариант Б</small>Трейлер</h2><span class="len">8 с</span></div>
+    <div class="screen" data-scene="trailer">
+      <div class="card" data-card="1">Два фильма</div>
+      <div class="card" data-card="2">Один вечер</div>
+      <div class="shot" data-shot="A"><div class="bgblur pA"></div><div class="poster pA"><span>Интерстеллар</span></div><div class="name"><b>Интерстеллар</b><span>добавила Аня</span></div></div>
+      <div class="shot" data-shot="B"><div class="bgblur pB"></div><div class="poster pB"><span>Однажды в Голливуде</span></div><div class="name"><b>Однажды в&nbsp;Голливуде</b><span>добавил Боря</span></div></div>
+      <div class="split"><div><div class="bgblur pA"></div></div><div><div class="bgblur pB"></div></div><i class="seam"></i></div>
+      <div class="trailer-title"><div class="big">Финал</div></div>
+      <div class="count">3</div>
+      <i class="flare"></i>
+      <i class="bar t"></i><i class="bar b"></i>
+      <i class="flash"></i><i class="progress"></i>
+      <button class="play" type="button"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>Смотреть</button>
+    </div>
+    <p class="lead">Ритм трейлера. Сверху и снизу съезжаются чёрные шторки до широкого кадра, через экран проходит синий анаморфный блик. Две короткие карточки с текстом, затем каждый финалист получает свой кадр с именем того, кто его добавил. Экран делится пополам по светящейся черте, «Финал» проходит бликом, и три жёстких удара отсчёта открывают колесо.</p>
+    <ul class="beats"><li><b>0–2,6 с</b>шторки, блик, «Два фильма», «Один вечер»</li><li><b>2,6–4,6 с</b>кадр первого финалиста, склейка, кадр второго</li><li><b>4,6–8 с</b>раскол, «Финал», 3·2·1, шторки расходятся</li></ul>
+  </section>
+
+  <section class="concept" id="studio">
+    <div class="c-head"><h2><small>Вариант В</small>Студия</h2><span class="len">8 с</span></div>
+    <div class="screen" data-scene="studio">
+      <div class="space"><div class="dolly"></div></div>
+      <i class="floor"></i><i class="beam"></i>
+      <div class="pair"><div class="poster pA"><span>Интерстеллар</span></div><div class="poster pB"><span>Однажды в Голливуде</span></div></div>
+      <div class="presents cap">Reelette представляет</div>
+      <div class="silver"><div class="big">Финал</div></div>
+      <div class="mini-count">3</div>
+      <i class="flash"></i><i class="progress"></i>
+      <button class="play" type="button"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>Смотреть</button>
+    </div>
+    <p class="lead">Заставка киностудии. Камера летит по тёмному коридору из постеров всех выбывших за вечер, они проносятся мимо и гаснут. В конце коридора двое финалистов стоят друг напротив друга на зеркальном полу, сверху падает синий луч. «Reelette представляет», серебряное «Финал» с бликом по металлу и короткий отсчёт.</p>
+    <ul class="beats"><li><b>0–2,8 с</b>пролёт по коридору выбывших</li><li><b>2,8–4,4 с</b>финалисты под лучом, «Reelette представляет»</li><li><b>4,4–8 с</b>серебряный «Финал», 3·2·1</li></ul>
+  </section>
+
+  <footer>Длительность любого варианта можно подогнать: сейчас перед финалом пауза 5 секунд, для интро её стоит сделать 8. Музыку и звуки на сайте подберём под выбранный вариант.</footer>
+</div>
+
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+  // ---- звук: синтез в WebAudio, включается кнопкой ----
+  let ac = null, soundOn = false;
+  const sbtn = $('#sound');
+  sbtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    if (soundOn && !ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
+    ac?.resume?.();
+    sbtn.setAttribute('aria-pressed', String(soundOn));
+    sbtn.textContent = soundOn ? 'Звук включён' : 'Звук выключен';
+  });
+  const out = () => { const g = ac.createGain(); g.connect(ac.destination); return g; };
+  const Sfx = {
+    beep(f = 1000, d = .09, v = .18) { if (!soundOn || !ac) return; const t = ac.currentTime, o = ac.createOscillator(), g = out(); o.frequency.value = f; o.type = 'sine'; g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g); o.start(t); o.stop(t + d + .02); },
+    boom(v = .9) { if (!soundOn || !ac) return; const t = ac.currentTime, o = ac.createOscillator(), g = out(); o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(32, t + .9); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.0001, t + 1.4); o.connect(g); o.start(t); o.stop(t + 1.5); this.noise(.25, .35, 800); },
+    braam(v = .5) { if (!soundOn || !ac) return; const t = ac.currentTime; [55, 55.6, 82.4, 110].forEach((f, i) => { const o = ac.createOscillator(), g = out(), lp = ac.createBiquadFilter(); o.type = 'sawtooth'; o.frequency.value = f; lp.type = 'lowpass'; lp.frequency.setValueAtTime(200, t); lp.frequency.linearRampToValueAtTime(1400, t + .25); lp.frequency.exponentialRampToValueAtTime(180, t + 2.2); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v / (i + 1.5), t + .06); g.gain.exponentialRampToValueAtTime(.0001, t + 2.4); o.connect(lp); lp.connect(g); o.start(t); o.stop(t + 2.5); }); },
+    noise(d = .6, v = .2, f = 3000, rise = false) { if (!soundOn || !ac) return; const t = ac.currentTime, n = ac.sampleRate * d, b = ac.createBuffer(1, n, ac.sampleRate), ch = b.getChannelData(0); for (let i = 0; i < n; i++) ch[i] = Math.random() * 2 - 1; const s = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = out(); s.buffer = b; bp.type = 'bandpass'; bp.frequency.setValueAtTime(rise ? 300 : f, t); if (rise) bp.frequency.exponentialRampToValueAtTime(f, t + d); g.gain.setValueAtTime(rise ? .0001 : v, t); if (rise) g.gain.exponentialRampToValueAtTime(v, t + d * .95); else g.gain.exponentialRampToValueAtTime(.0001, t + d); s.connect(bp); bp.connect(g); s.start(t); },
+    projector(d) { if (!soundOn || !ac) return; for (let k = 0; k < d * 24; k++) setTimeout(() => this.noise(.02, .05, 2200), k * 1000 / 24); },
+  };
+
+  // ---- общий движок: план — список [секунда, функция]; повторный запуск отменяет прошлый ----
+  function runner(screen, total, plan, reset) {
+    let timers = [];
+    const prog = $('.progress', screen), btn = $('.play', screen);
+    const stop = () => { timers.forEach(clearTimeout); timers = []; screen.getAnimations({ subtree: true }).forEach(a => a.cancel()); };
+    const play = () => {
+      stop(); reset();
+      if (!reduce) prog.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: total * 1000, easing: 'linear', fill: 'forwards' });
+      for (const [t, fn] of plan) timers.push(setTimeout(fn, t * 1000));
+      btn.lastChild.textContent = 'Ещё раз';
+    };
+    btn.addEventListener('click', () => { ac?.resume?.(); play(); });
+    return { play, stop };
+  }
+  const A = (el, frames, o) => el && el.animate(frames, { fill: 'forwards', easing: 'cubic-bezier(.2,.8,.2,1)', ...o });
+  const show = (el, d = 300) => A(el, [{ opacity: 0 }, { opacity: 1 }], { duration: d });
+  const hide = (el, d = 200) => A(el, [{ opacity: 1 }, { opacity: 0 }], { duration: d });
+  const set = (el, o) => el && el.animate([{ opacity: o }, { opacity: o }], { duration: 1, fill: 'forwards' });
+  const flash = (scr, v = 1, d = 380) => A($('.flash', scr), [{ opacity: v }, { opacity: 0 }], { duration: d, easing: 'ease-out' });
+
+  // ---------- А. Ракорд ----------
+  (() => {
+    const s = $('[data-scene="leader"]'), ring = $('.lead-ring', s), sweep = $('.sweep', s), num = $('.lead-n', s), cross = $('.cross', s);
+    const grain = $('.grain', s), g = grain.getContext('2d');
+    let gl = null;
+    const grainOn = on => {
+      cancelAnimationFrame(gl);
+      if (!on || reduce) return;
+      grain.width = 240; grain.height = 135;
+      const img = g.createImageData(240, 135);
+      const loop = () => { for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255 | 0; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 40; } g.putImageData(img, 0, 0); gl = requestAnimationFrame(loop); };
+      loop();
+    };
+    const reset = () => { grainOn(false); $$('.cut, .lead-ring, .cross, .lead-n, .title-card, .duo, .duo-x, .scratch, .grain', s).forEach(e => set(e, 0)); };
+    const scratches = () => $$('.scratch', s).forEach((sc, i) => A(sc, [{ opacity: 0 }, { opacity: .7, offset: .1 }, { opacity: 0, offset: .2 }, { opacity: .5, offset: .55 }, { opacity: 0 }], { duration: 900, delay: i * 340, iterations: 4, easing: 'steps(6)' }));
+    const tick = (n, cut) => () => {
+      num.textContent = n; set(num, 1);
+      A(sweep, [{ '--a': '0deg' }, { '--a': '360deg' }], { duration: 1000, easing: 'linear' });
+      A(ring, [{ scale: 1.04 }, { scale: 1 }], { duration: 300 });
+      Sfx.beep(n === 2 ? 1400 : 1000);
+      if (cut) { const c = $(`[data-cut="${cut}"]`, s); A(c, [{ opacity: .85 }, { opacity: .85, offset: .6 }, { opacity: 0 }], { duration: 140, easing: 'steps(2)' }); }
+    };
+    const plan = [
+      [0, () => { grainOn(true); set(grain, .35); A(ring, [{ opacity: 0 }, { opacity: .9, offset: .2 }, { opacity: .3, offset: .35 }, { opacity: 1 }], { duration: 400, easing: 'steps(4)' }); show(cross, 200); scratches(); Sfx.projector(4); }],
+      [.1, tick(5, 'A')], [1.1, tick(4, 'B')], [2.1, tick(3, 'A')], [3.1, tick(2, 'B')],
+      [4.05, () => { flash(s, 1, 500); [ring, cross, num].forEach(e => set(e, 0)); Sfx.boom(); }],
+      [4.2, () => { const t = $('.title-card', s); show(t, 500); A($('.big', t), [{ letterSpacing: '.4em', filter: 'blur(1cqw)' }, { letterSpacing: '-.02em', filter: 'blur(0)' }], { duration: 1400 }); A($('.vs', t), [{ opacity: 0, translate: '0 1cqw' }, { opacity: 1, translate: '0 0' }], { duration: 700, delay: 500 }); }],
+      [6.1, () => { hide($('.title-card', s), 250); const d = $('.duo', s), ps = $$('.poster', d); set(d, 1); A(ps[0], [{ transform: 'translateX(-40cqw) rotate(-8deg)' }, { transform: 'none' }], { duration: 900, easing: 'cubic-bezier(.16,1,.3,1)' }); A(ps[1], [{ transform: 'translateX(40cqw) rotate(8deg)' }, { transform: 'none' }], { duration: 900, easing: 'cubic-bezier(.16,1,.3,1)' }); Sfx.noise(.5, .18, 1800, true); }],
+      [6.9, () => { const x = $('.duo-x', s); show(x, 150); A(x, [{ scale: 2.4 }, { scale: 1 }], { duration: 500 }); flash(s, .35, 300); Sfx.boom(.6); }],
+      [7.7, () => { A($('.duo', s), [{ opacity: 1, scale: 1 }, { opacity: 0, scale: .9 }], { duration: 300, easing: 'ease-in' }); hide($('.duo-x', s), 200); grainOn(false); hide(grain, 200); }],
+    ];
+    const r = runner(s, 8, plan, reset);
+    // стоп-кадр в покое: титр с именами
+    set($('.title-card', s), 1);
+    io(s, r);
+  })();
+
+  // ---------- Б. Трейлер ----------
+  (() => {
+    const s = $('[data-scene="trailer"]'), bars = $$('.bar', s), flare = $('.flare', s), count = $('.count', s);
+    const reset = () => { $$('.card, .shot, .split, .trailer-title, .count, .flare', s).forEach(e => set(e, 0)); bars.forEach(b => A(b, [{ height: '0' }, { height: '0' }], { duration: 1 })); };
+    const sweepFlare = (d = 900) => { set(flare, 1); A(flare, [{ transform: 'translate(-60%, -50%) scaleX(.4)', opacity: 0 }, { opacity: 1, offset: .3 }, { transform: 'translate(60%, -50%) scaleX(1.4)', opacity: 0 }], { duration: d, easing: 'cubic-bezier(.5,0,.5,1)' }); };
+    const card = (n, d) => () => { const c = $(`[data-card="${n}"]`, s); A(c, [{ opacity: 0, letterSpacing: '.18em' }, { opacity: 1, offset: .2 }, { opacity: 1, offset: .8 }, { opacity: 0, letterSpacing: '.42em' }], { duration: d, easing: 'linear' }); Sfx.noise(.4, .12, 5000); };
+    const shot = id => () => { $$('.shot', s).forEach(e => set(e, 0)); const sh = $(`[data-shot="${id}"]`, s); set(sh, 1); A($('.poster', sh), [{ scale: 1.08 }, { scale: 1 }], { duration: 1000, easing: 'cubic-bezier(.16,1,.3,1)' }); A($('.bgblur', sh), [{ scale: 1 }, { scale: 1.12 }], { duration: 1000, easing: 'linear' }); A($('.name', sh), [{ opacity: 0, translate: '-2cqw -50%' }, { opacity: 1, translate: '0 -50%' }], { duration: 600, delay: 120 }); Sfx.boom(.55); };
+    const beat = n => () => { count.textContent = n; set(count, 1); A(count, [{ scale: 1.6, opacity: 0, filter: 'blur(1.2cqw)' }, { scale: 1, opacity: 1, filter: 'blur(0)', offset: .35 }, { opacity: 1, offset: .75 }, { opacity: 0 }], { duration: 800, easing: 'cubic-bezier(.16,1,.3,1)' }); flash(s, .5, 260); A($('.split', s), [{ scale: 1.04 }, { scale: 1 }], { duration: 400 }); Sfx.boom(.8); };
+    const plan = [
+      [0, () => { bars.forEach(b => A(b, [{ height: '0' }, { height: '12.2%' }], { duration: 700, easing: 'cubic-bezier(.7,0,.3,1)' })); Sfx.noise(1.2, .2, 2500, true); }],
+      [.5, () => sweepFlare(1000)], [.7, card(1, 1100)], [1.8, () => sweepFlare(800)], [1.9, card(2, 1000)],
+      [2.7, shot('A')], [3.7, shot('B')],
+      [4.7, () => { $$('.shot', s).forEach(e => set(e, 0)); const sp = $('.split', s); set(sp, 1); A($$('.split > div', s)[0], [{ transform: 'translateX(-30%)' }, { transform: 'none' }], { duration: 700, easing: 'cubic-bezier(.16,1,.3,1)' }); A($$('.split > div', s)[1], [{ transform: 'translateX(30%)' }, { transform: 'none' }], { duration: 700, easing: 'cubic-bezier(.16,1,.3,1)' }); A($('.seam', s), [{ scale: '1 0' }, { scale: '1 1' }], { duration: 600 }); const tt = $('.trailer-title', s); show(tt, 300); A($('.big', tt), [{ backgroundPosition: '100% 0' }, { backgroundPosition: '0% 0' }], { duration: 1400, easing: 'ease-in-out' }); sweepFlare(1000); Sfx.braam(); }],
+      [5.8, () => { hide($('.trailer-title', s), 200); beat(3)(); }], [6.5, beat(2)], [7.2, beat(1)],
+      [7.75, () => { bars.forEach(b => A(b, [{ height: '12.2%' }, { height: '0' }], { duration: 500, easing: 'cubic-bezier(.7,0,.3,1)' })); hide($('.split', s), 400); flash(s, .8, 450); }],
+    ];
+    const r = runner(s, 8, plan, reset);
+    set($('.split', s), 1); set($('.trailer-title', s), 1);
+    io(s, r);
+  })();
+
+  // ---------- В. Студия ----------
+  (() => {
+    const s = $('[data-scene="studio"]'), dolly = $('.dolly', s);
+    const titles = ['Начало', 'Паразиты', 'Дюна', 'Оппенгеймер', 'Достать ножи', 'Бегущий по лезвию', 'Ла-Ла Ленд', 'Аватар', 'Джокер', 'Матрица', 'Престиж', 'Солярис'];
+    // постеры выбывших по обе стороны коридора, всё глубже
+    dolly.innerHTML = titles.map((t, i) => { const side = i % 2 ? 1 : -1, z = -i * 26; return `<div class="poster dim" style="transform: translate3d(${side * 22}cqw, ${(i % 3 - 1) * 3}cqw, ${z}cqw) rotateY(${-side * 62}deg)"><span>${t}</span></div>`; }).join('');
+    const reset = () => { $$('.floor, .beam, .pair, .presents, .silver, .mini-count', s).forEach(e => set(e, 0)); set($('.space', s), 1); };
+    const beat = n => () => { const c = $('.mini-count', s); c.textContent = n; set(c, 1); A(c, [{ scale: 1.5, opacity: 0 }, { scale: 1, opacity: 1, offset: .3 }, { opacity: 1, offset: .8 }, { opacity: 0 }], { duration: 700 }); const ps = $$('.pair .poster', s); A(ps[0], [{ transform: 'rotateY(24deg)' }, { transform: 'rotateY(12deg) translateX(2cqw)', offset: .2 }, { transform: 'rotateY(24deg)' }], { duration: 650 }); A(ps[1], [{ transform: 'rotateY(-24deg)' }, { transform: 'rotateY(-12deg) translateX(-2cqw)', offset: .2 }, { transform: 'rotateY(-24deg)' }], { duration: 650 }); A($('.beam', s), [{ opacity: 1.4, filter: 'blur(1.2cqw) brightness(2)' }, { opacity: 1, filter: 'blur(1.2cqw)' }], { duration: 500 }); Sfx.boom(.7); };
+    const plan = [
+      [0, () => { A(dolly, [{ transform: 'translateZ(-40cqw)' }, { transform: 'translateZ(320cqw)' }], { duration: 2900, easing: 'cubic-bezier(.55,0,.25,1)' }); $$('.poster', dolly).forEach((p, i) => A(p, [{ opacity: 0 }, { opacity: .9, offset: .25 }, { opacity: .9, offset: .7 }, { opacity: 0 }], { duration: 2900, delay: i * 20, easing: 'linear' })); Sfx.noise(2.8, .3, 1800, true); }],
+      [2.6, () => { hide($('.space', s), 300); show($('.floor', s), 600); }],
+      [2.8, () => { const p = $('.pair', s); set(p, 1); A(p, [{ opacity: 0, transform: 'translateZ(0) scale(.85)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 1200, easing: 'cubic-bezier(.16,1,.3,1)' }); A($('.beam', s), [{ opacity: 0 }, { opacity: .8, offset: .15 }, { opacity: .1, offset: .3 }, { opacity: 1 }], { duration: 700, easing: 'steps(5)' }); Sfx.boom(.5); }],
+      [3.5, () => A($('.presents', s), [{ opacity: 0, letterSpacing: '.2em' }, { opacity: 1, letterSpacing: '.36em' }], { duration: 900 })],
+      [4.4, () => { hide($('.presents', s), 300); const sv = $('.silver', s); show(sv, 400); A($('.big', sv), [{ backgroundPosition: '100% 0', transform: 'scale(1.06)' }, { backgroundPosition: '0% 0', transform: 'scale(1)' }], { duration: 2200, easing: 'cubic-bezier(.3,0,.2,1)' }); Sfx.braam(.45); }],
+      [5.6, beat(3)], [6.3, beat(2)], [7.0, beat(1)],
+      [7.6, () => { flash(s, .9, 450); ['.pair', '.silver', '.beam', '.floor'].forEach(q => hide($(q, s), 350)); }],
+    ];
+    const r = runner(s, 8, plan, reset);
+    set($('.space', s), 0); set($('.floor', s), 1); set($('.beam', s), 1); set($('.pair', s), 1); set($('.silver', s), 1);
+    io(s, r);
+  })();
+
+  // при первой прокрутке до экрана вариант проигрывается сам, без звука
+  function io(screen, r) {
+    if (reduce || !('IntersectionObserver' in window)) return;
+    const ob = new IntersectionObserver(es => { if (es[0].isIntersecting && es[0].intersectionRatio > .6) { ob.disconnect(); r.play(); } }, { threshold: [.6] });
+    ob.observe(screen);
+  }
+})();
+</script>
+
+</body>
+</html>
