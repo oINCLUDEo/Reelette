@@ -20,9 +20,9 @@ const ICON = {
 };
 
 // ---------- палитра ----------
-const PALS = ['night', 'mono', 'ember'];
+const PALS = ['ulya', 'night', 'mono', 'ember'];
 function applyPalette(p) {
-  if (!PALS.includes(p)) p = 'night';
+  if (!PALS.includes(p)) p = 'ulya';
   document.documentElement.dataset.pal = p;
   ls.set('pal', p);
   window.setBackdropColors?.();
@@ -32,7 +32,8 @@ function applyPalette(p) {
 }
 
 let wheel = null, demo = null;
-applyPalette(ls.get('pal', 'night'));
+// фирменная палитра — для всех, кто палитру сам не выбирал (прошлое значение по умолчанию «Ночь» тоже переезжает)
+applyPalette(ls.get('palPicked', false) ? ls.get('pal', 'ulya') : 'ulya');
 
 // ---------- появление: заголовки из маски, блоки из размытия ----------
 document.documentElement.classList.add('js');
@@ -308,7 +309,7 @@ function initRoom(roomId) {
   let provider = 'none';
   // серия «до победителя» по умолчанию включена: на выбывании колесо само крутит до финала
   // дуэль убрана: кто выбирал её последней, тот попадает в обычный режим
-  const settings = { mode: ls.get('mode', 'normal') === 'elimination' ? 'elimination' : 'normal', duration: ls.get('dur', 12), auto: ls.get('auto', true), sound: ls.get('sound', true), showOut: ls.get('showOut', false), flyChat: ls.get('flyChat', true), music: ls.get('music', false), delay: 0 };
+  const settings = { mode: ls.get('mode', 'normal') === 'elimination' ? 'elimination' : 'normal', duration: ls.get('dur', 12), auto: ls.get('auto', true), sound: ls.get('sound', true), showOut: ls.get('showOut', false), flyChat: ls.get('flyChat', true), filmAccent: ls.get('filmAccent', false), music: ls.get('music', false), delay: 0 };
   let people = [];
   let countdown = null; // секунд до старта, пока идёт отсчёт
   let countdownTimer = null;
@@ -427,11 +428,14 @@ function initRoom(roomId) {
       (it?.poster ? posterHue(it.poster) : Promise.resolve(it ? hue(it.title || '') : null)).then(h => { if (paintId === id) paintHue(h, ui); });
     }, Math.max(0, 90 - (performance.now() - paintAt)));
   }
+  const BRAND_HUE = 231; // Laser Blue #465DFF
   function paintHue(h, ui) {
+    // акцент палитры: свет комнаты и колесо — её синим; постер остаётся только фоном
+    if (!settings.filmAccent) { document.body.classList.remove('fc'); h = h == null ? null : BRAND_HUE; }
     window.setBackdropTint?.(h);
     wheel.tint = h == null ? null : `hsl(${h} 85% 62%)`;
     if (h != null) $('#roomBg .tug').style.setProperty('--tug', `hsl(${h} 85% 52% / .6)`);
-    if (!ui) return;
+    if (!ui || !settings.filmAccent) return;
     const room = document.body; // на body: окна вне комнаты тоже в цвете фильма
     if (h == null) { room.classList.remove('fc'); return; } // серый постер: акцент темы
     room.style.setProperty('--fa', `hsl(${h} 80% 58%)`);
@@ -3397,6 +3401,11 @@ function initRoom(roomId) {
       .catch(err => { e.target.checked = !e.target.checked; toast(err.message, true); });
   });
   $('#showOutOn').checked = settings.showOut;
+  $('#filmAccentOn').checked = settings.filmAccent;
+  $('#filmAccentOn').addEventListener('change', e => {
+    settings.filmAccent = e.target.checked; ls.set('filmAccent', settings.filmAccent);
+    paintId = undefined; paintFilm(wheel.items[wheel.currentIndex()], true); // перекрасить сразу
+  });
   $('#flyChatOn').checked = settings.flyChat;
   $('#flyChatOn').addEventListener('change', e => { settings.flyChat = e.target.checked; ls.set('flyChat', settings.flyChat); });
   $('#showOutOn').addEventListener('change', e => { settings.showOut = e.target.checked; ls.set('showOut', settings.showOut); });
@@ -3488,7 +3497,7 @@ function initRoom(roomId) {
   });
   $('#roomTitle').addEventListener('click', openSettings);
   $('#roomTitleM').addEventListener('click', openSettings);
-  $('#pals').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) applyPalette(b.dataset.p); });
+  $('#pals').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) { ls.set('palPicked', true); applyPalette(b.dataset.p); } });
   $('#saveSettings').addEventListener('click', async () => {
     const body = { name: $('#setName').value };
     const hook = $('#setHook').value.trim();

@@ -1,7 +1,20 @@
 /* Reelette. Токены на <html data-pal>: один акцент, нейтрали с оттенком.
    Принципы как у Apple: главное — колесо, управление отступает; стекло только у элементов управления над сценой;
    связанные кнопки сгруппированы; скругления концентричны (внутреннее = внешнее − отступ). */
-:root, [data-pal="night"] {
+/* фирменная палитра ulya (гайдлайн): Deep Black #141414, Laser Blue #465DFF, Light Silver #E2E2E2.
+   Нейтрали без оттенка, как в гайдлайне: чёрный, графит, серебро; акцент один — синий */
+:root, [data-pal="ulya"] {
+  --on-acc: #FFFFFF;
+  --bg: #0E0E0E; --sheetA: #141414; --sheetB: #1A1A1A; --s1: #1F1F1F; --s2: #282828; --s3: #343434; --bd: rgba(226,226,226,.08);
+  --tx: #E2E2E2; --tx2: #A6A6A6; --tx3: #8A8A8A;
+  --acc: #465DFF; --acc-hi: #8C9BFF; --glow: rgba(70,93,255,.45);
+  --btn: #E2E2E2; --btn-tx: #141414; --sq: #465DFF; --sq-tx: #FFFFFF;
+  --ghost: rgba(226,226,226,.06); --ghost-bd: rgba(226,226,226,.12);
+  --nav: rgba(20,20,20,.72); --hero: #101010; --h1a: #E2E2E2; --h1b: #8C9BFF;
+  --seg: #1E1E20, #28282B, #18181A, #323236, #222225, #1B1B1D;
+  --grain-op: .08; --ok: #30D158; --bad: #FF453A;
+}
+[data-pal="night"] {
   --on-acc: #FFFFFF;
   --bg: #050508; --sheetA: #0C0B12; --sheetB: #111019; --s1: #18171F; --s2: #22212C; --s3: #2E2D3B; --bd: rgba(255,255,255,.07);
   --tx: #FFFFFF; --tx2: #A9A8B9; --tx3: #8A8999;
@@ -35,8 +48,9 @@
   --grain-op: .09; --ok: #30D158; --bad: #FF453A;
 }
 :root {
-  --f-ui: "Manrope", "Segoe UI", system-ui, sans-serif;
-  --f-head: "Wix Madefor Display", "Manrope", sans-serif;
+  --f-ui: "Carlito", "Segoe UI", system-ui, sans-serif;
+  --f-head: "Lack", "Carlito", "Segoe UI", sans-serif;
+  --f-mark: "Alan Sans", "Carlito", sans-serif; /* только латинский знак REELETTE: кириллицы в Alan Sans нет */
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   --ease: cubic-bezier(.2, .8, .2, 1);
   --spring: cubic-bezier(.34, 1.56, .64, 1);
@@ -49,7 +63,8 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 html { overflow-x: clip; }
-body { background: var(--bg); color: var(--tx); font: 500 15px/1.5 var(--f-ui); -webkit-font-smoothing: antialiased; overflow-x: hidden; transition: background .5s; }
+/* у Carlito маленький очко строчных: font-size-adjust выравнивает его, и подписи 11–13px остаются читаемыми */
+body { background: var(--bg); color: var(--tx); font: 500 15px/1.5 var(--f-ui); font-size-adjust: .5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; background: none; border: 0; padding: 0; }
 a { color: inherit; text-decoration: none; }
@@ -188,7 +203,7 @@ input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px var(--
 .nav { position: sticky; top: 0; z-index: var(--z-nav); padding: 8px 8px 0; }
 .nav .bar { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 8px 6px 14px; border-radius: 20px; background: var(--nav); border: 1px solid var(--bd); -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
 .nav .act { margin-left: auto; display: flex; align-items: center; gap: 10px; flex: none; }
-.brand { display: flex; align-items: center; gap: 10px; font: 800 19px/1 var(--f-head); letter-spacing: -.02em; flex: none; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 19px/1 var(--f-mark); letter-spacing: .02em; text-transform: uppercase; flex: none; }
 .brand svg { width: 28px; height: 28px; color: var(--tx); filter: drop-shadow(0 0 10px var(--glow)); stroke: none; }
 .user-chip { display: flex; align-items: center; gap: 9px; height: 44px; padding: 0 14px 0 5px; border-radius: 12px; background: var(--ghost); border: 1px solid var(--bd); font-weight: 700; font-size: 14.5px; }
 .user-chip img { width: 34px; height: 34px; border-radius: 9px; }
@@ -214,7 +229,7 @@ input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px var(--
 @property --fa-hi { syntax: "<color>"; inherits: false; initial-value: #B8ADFF; }
 @property --fa-glow { syntax: "<color>"; inherits: false; initial-value: rgba(124, 107, 255, .45); }
 /* на body, а не на #room: окна (настройки, профиль) лежат вне комнаты, и их переключатели были в цвете темы */
-body { transition: --fa .7s var(--ease), --fa-hi .7s var(--ease), --fa-glow .7s var(--ease); }
+body { transition: background .5s, --fa .7s var(--ease), --fa-hi .7s var(--ease), --fa-glow .7s var(--ease); }
 html:not([data-pal="mono"]) body.fc { --acc: var(--fa); --acc-hi: var(--fa-hi); --glow: var(--fa-glow); --on-acc: var(--fa-on, #fff); }
 /* фон: два слоя постера сменяют друг друга плавно, поверх затемнение для читаемости текста */
 /* z-index −1 вместо слоя у сетки: у сетки нет своего контекста наложения, и шторка с затемнением на телефоне ложатся правильно */

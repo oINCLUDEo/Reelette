@@ -17,6 +17,8 @@ class Wheel {
     this.tint = null; // цвет постера под стрелкой (app.js): подсветка сектора и свечение ламп
     this.calm = matchMedia('(prefers-reduced-motion: reduce)').matches; // без вспышек ламп
     this.readColors();
+    // подписи рисуются шрифтом интерфейса: когда он догрузился, кэш пересобирается
+    document.fonts?.ready.then(() => { this.dirty = true; });
     new ResizeObserver(() => this.resize()).observe(canvas);
     this.resize();
     this.last = performance.now();
@@ -282,7 +284,7 @@ class Wheel {
       g.translate(c, c); g.rotate(mid);
       const flip = Math.cos(mid + lr) < -0.01;
       if (flip) g.rotate(Math.PI);
-      g.font = `700 ${fs}px Manrope, sans-serif`;
+      g.font = `700 ${fs}px Carlito, sans-serif`;
       g.fillStyle = '#fff';
       g.shadowColor = 'rgba(0,0,0,.8)'; g.shadowBlur = fs * 0.5;
       g.textBaseline = 'middle';
@@ -293,7 +295,7 @@ class Wheel {
       const tw = g.measureText(text).width;
       if (tw > maxW) {
         const f2 = fs * maxW / tw;
-        if (f2 >= fs * 0.75 && f2 / dpr >= 10.5 && f2 >= 9) g.font = `700 ${f2}px Manrope, sans-serif`;
+        if (f2 >= fs * 0.75 && f2 / dpr >= 10.5 && f2 >= 9) g.font = `700 ${f2}px Carlito, sans-serif`;
         else if (img?.ok) { g.restore(); return; }
         else {
           while (text.length > 1 && g.measureText(text + '…').width > maxW) text = text.slice(0, -1);
@@ -392,14 +394,14 @@ class Wheel {
     const count = this.items.filter(i => i.target > 0).length;
     if (count) {
       x.textAlign = 'center'; x.textBaseline = 'middle';
-      x.font = `800 ${hub * 0.72}px Manrope, sans-serif`;
+      x.font = `800 ${hub * 0.72}px Carlito, sans-serif`;
       const tg = x.createLinearGradient(0, c - hub * 0.4, 0, c + hub * 0.2);
       tg.addColorStop(0, this.colors.ink); tg.addColorStop(1, this.colors.accentL);
       x.fillStyle = tg;
       x.shadowColor = this.colors.accent; x.shadowBlur = S / 50;
       x.fillText(String(count), c, c - hub * 0.12);
       x.shadowBlur = 0;
-      x.font = `600 ${hub * 0.2}px Manrope, sans-serif`;
+      x.font = `600 ${hub * 0.2}px Carlito, sans-serif`;
       x.fillStyle = this.colors.muted;
       x.fillText(plural(count, 'фильм', 'фильма', 'фильмов'), c, c + hub * 0.42);
     }

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru" data-pal="night">
+<html lang="ru" data-pal="ulya">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#07060C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Wix+Madefor+Display:wght@600;700;800&family=Unbounded:wght@700&family=Press+Start+2P&family=Pacifico&family=Russo+One&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400&family=Alan+Sans:wght@700&family=Unbounded:wght@700&family=Press+Start+2P&family=Pacifico&family=Russo+One&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -530,7 +530,11 @@
     </section>
     <section class="ctl">
       <div class="ctl-head">Палитра</div>
+      <div class="grp">
+        <label class="check row"><input type="checkbox" role="switch" id="filmAccentOn"><span class="box"></span><span class="check-text">Акцент в цвет фильма <button type="button" class="hint" data-hint="Кнопки и подсветка перекрашиваются в тон постера под стрелкой. Выключено — всегда цвет палитры. Настройка только у вас." aria-label="Подсказка: акцент в цвет фильма">?</button></span></label>
+      </div>
       <div class="grp pals" id="pals">
+        <button class="row" data-p="ulya"><i style="background:linear-gradient(90deg,#141414 50%,#465DFF 50%)"></i>Фирменная</button>
         <button class="row" data-p="night"><i style="background:#7C6BFF"></i>Ночь</button>
         <button class="row" data-p="mono"><i style="background:linear-gradient(90deg,#000 50%,#fff 50%)"></i>Чёрно-белая</button>
         <button class="row" data-p="ember"><i style="background:linear-gradient(90deg,#111 50%,#FF4D00 50%)"></i>Ч/б с оранжевым</button>
