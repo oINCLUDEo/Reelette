@@ -1,5 +1,5 @@
 // Звук: щелчки колеса, сигналы отсчёта и музыка прокрута (генерируется на лету).
-// Всё на Web Audio, без файлов. Браузер разрешает звук только после первого клика по странице.
+// Всё на Web Audio и генерируется на лету; из файла — только музыка заставки финала. Браузер разрешает звук только после первого клика по странице.
 (() => {
   let ctx = null, master = null, noise = null, analyser = null;
   function ac() {
@@ -169,9 +169,52 @@
     tone(t + 0.17, { freq: 54, type: 'sine', peak: 0.2, attack: 0.008, decay: 0.2, glide: 36 });
   }
 
+  // ---- музыка заставки финала: нарезка трека, выровненная по её секундам (public/sfx/finale.mp3, app.js showFinale) ----
+  const songs = {};
+  function load(url) {
+    ac();
+    // громкость записи выравниваем по среднему уровню: нарезки приходят разной громкости
+    return songs[url] ||= fetch(url).then(r => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))).then(b => ctx.decodeAudioData(b)).then(buf => {
+      const ch = buf.getChannelData(0);
+      let sum = 0, peak = 0;
+      for (let i = 0; i < ch.length; i += 4) { sum += ch[i] * ch[i]; peak = Math.max(peak, Math.abs(ch[i])); }
+      const rms = Math.sqrt(sum / (ch.length / 4)) || 1e-4;
+      return { buf, gain: Math.min(0.2 / rms, 0.85 / (peak || 1)) };
+    }).catch(() => { delete songs[url]; return null; });
+  }
+  let song = null;
+  // at() — с какой секунды записи играть в момент старта: зашедший посреди заставки слышит её с того же места
+  async function songPlay(url, at) {
+    songFade(0.15);
+    const me = song = {};
+    const s = await load(url);
+    if (!s || song !== me) return;
+    const off = Math.max(0, at());
+    if (off > s.buf.duration - 1) return;
+    const t = ctx.currentTime, g = ctx.createGain(), src = ctx.createBufferSource();
+    src.buffer = s.buf;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(s.gain, t + (off > 0.3 ? 0.8 : 0.02));
+    src.connect(g).connect(master);
+    src.start(t, off);
+    Object.assign(me, { src, g });
+  }
+  // уход без обрыва: громкость спадает по экспоненте (за tau секунд — примерно втрое), хвост тихо звучит под стартом колеса
+  function songFade(tau = 1) {
+    const s = song;
+    song = null;
+    if (!s?.g) return;
+    const t = ctx.currentTime;
+    s.g.gain.cancelScheduledValues(t);
+    s.g.gain.setValueAtTime(Math.max(0.0001, s.g.gain.value), t);
+    s.g.gain.setTargetAtTime(0, t, tau);
+    setTimeout(() => { try { s.src.stop(); } catch {} }, tau * 6000);
+  }
+
   window.Sfx = {
     unlock: ac, tick, beep, win, out, splat, caw, heart,
     analyser: () => analyser,
     spinStart, spinStop: () => spinStop(false),
+    preload: load, songPlay, songFade,
   };
 })();

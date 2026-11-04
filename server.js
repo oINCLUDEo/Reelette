@@ -345,9 +345,10 @@ function pickWeighted(list, weights) {
 }
 
 // Темп выбывания: пока фильмов много, колесо крутится быстро, с каждым порогом дольше, финал самый долгий.
-// n — сколько фильмов на колесе перед прокрутом; pause — пауза серии после прокрута; intro — заставка «Финал» перед ним.
+// n — сколько фильмов на колесе перед прокрутом; pause — пауза серии после прокрута; intro — заставка «Финал» перед ним
+// (рулетка из фильмов вечера, строки, «Финал» с выдержкой и переход в колесо — app.js showFinale, FIN_LEN).
 function elimPace(n) {
-  if (n <= 2) return { stage: 'final', duration: 20, turns: 15, pause: 0, intro: 5 };
+  if (n <= 2) return { stage: 'final', duration: 20, turns: 15, pause: 0, intro: 12.5 };
   if (n === 3) return { stage: 'semi', duration: 14, turns: 11, pause: 3 };
   if (n <= 5) return { stage: 'top', duration: 10, turns: 8, pause: 3 };
   if (n <= 10) return { stage: 'mid', duration: 6.5, turns: 5, pause: 2 };
@@ -1297,7 +1298,7 @@ async function proxyImage(res, raw) {
   }
 }
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.ttf': 'font/ttf', '.mp3': 'audio/mpeg' };
 
 function json(res, code, body) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });

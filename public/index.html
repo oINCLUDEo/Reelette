@@ -323,18 +323,22 @@
     <div class="tk-in"><div class="tk-title" id="tkTitle"></div><div class="tk-sub" id="tkSub"></div></div>
     <div class="tk-shards" id="tkShards"></div>
   </div>
-  <!-- финал — дуэль под софитами: двое финалистов в свете своих цветов, отсчёт на черте между ними (app.js showFinale, clash) -->
-  <div class="finale" id="finale" hidden aria-live="polite">
-    <i class="fn-stage" aria-hidden="true"></i>
-    <div class="fn-in">
-      <h2 class="fn-h"><span class="fn-t"></span><span class="fn-s">Колесо выбьет один из двух</span><span class="tk-shards" id="fnShards"></span></h2>
-      <div class="fn-duel">
-        <i class="fn-flash" aria-hidden="true"></i>
-        <i class="fn-blade" aria-hidden="true"></i>
-        <div class="fn-pair" id="finalePair"></div>
-        <b class="fn-count" id="finaleCount"></b>
-      </div>
+  <!-- финал: рулетка из фильмов вечера, три строки трейлера, «Финал» с выдержкой, затем заставка тает и открывает колесо (app.js showFinale) -->
+  <div class="finale" id="finale" hidden>
+    <p class="fn-say" id="fnSay" aria-live="polite"></p>
+    <div class="fn-screen" aria-hidden="true">
+      <div class="fn-orbit"><i class="fn-halo"></i><div class="fn-ring" id="fnRing"></div></div>
+      <div class="fn-card"><span></span></div>
+      <div class="fn-card"><span></span></div>
+      <div class="fn-card"><span></span></div>
+      <i class="fn-glow"></i>
+      <div class="fn-title"><div class="fn-cap" id="fnCap"></div><div class="fn-big">Финал</div><div class="fn-vs" id="fnVs"></div></div>
+      <div class="fn-flare"><i class="haze"></i><i class="streak"></i><i class="core"></i><i class="hot"></i></div>
+      <i class="fn-bar t"></i><i class="fn-bar b"></i>
+      <canvas class="fn-grain" width="240" height="135"></canvas>
+      <i class="fn-vignette"></i>
     </div>
+    <i class="fn-flash" aria-hidden="true"></i>
   </div>
 </div>
 

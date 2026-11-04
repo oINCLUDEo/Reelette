@@ -766,7 +766,7 @@ function initRoom(roomId) {
     // выбывший постер гаснет на лету
     el.firstChild.animate([{ filter: 'none' }, { filter: 'grayscale(1) brightness(.7)' }], { duration: T * 1000, easing: 'ease-in' });
   }
-  // осколки из точки экрана: у острия стрелки на остановке, на стыке в финале (style.css .burst)
+  // осколки из точки экрана: у острия стрелки на остановке (style.css .burst)
   function burst(host, x, y, k) {
     const box = document.createElement('div');
     box.className = 'tk-shards burst';
@@ -831,67 +831,219 @@ function initRoom(roomId) {
     window.setBackdropPulse?.(0.55);
     $('#roomBg .tug').animate([{ opacity: 1, scale: '1.08' }, { scale: '1' }], { duration: 800, easing: 'cubic-bezier(.2, .8, .2, 1)' });
   }
-  // ---- финал — дуэль под софитами (style.css .finale): постеры друг напротив друга, каждый в свете своего цвета ----
-  let fnAt = 0;
+  // ---- финал (style.css .finale): рулетка из фильмов вечера → три строки трейлера → «Финал» с выдержкой → заставка тает в колесо.
+  // Идёт всю паузу перед финальным прокрутом (server.js elimPace, intro = FIN_LEN). Строки у всех в комнате одинаковые:
+  // случайность берётся от id прокрута, поэтому у каждого финала свои
+  const FIN_LEN = 12.5;
+  const FIN_DROP = 7.05; // вспышка «Финала» — вход музыки в нарезке
+  const FIN_SONG = '/sfx/finale.mp3'; // Efterklang (Epidemic Sound), нарезан под эти секунды
+  const NUM1 = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять', 'десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
+  const NUM10 = ['', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'];
+  const numWord = n => (n < 20 ? NUM1[n] : n < 100 ? NUM10[n / 10 | 0] + (n % 10 ? ' ' + NUM1[n % 10] : '') : String(n));
+  const crowd = n => ['', 'один', 'двое', 'трое', 'четверо', 'пятеро', 'шестеро', 'семеро'][n] || numWord(n); // «трое выбыли», но «десять выбыли»
+  // столбцы строк: первая, вторая, третья и надпись над «Финалом»; n — фильмов в вечере, выбыло n − 2
+  const FIN_LINES = [
+    [
+      n => `${numWord(n)} ${plural(n, 'фильм', 'фильма', 'фильмов')}`,
+      n => `${numWord(n)} ${plural(n, 'кандидат', 'кандидата', 'кандидатов')}`,
+      n => `${numWord(n)} ${plural(n, 'фильм', 'фильма', 'фильмов')} на кону`,
+      () => 'Один вечер', () => 'Попкорн на исходе', () => 'Вечер был долгим', () => 'Ставки росли весь вечер', () => 'Зал затих', () => 'Свет приглушён',
+    ],
+    [
+      n => `${crowd(n - 2)} ${plural(n - 2, 'выбыл', 'выбыли', 'выбыли')}`,
+      n => `${crowd(n - 2)} позади`,
+      n => `${crowd(n - 2)} ${plural(n - 2, 'сошёл', 'сошли', 'сошли')} с дистанции`,
+      n => `${crowd(n - 2)} не ${plural(n - 2, 'дожил', 'дожили', 'дожили')} до титров`,
+      n => `${numWord(n - 2)} ${plural(n - 2, 'фильм', 'фильма', 'фильмов')} в архив`,
+      () => 'Остальные — в титрах', () => 'Колесо было беспощадно', () => 'Отсев окончен', () => 'Выжили не все',
+    ],
+    [
+      () => 'Остались двое', () => 'Двое лицом к лицу', () => 'Победит один', () => 'Останется один', () => 'Решит один прокрут',
+      () => 'Последняя дуэль', () => 'Ставки сделаны', () => 'Двое. Одно колесо', () => 'Что смотрим сегодня?',
+    ],
+    [() => 'последний прокрут', () => 'решающий прокрут', () => 'главный прокрут вечера', () => 'последнее слово за колесом', () => 'один прокрут — один фильм', () => 'момент истины'],
+  ];
+  // вечер из двух фильмов: никто не выбывал, строки про отсев не подходят
+  const FIN_DUO = [['Два фильма', 'Один вечер', 'Решит один прокрут'], ['Двое с самого начала', 'Без разминки', 'Победит один'], ['Два фильма', 'Сразу к делу', 'Что смотрим сегодня?']];
+  // случайные числа от строки: у всех в комнате одна и та же последовательность
+  function seeded(seed) {
+    let a = 0;
+    for (const c of String(seed)) a = Math.imul(a ^ c.charCodeAt(0), 2654435761) >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  // одинаковые корни рядом звучат как повтор: «Ставки росли…» и «Ставки сделаны» вместе не ставим
+  const finRoots = t => (t.toLowerCase().match(/[а-яё]{5,}/g) || []).map(w => w.slice(0, 5));
+  function finLines(n, rnd) {
+    const any = a => a[rnd() * a.length | 0];
+    for (let k = 0; k < 200; k++) {
+      const txt = n <= 2 ? [...any(FIN_DUO), any(FIN_LINES[3])(n)] : FIN_LINES.map(p => any(p)(n));
+      const r = txt.flatMap(finRoots);
+      if (new Set(r).size === r.length) return txt;
+    }
+    return n <= 2 ? [...FIN_DUO[0], 'момент истины'] : FIN_LINES.map(p => p[0](n));
+  }
+  let finTimers = [], finOut = false, finRaf = 0;
+  // зерно плёнки на «Финале»
+  function finGrain(on) {
+    cancelAnimationFrame(finRaf);
+    if (!on || reduceMotion) return;
+    const g = $('#finale .fn-grain').getContext('2d'), img = g.createImageData(240, 135);
+    const loop = () => {
+      for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255 | 0; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 40; }
+      g.putImageData(img, 0, 0);
+      finRaf = requestAnimationFrame(loop);
+    };
+    loop();
+  }
+  function finReset() {
+    const el = $('#finale');
+    finTimers.forEach(clearTimeout); finTimers = [];
+    finGrain(false);
+    finOut = false;
+    clearTimeout(el._t);
+    el.getAnimations({ subtree: true }).forEach(a => a.cancel());
+  }
   function showFinale(spin) {
+    const el = $('#finale');
     const byId = new Map(state.films.map(f => [f.id, f]));
     const pair = spin.snapshot.map(s => byId.get(s.id)).filter(Boolean);
-    // под постером — фильм и автор с его аватаркой и ником в его оформлении
-    setHTML($('#finalePair'), pair.map(f => {
-      const pid = personOf(f), name = f.addedBy || 'Без имени', p = prof(pid);
-      return `<figure data-id="${esc(f.id)}"><i class="fn-beam"></i><i class="fn-floor"></i><span class="fn-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</span><figcaption><b>${esc(f.title)}</b><span class="fn-by">${avaHtml(pid, name, p, avatarFor(pid), 'fn-ava')}${nick(pid, name, p)}</span></figcaption></figure>`;
-    }).join(''));
-    const el = $('#finale');
-    clearTimeout(el._t);
-    el.classList.remove('on', 'out');
+    const clock = () => FIN_LEN - (spin.startedAt - (Date.now() + serverOffset)) / 1000; // секунда заставки сейчас
+    const skip = clock();
+    // зашедший посреди паузы видит заставку с того же места; почти отыгравшую не показываем
+    if (pair.length < 2 || skip > FIN_LEN - 1.8) return;
+    finReset();
+    const outs = state.eliminated.map(id => byId.get(id)).filter(Boolean);
+    const rnd = seeded(spin.sid);
+    const lines = finLines(outs.length + pair.length, rnd);
+    const q = s => el.querySelector(s), qa = s => [...el.querySelectorAll(s)];
+
+    // рулетка: до десяти последних выбывших и двое финалистов. Финалисты стоят через одного (в маленьком круге — рядом),
+    // круг доворачивается так, что в конце они встают по бокам от центра
+    const ring = outs.slice(-10), m = ring.length + 2;
+    const ia = m >= 8 ? m - 3 : m - 2, ib = m - 1, step = m === 2 ? 70 : 360 / m;
+    const slots = [];
+    for (let i = 0, k = 0; i < m; i++) slots.push(i === ia ? pair[0] : i === ib ? pair[1] : ring[k++]);
+    let turn = -((ia + ib) / 2) * step;
+    while (turn > -240) turn -= 360;
+    q('.fn-ring').innerHTML = slots.map((f, i) => `<div class="fn-p${i === ia || i === ib ? ' fin' : ''}" style="${posterStyle(f)};transform:rotateY(${(i * step).toFixed(1)}deg) translateZ(34cqw)">${f.poster ? '' : `<span>${esc(f.title)}</span>`}</div>`).join('');
+    const ps = qa('.fn-p'), fins = ps.filter(p => p.classList.contains('fin')), falls = ps.filter(p => !p.classList.contains('fin'));
+    for (let i = falls.length - 1; i > 0; i--) { const j = rnd() * (i + 1) | 0; [falls[i], falls[j]] = [falls[j], falls[i]]; }
+    qa('.fn-card span').forEach((s, i) => { s.textContent = lines[i]; });
+    q('#fnCap').textContent = lines[3];
+    q('#fnVs').innerHTML = `<span>${esc(pair[0].title)}</span><i>×</i><span>${esc(pair[1].title)}</span>`;
+    q('#fnSay').textContent = `Финал: ${pair[0].title} против ${pair[1].title}`;
+
+    const A = (e, frames, o) => e.animate(frames, { fill: 'forwards', easing: 'cubic-bezier(.2, .8, .2, 1)', ...o });
+    const set = (e, o) => A(e, [{ opacity: o }, { opacity: o }], { duration: 1 });
+    const screen = q('.fn-screen'), orbit = q('.fn-orbit'), cards = qa('.fn-card'), flare = q('.fn-flare'), bars = qa('.fn-bar');
+    const title = q('.fn-title'), big = q('.fn-big'), vs = q('#fnVs'), glow = q('.fn-glow'), grain = q('.fn-grain'), flash = q('.fn-flash');
+    const bar = (from, to, d, easing = 'cubic-bezier(.7, 0, .3, 1)') => bars.forEach(b => A(b, [{ height: from }, { height: to }], { duration: d, easing }));
+    const SW = 'cubic-bezier(.45, 0, .55, 1)';
+    // анаморфный блик и блеск на буквах идут с одной скоростью: где проходит вспышка, там светлеет текст
+    const sweep = (dir, d) => A(flare, [{ opacity: 0, transform: `translateX(${-dir * 100}cqw) scaleX(.6)` }, { opacity: 1, offset: 0.25 }, { opacity: 1, offset: 0.7 }, { opacity: 0, transform: `translateX(${dir * 100}cqw) scaleX(1.2)` }], { duration: d, easing: SW });
+    const sheen = (e, dir, d) => A(e, [{ backgroundPosition: dir > 0 ? '100% 0' : '0% 0' }, { backgroundPosition: dir > 0 ? '0% 0' : '100% 0' }], { duration: d, easing: SW });
+    // строка проявляется из размытия и расходится по буквам, на середине её подсвечивает блик; длинная ужимается в кадр
+    const line = (i, d) => {
+      const c = cards[i], span = c.firstElementChild, r = document.createRange();
+      c.style.fontSize = '';
+      r.selectNodeContents(span);
+      const w = r.getBoundingClientRect().width;
+      if (w) c.style.fontSize = `${4.4 * Math.min(1, screen.clientWidth * 0.78 / w)}cqw`;
+      const dir = rnd() < 0.5 ? 1 : -1;
+      A(c, [
+        { opacity: 0, letterSpacing: '.18em', filter: 'blur(.5cqw) drop-shadow(0 0 0 rgba(70,93,255,0))' },
+        { opacity: 1, filter: 'blur(0cqw) drop-shadow(0 0 .3cqw rgba(70,93,255,.2))', offset: 0.2 },
+        { filter: 'blur(0cqw) drop-shadow(0 0 1.6cqw rgba(110,130,255,.75))', offset: 0.5 },
+        { opacity: 1, filter: 'blur(0cqw) drop-shadow(0 0 .5cqw rgba(70,93,255,.3))', offset: 0.8 },
+        { opacity: 0, letterSpacing: '.42em', filter: 'blur(.4cqw) drop-shadow(0 0 0 rgba(70,93,255,0))' },
+      ], { duration: d, easing: 'linear' });
+      sheen(span, dir, d); sweep(dir, d);
+    };
+    const start = () => { ytDuck(true); if (settings.sound) Sfx.songPlay(FIN_SONG, clock); };
+    // уход: музыка затихает без обрыва (тихий хвост звучит под стартом колеса)
+    const fadeOut = () => { finOut = true; Sfx.songFade(1.1); };
+    // заставка растворяется, под ней из полутени выходит колесо, уже в киношном режиме: к старту оно на месте
+    const reveal = () => {
+      setCine(true);
+      A(el, [{ opacity: 1 }, { opacity: 0 }], { duration: 1150, easing: 'cubic-bezier(.4, 0, .2, 1)' });
+      if (!reduceMotion) $('#wheelBox')?.animate([{ scale: '.93', filter: 'brightness(.45)' }, { scale: '1', filter: 'brightness(1)' }], { duration: 1500, easing: 'cubic-bezier(.2, .7, .2, 1)' });
+    };
+    const plan = reduceMotion ? [
+      // без движения: титр с финалистами просто проявляется и в конце растворяется
+      [0, () => { A(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 400 }); start(); set(title, 1); set(glow, 0.7); bar('12.2%', '12.2%', 1); }],
+      [10.9, fadeOut],
+      [11.3, reveal],
+    ] : [
+      // 1. рулетка: круг наплывает и поворачивается, выбывшие сереют и по одному падают, финалисты разгораются
+      [0, () => {
+        A(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 450 });
+        start();
+        set(orbit, 1);
+        A(q('.fn-ring'), [{ transform: 'translateZ(-30cqw) rotateX(-10deg) rotateY(0deg)' }, { transform: `translateZ(-4cqw) rotateX(-4deg) rotateY(${turn}deg)` }], { duration: 3400, easing: 'cubic-bezier(.45, 0, .2, 1)' });
+        A(q('.fn-halo'), [{ opacity: 0.35 }, { opacity: 1 }], { duration: 3000 });
+        falls.forEach((p, k) => A(p, [
+          { filter: 'grayscale(0) brightness(1)', opacity: 1, translate: '-50% -50%' },
+          { filter: 'grayscale(1) brightness(.55)', opacity: 1, translate: '-50% -50%', offset: 0.4 },
+          { filter: 'grayscale(1) brightness(.3)', opacity: 0, translate: '-50% 36cqw' },
+        ], { duration: 1300, delay: 550 + k * (1500 / Math.max(1, falls.length)), easing: 'cubic-bezier(.5, 0, .8, .4)' }));
+        const glowA = '0 0 0 .2cqw #465DFF, 0 0 3cqw rgba(70,93,255,.55), 0 1.6cqw 3.2cqw rgba(0,0,0,.6)', glowB = '0 0 0 .3cqw #8C9BFF, 0 0 6cqw rgba(70,93,255,.9), 0 1.6cqw 3.2cqw rgba(0,0,0,.6)';
+        fins.forEach(p => A(p, [{ boxShadow: glowA }, { boxShadow: glowB }], { duration: 900, delay: 2100, easing: 'ease-out' }));
+      }],
+      // 2. шторки и три строки; после третьей — короткая пауза в темноте
+      [3, () => bar('0', '12.2%', 700)],
+      [3.15, () => A(orbit, [{ opacity: 1 }, { opacity: 0 }], { duration: 450 })],
+      [3.45, () => line(0, 1150)],
+      [4.6, () => line(1, 1100)],
+      [5.7, () => line(2, 1100)],
+      // 3. «Финал»: вспышка на входе музыки, надпись сжимается из широкой и размытой и держится — медленный наезд и свечение
+      [FIN_DROP, () => {
+        A(flash, [{ opacity: 1 }, { opacity: 0 }], { duration: 600, easing: 'ease-out' });
+        finGrain(true); set(grain, 0.35);
+        A(glow, [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 0.55, offset: 0.55 }, { opacity: 0.85 }], { duration: 3500, easing: 'ease-in-out' });
+      }],
+      [FIN_DROP + 0.1, () => {
+        A(title, [{ opacity: 0 }, { opacity: 1 }], { duration: 500 });
+        A(title, [{ scale: 1 }, { scale: 1.07 }], { duration: 5200, easing: 'cubic-bezier(.2, .6, .3, 1)' });
+        A(big, [{ letterSpacing: '.4em', filter: 'blur(1cqw)' }, { letterSpacing: '-.02em', filter: 'blur(0cqw)' }], { duration: 1500 });
+        A(vs, [{ opacity: 0, translate: '0 1cqw' }, { opacity: 1, translate: '0 0' }], { duration: 800, delay: 600, fill: 'both' });
+      }],
+      // блик проходит по «Финалу», буквы вспыхивают металлом
+      [8.7, () => {
+        sweep(1, 1600); sheen(big, 1, 1600);
+        A(big, [{ filter: 'blur(0cqw) drop-shadow(0 0 0 rgba(70,93,255,0))' }, { filter: 'blur(0cqw) drop-shadow(0 0 2.4cqw rgba(110,130,255,.6))', offset: 0.5 }, { filter: 'blur(0cqw) drop-shadow(0 0 .8cqw rgba(70,93,255,.3))' }], { duration: 1600, easing: SW });
+      }],
+      // уход: шторки медленно раскрываются, «Финал» поднимается и тает
+      [10.9, () => {
+        fadeOut();
+        bar('12.2%', '0', 1300, 'cubic-bezier(.45, 0, .25, 1)');
+        A(title, [{ opacity: 1, translate: '0 0', filter: 'blur(0cqw)' }, { opacity: 0, translate: '0 -2.5cqw', filter: 'blur(.8cqw)' }], { duration: 1100, easing: 'cubic-bezier(.4, 0, .2, 1)' });
+        A(glow, [{ opacity: 0.85 }, { opacity: 0 }], { duration: 1200 });
+        A(grain, [{ opacity: 0.35 }, { opacity: 0 }], { duration: 900 });
+      }],
+      [11.3, reveal],
+    ];
     el.hidden = false;
-    fnAt = performance.now();
-    // свет каждого — тон постера своего финалиста; пока тон считается, цвет по названию (как у сектора без постера)
-    pair.forEach((f, i) => {
-      const set = h => el.style.setProperty(i ? '--cb' : '--ca', `hsl(${h} 78% 50%)`);
-      set(hue(f.title));
-      if (f.poster) posterHue(pimg(f.poster)).then(h => { if (h != null) set(h); });
-    });
-    sliceTitle($('#finale .fn-t'), 'Финал');
-    shards($('#fnShards'));
-    // постеры финалистов поднимаются со своих секторов колеса, пока половины съезжаются
-    if (!reduceMotion) $$('#finalePair figure').forEach((fig, i) => wheelFlight(fig, wheelPoint(fig.dataset.id), { duration: 1100, delay: 250 + i * 120, easing: 'cubic-bezier(.34, 1.3, .64, 1)', fill: 'backwards' }));
-    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
-  }
-  // удар на секунде отсчёта: карточки бросаются к черте и отскакивают, в момент удара софиты вспыхивают,
-  // на черте вспышка и осколки, зал подаётся к зрителю. С каждой секундой сильнее; пока постеры летят из колеса, удара нет
-  function clash(sec) {
-    const el = $('#finale');
-    if (reduceMotion || el.hidden || el.classList.contains('out') || performance.now() - fnAt < 1300) return;
-    const k = Math.min(1, 0.55 + (4 - sec) * 0.15);
-    $$('#finalePair .fn-poster').forEach((p, i) => {
-      const s = i ? -1 : 1, rest = `perspective(900px) translateX(0) rotateY(${s * 14}deg) scale(1)`;
-      p.animate([
-        { transform: rest, easing: 'cubic-bezier(.55, 0, .9, .45)' },
-        { transform: `perspective(900px) translateX(${(s * 4.5 * k).toFixed(2)}vw) rotateY(${s * 4}deg) scale(${(1 + 0.06 * k).toFixed(3)})`, offset: 0.2, easing: 'cubic-bezier(.16, 1, .3, 1)' },
-        { transform: rest },
-      ], { duration: 780 });
-    });
-    setTimeout(() => {
-      if (el.hidden || el.classList.contains('out')) return;
-      const c = $('#finaleCount').getBoundingClientRect();
-      burst(el, c.left + c.width / 2, c.top + c.height / 2, 0.45 + 0.35 * k);
-      $('#finale .fn-flash').animate([{ opacity: 0.8 * k }, { opacity: 0 }], { duration: 520, easing: 'ease-out' });
-      $('#finale .fn-blade').animate([{ boxShadow: `0 0 ${(40 + 50 * k).toFixed(0)}px rgba(255,255,255,1)`, scale: `${(1 + 2 * k).toFixed(2)} 1` }, { boxShadow: '0 0 18px rgba(255,255,255,.6)', scale: '1 1' }], { duration: 600, easing: 'ease-out' });
-      $$('#finale .fn-beam').forEach(b => b.animate([{ filter: `brightness(${(1.4 + 0.8 * k).toFixed(2)})` }, { filter: 'none' }], { duration: 600, easing: 'ease-out' }));
-      $('#finale .fn-in').animate([{ scale: '1' }, { scale: `${(1 + 0.02 * k).toFixed(3)}`, offset: 0.25 }, { scale: '1' }], { duration: 420, easing: 'cubic-bezier(.2, .8, .2, 1)' });
-    }, 156);
+    set(el, 0);
+    for (const [t, fn] of plan) {
+      if (t > skip) { finTimers.push(setTimeout(fn, (t - skip) * 1000)); continue; }
+      const had = new Set(el.getAnimations({ subtree: true }));
+      fn();
+      // шаги, которые зашедший пропустил, догоняют своё место: их анимации перематываются вперёд
+      for (const a of el.getAnimations({ subtree: true })) if (!had.has(a)) a.currentTime = (a.currentTime || 0) + (skip - t) * 1000;
+    }
   }
   function hideFinale() {
     const el = $('#finale');
+    finTimers.forEach(clearTimeout); finTimers = [];
     if (el.hidden) return;
+    // прервали до ухода (новый прокрут, отмена): картинка и музыка уходят быстро. После ухода хвост музыки доигрывает сам
+    if (!finOut) {
+      Sfx.songFade(0.25);
+      if (!musicLive) ytDuck(false);
+      el.animate([{ opacity: getComputedStyle(el).opacity }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    }
     clearTimeout(el._t);
-    // после отсчёта софиты гаснут, надписи уходят, постеры возвращаются в колесо, зал открывает колесо, и оно стартует
-    if (!reduceMotion && el.classList.contains('on')) {
-      el.classList.add('out');
-      $$('#finalePair figure').forEach(fig => wheelFlight(fig, wheelPoint(fig.dataset.id), { duration: 650, easing: 'cubic-bezier(.5, 0, .75, 0)', fill: 'forwards' }, true));
-    } else el.classList.remove('on');
-    el._t = setTimeout(() => { el.hidden = true; el.classList.remove('on', 'out'); }, 800);
+    el._t = setTimeout(() => { finReset(); el.hidden = true; }, finOut ? 60 : 320);
   }
   function endDrama() {
     clearInterval(heartTimer); heartTimer = null;
@@ -1120,6 +1272,8 @@ function initRoom(roomId) {
     clearOut();
     endDrama();
     setStage(spin.stage);
+    // музыку заставки финала грузим заранее, с полуфинала: к финалу она уже готова и стартует вместе с картинкой
+    if (settings.sound && (spin.stage === 'semi' || spin.stage === 'final')) Sfx.preload(FIN_SONG);
     // глава этапа (топ-15, топ-5): сервер дал под неё паузу перед стартом, колесо трогается, когда она отыграла.
     // Зашедший посреди паузы главу не видит, если от неё остались крохи
     if (spin.chapter === 'Топ-5') {
@@ -1172,7 +1326,8 @@ function initRoom(roomId) {
   }
 
   function startCountdown(spin) {
-    const quiet = Boolean(spin.chapter); // пауза под главу — не отсчёт: без сигналов
+    // пауза под главу — не отсчёт: без сигналов; у заставки финала своя музыка, сигналы бы в неё врезались
+    const quiet = Boolean(spin.chapter) || spin.stage === 'final';
     const step = () => {
       const left = spin.startedAt - (Date.now() + serverOffset);
       if (left <= 0) {
@@ -1189,10 +1344,6 @@ function initRoom(roomId) {
       if (sec !== countdown) {
         countdown = sec;
         if (!quiet) beep(false);
-        const c = $('#finaleCount');
-        c.textContent = String(sec);
-        c.classList.remove('beat'); void c.offsetWidth; c.classList.add('beat');
-        clash(sec);
         render();
         const b = $('#spinBtn');
         b.classList.remove('beat'); void b.offsetWidth; b.classList.add('beat');
@@ -3423,7 +3574,10 @@ function initRoom(roomId) {
   });
 
   $('#soundOn').checked = settings.sound;
-  $('#soundOn').addEventListener('change', e => { settings.sound = e.target.checked; ls.set('sound', settings.sound); });
+  $('#soundOn').addEventListener('change', e => {
+    settings.sound = e.target.checked; ls.set('sound', settings.sound);
+    if (!settings.sound) Sfx.songFade(0.3); // выключили посреди заставки финала — её музыка уходит
+  });
 
   async function spin() {
     if ($('#spinBtn').disabled || state?.karaoke || state?.quiz) return;
