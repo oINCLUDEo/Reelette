@@ -23,6 +23,9 @@ const envClean = k => (process.env[k] || '').trim().replace(/^["']|["']$/g, '').
 const PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
 let profiles = {};
 try { profiles = JSON.parse(fs.readFileSync(PROFILES_FILE, 'utf8')); } catch { profiles = {}; }
+// «Ворона» из «Наших треков»: старый ролик удалили с YouTube, у кого он стоял победной музыкой — переезжает на новый
+const CROW_VID = 'lBO0JZJLv-Y';
+for (const p of Object.values(profiles)) if (p?.winTrack?.vid === 'RnMVb0lJ8LI') p.winTrack.vid = CROW_VID;
 let profilesTimer = null;
 function saveProfiles() {
   clearTimeout(profilesTimer);
@@ -159,8 +162,8 @@ function publicState(r) {
     music: r.music?.quiz && r.quiz?.state === 'playing' ? { ...r.music, title: 'Угадай мелодию', author: '' } : r.music || null,
     quiz: publicQuiz(r), quizWins: r.quizWins || {}, chat: r.chat || [], queue: r.queue || [], lastTrack: r.music ? null : r.lastTrack || null,
     spinLock: Boolean(r.spinLock), addLock: Boolean(r.addLock),
-    // кого создатель отключил из колеса (его фильмы не крутятся) и кому запретил добавлять фильмы
-    off: r.off || [], noAdd: r.noAdd || [],
+    // кого создатель отключил из колеса (его фильмы не крутятся), кому запретил добавлять фильмы и оценивать
+    off: r.off || [], noAdd: r.noAdd || [], noRate: r.noRate || [],
     // идёт выбывание: есть выбывшие или серия — новые фильмы сломали бы колесо посреди серии
     elimActive: r.eliminated.length > 0 || runtime(r).series,
     karaoke: Boolean(r.karaoke), perfs: (r.perfs || []).slice(0, 40),
@@ -1660,7 +1663,7 @@ async function api(req, res, url) {
       if (b.now && r.quiz && r.music?.quiz) return json(res, 409, { error: 'Идёт «Угадай мелодию»' });
       const t = await fetchTrack(b.url);
       if (t.error) return json(res, 400, { error: t.error });
-      if (t.vid === 'RnMVb0lJ8LI') broadcast(r.id, { type: 'react', kind: 'crow', name: who, pid: personKey(me, b) });
+      if (t.vid === CROW_VID) broadcast(r.id, { type: 'react', kind: 'crow', name: who, pid: personKey(me, b) });
       // кто поёт (для караоке): по умолчанию тот, кто добавил
       const singer = str(b.singer, 32);
       const track = { ...t, by: who, singer: singer || who, singerPid: !singer || singer === who ? personKey(me, b) : '' };
@@ -1804,6 +1807,7 @@ async function api(req, res, url) {
     const pid = personKey(me, b);
     if (!pid) return json(res, 400, { error: 'Не понятно, кто оценивает' });
     if (pid === personOf(h.film)) return json(res, 400, { error: 'Свой фильм оценивают остальные' });
+    if ((r.noRate || []).includes(pid) && !isOwner(r, me, b)) return json(res, 403, { error: 'Создатель комнаты запретил вам оценивать фильмы' });
     const score = Math.round(num(b.score, 0));
     h.ratings ||= {};
     const old = h.ratings[pid];
@@ -1820,7 +1824,7 @@ async function api(req, res, url) {
     pushState(r); return json(res, 200, { ok: true });
   }
 
-  // создатель управляет человеком: отключить из колеса (сегодня его нет) или запретить добавлять фильмы
+  // создатель управляет человеком: отключить из колеса (сегодня его нет), запретить добавлять фильмы или оценивать, снять его оценки
   if (sub === 'person' && m === 'POST') {
     if (!isOwner(r, me, b)) return json(res, 403, { error: 'Это может только создатель комнаты' });
     const pid = str(b.pid, 64);
@@ -1834,6 +1838,18 @@ async function api(req, res, url) {
       r.plan = null;
     }
     if (b.noAdd !== undefined) setIn('noAdd', Boolean(b.noAdd));
+    if (b.noRate !== undefined) setIn('noRate', Boolean(b.noRate));
+    // снять все оценки человека (например, троллит): бонусы авторов, где он оценивал, считаются заново
+    if (b.clearRatings) {
+      r.mods ||= {};
+      for (const h of r.history) {
+        if (!h.ratings?.[pid]) continue;
+        delete h.ratings[pid];
+        if (!h.src) continue;
+        const a = personOf(h.film), mm = modFromEntry(h);
+        if (mm && mm.factor !== 1) r.mods[a] = mm; else delete r.mods[a];
+      }
+    }
     pushState(r); return json(res, 200, { ok: true });
   }
 

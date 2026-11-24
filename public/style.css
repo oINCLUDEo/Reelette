@@ -628,9 +628,11 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .rate-film div { min-width: 0; }
 .rate-film b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rate-film span { color: var(--tx3); font-size: 12px; }
+/* части блока оценки перерисовываются по отдельности, в раскладке их нет */
+.rate-slot { display: contents; }
 .rate-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
 .rate-scale button { height: 36px; border-radius: 10px; background: var(--s2); font: 700 15px var(--f-ui); color: var(--tx2); transition: background .2s, color .2s, box-shadow .2s, transform .3s var(--spring); }
-.rate-scale button:hover { color: var(--tx); background: var(--s3); transform: translateY(-1px); }
+.rate-scale button:hover { color: var(--tx); background: var(--s3); }
 .rate-scale button.low:hover, .rate-scale button.low.on { box-shadow: inset 0 0 0 1px var(--bad); }
 .rate-scale button.high:hover, .rate-scale button.high.on { box-shadow: inset 0 0 0 1px var(--ok); }
 .rate-scale button.on { background: var(--btn); color: var(--btn-tx); }
@@ -667,7 +669,10 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .films-panel .rate-line { min-height: 48px; padding: 6px 12px 6px 8px; border-radius: 20px; background: var(--fill); }
 .films-panel .rate-line:hover { background: rgba(255,255,255,.12); }
 .films-panel .rate-line i { width: 24px; height: 36px; border-radius: 5px; }
-.films-panel .rate-scale button { background: rgba(255,255,255,.08); }
+.films-panel .rate-scale button:not(.on) { background: rgba(255,255,255,.08); }
+.films-panel .rate-scale button:not(.on):hover { background: rgba(255,255,255,.16); }
+/* нажатие видно сразу, ещё до отпускания; размер не меняется, чтобы цель не уезжала из-под пальца */
+.rate-scale button:not(.on):active, .films-panel .rate-scale button:not(.on):active { background: rgba(255,255,255,.26); color: var(--tx); transition: none; }
 .films-panel .rate-list span { background: rgba(255,255,255,.08); }
 
 /* ---------- «под стрелкой»: фильм, на котором стрелка; на прокруте меняется вместе с ней ---------- */

@@ -530,20 +530,18 @@ function initRoom(roomId) {
   function beep(go) {
     if (settings.sound) Sfx.beep(go);
   }
-  // музыка прокрута подстраивает темп под скорость колеса; свой трек на это время приглушается.
+  // музыка прокрута подстраивает темп под скорость колеса; общий трек играет на своей громкости.
   // В серии музыка между прокрутами не выключается.
   let musicLive = false;
   function musicOn(stage) {
     musicLive = true;
     window.setBackdropActive?.(stage === 'final' ? 1.6 : 1);
-    ytDuck(true);
     if (settings.music) Sfx.spinStart(() => wheel.speed || 0);
   }
   function musicOff() {
     if (!musicLive) return;
     musicLive = false;
     window.setBackdropActive?.(false);
-    ytDuck(false);
     Sfx.spinStop();
   }
 
@@ -959,7 +957,7 @@ function initRoom(roomId) {
       ], { duration: d, easing: 'linear' });
       sheen(span, dir, d); sweep(dir, d);
     };
-    const start = () => { ytDuck(true); if (settings.sound) Sfx.songPlay(FIN_SONG, clock); };
+    const start = () => { if (settings.sound) Sfx.songPlay(FIN_SONG, clock); };
     // уход: музыка затихает без обрыва (тихий хвост звучит под стартом колеса)
     const fadeOut = () => { finOut = true; Sfx.songFade(1.1); };
     // заставка растворяется, под ней из полутени выходит колесо, уже в киношном режиме: к старту оно на месте
@@ -1039,7 +1037,6 @@ function initRoom(roomId) {
     // прервали до ухода (новый прокрут, отмена): картинка и музыка уходят быстро. После ухода хвост музыки доигрывает сам
     if (!finOut) {
       Sfx.songFade(0.25);
-      if (!musicLive) ytDuck(false);
       el.animate([{ opacity: getComputedStyle(el).opacity }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
     }
     clearTimeout(el._t);
@@ -1796,7 +1793,7 @@ function initRoom(roomId) {
     setHTML($('#historyList'), state.history.length
       ? state.history.slice(0, 50).map((h, i) => {
         const a = avgRating(h);
-        const canRate = personOf(h.film) !== myPid() && !h.ratings?.[myPid()];
+        const canRate = personOf(h.film) !== myPid() && !h.ratings?.[myPid()] && !noRateMe();
         return `<div class="hist" data-h="${i}"><i style="${posterStyle(h.film)}"></i><div><b>${esc(h.film.title)}</b><span>${timeAgo(h.at)}</span></div>${canRate ? '<em class="rate-me">Оценить</em>' : ''}${a !== null ? `<em class="score">${a.toFixed(1).replace('.', ',')}</em>` : ''}</div>`;
       }).join('')
       : '<p class="note">Пока ничего. Победители будут появляться здесь.</p>');
@@ -1900,7 +1897,7 @@ function initRoom(roomId) {
   // ---- общая музыка из YouTube ----
   // Сервер хранит, когда трек был на нуле (startedAt) или на какой секунде пауза (pausedAt).
   // Каждый плеер считает ожидаемую позицию сам и подтягивается, если ушёл больше чем на 2,5 с.
-  let yt = null, ytReady = false, ytVid = null, ytDucked = false, ytChanging = false;
+  let yt = null, ytReady = false, ytVid = null, ytChanging = false;
   // запуски трека (vid:startedAt), которые YouTube отказался играть: этот запуск не трогаем,
   // а новый запуск того же трека (заново, с начала, после паузы) пробуем снова
   const ytBroken = new Set(), ytRetried = new Set();
@@ -1956,9 +1953,8 @@ function initRoom(roomId) {
   function ytVolume() {
     if (!ytReady) return;
     const v = Number($('#ytVol').value);
-    yt.setVolume(Math.round(v * (ytDucked ? 0.3 : 1)));
+    yt.setVolume(Math.round(v));
   }
-  function ytDuck(on) { ytDucked = on; ytVolume(); }
   let ytHostCur = '#ytHost';
   function syncMusic() {
     if (vtBusy) return; // догоним после перехода
@@ -2669,7 +2665,7 @@ function initRoom(roomId) {
     }
     const b = e.target.closest('[data-our]');
     if (!b) return;
-    if (state?.music?.vid === b.dataset.our) return toast(b.dataset.our === 'RnMVb0lJ8LI' ? 'Ворона уже летит' : 'Уже играет');
+    if (state?.music?.vid === b.dataset.our) return toast(b.dataset.our === 'lBO0JZJLv-Y' ? 'Ворона уже летит' : 'Уже играет');
     Sfx.unlock();
     try {
       await api(`/rooms/${roomId}/music`, { method: 'POST', body: { url: b.dataset.our, now: true, by: me.name, cid: me.cid } });
@@ -2728,12 +2724,13 @@ function initRoom(roomId) {
     const author = personOf(h.film);
     const isAuthor = author === myPid();
     const mine = h.ratings?.[myPid()]?.score || 0;
-    // свёрнуто: свой фильм или оценка уже стоит и минута на исправление прошла
-    const done = isAuthor || (mine && rateLeft(h) <= 0);
+    // свёрнуто: свой фильм, оценки закрыты создателем или оценка уже стоит и минута на исправление прошла
+    const banned = !isAuthor && noRateMe();
+    const done = isAuthor || banned || (mine && rateLeft(h) <= 0);
     box.classList.toggle('compact', done && rateOpen !== h.hid);
     if (done && rateOpen !== h.hid) {
       const a0 = avgRating(h);
-      box.innerHTML = `<button class="rate-line" data-rate-open title="Подробнее"><i style="${posterStyle(h.film)}"></i><span><b>${esc(h.film.title)}</b><small>${isAuthor ? 'ваш фильм' : `ваша ${mine}`}${a0 !== null ? ` · средняя ${a0.toFixed(1).replace('.', ',')}` : ''}</small></span><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>`;
+      setHTML(box, `<button class="rate-line" data-rate-open title="Подробнее"><i style="${posterStyle(h.film)}"></i><span><b>${esc(h.film.title)}</b><small>${isAuthor ? 'ваш фильм' : banned ? 'оценки для вас закрыты' : `ваша ${mine}`}${a0 !== null ? ` · средняя ${a0.toFixed(1).replace('.', ',')}` : ''}</small></span><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>`);
       return;
     }
     const list = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author);
@@ -2745,11 +2742,24 @@ function initRoom(roomId) {
       : a === null ? `Средняя оценка даст фильмам ${whoT} бонус или штраф до следующего выпадения его фильма: ниже 6 — ×0,5 и 1 голос вместо 3; 8–9,9 — ×1,5 и +2 голоса; 10 — ×2 и +4 голоса.`
       : fct === 1 ? `Средняя ${a.toFixed(1).replace('.', ',')}: шанс фильмов ${whoT} не меняется.`
       : `Средняя ${a.toFixed(1).replace('.', ',')}: фильмы ${whoT} получают ${fmtFactor(fct)}, пока снова не выпадет его фильм.`;
-    box.innerHTML = `
+    // три части обновляются отдельно и только при изменении: чужая оценка не пересоздаёт кнопки шкалы
+    // посреди нажатия (иначе клик между нажатием и отпусканием терялся)
+    if (!box.firstElementChild?.classList.contains('rate-slot')) {
+      box.innerHTML = '<div class="rate-slot"></div><div class="rate-slot"></div><div class="rate-slot"></div>';
+      box.__html = null;
+    }
+    const [top, scale, rated] = box.children;
+    setHTML(top, `
       <h3><span>Оцените фильм <button type="button" class="hint" data-hint="${esc(effect)}" aria-label="Подсказка: что даёт оценка">?</button></span>${done ? ' <button class="link-btn" data-rate-close>Свернуть</button>' : ''}</h3>
-      <div class="rate-film" data-h="0"><i style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><div><b>${esc(h.film.title)}</b><span>добавил(а) ${who}</span></div></div>
-      ${isAuthor ? '<p class="note">Это ваш фильм, его оценивают остальные.</p>' : rateScale(h)}
-      ${list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>${rateClearBtn(h)}` : ''}`;
+      <div class="rate-film" data-h="0"><i style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><div><b>${esc(h.film.title)}</b><span>добавил(а) ${who}</span></div></div>`);
+    const scaleHtml = isAuthor ? '<p class="note">Это ваш фильм, его оценивают остальные.</p>' : rateScale(h);
+    // своя оценка дошла: шкала та же, меняется только подсветка — правим на месте, не пересоздавая кнопки,
+    // иначе следующее нажатие посреди перерисовки теряется. Пока своя оценка в пути, подсветку не трогаем
+    const cur = scale.querySelector(':scope > .rate-scale');
+    if (cur && cur.dataset.hid === h.hid && scaleHtml.startsWith('<div class="rate-scale"')) {
+      if (scale.__html !== scaleHtml && !ratePend) { scale.__html = scaleHtml; patchScale(cur, mine); }
+    } else setHTML(scale, scaleHtml);
+    setHTML(rated, list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>${rateClearBtn(h)}` : '');
   }
   // создатель комнаты может снять все оценки фильма, чтобы его оценили заново
   const rateClearBtn = h => (isRoomOwner() ? `<button class="link-btn rate-clear" data-rate-clear="${esc(h.hid)}">Снять оценки</button>` : '');
@@ -2770,10 +2780,13 @@ function initRoom(roomId) {
   // своя оценка меняется только первую минуту, потом шкала закрывается
   const RATE_EDIT_MS = 60000;
   let detailHid = null, rateTimer = null;
+  // создатель запретил этому человеку оценивать (на создателя запрет не действует, как с добавлением)
+  function noRateMe() { return Boolean(state?.noRate?.includes(myPid())) && !isRoomOwner(); }
   const rateLeft = h => { const r = h.ratings?.[myPid()]; return r ? RATE_EDIT_MS - (Date.now() + serverOffset - (r.at || 0)) : Infinity; };
   function rateScale(h) {
     const mine = h.ratings?.[myPid()]?.score || 0;
     const left = rateLeft(h);
+    if (noRateMe()) return '<p class="note rate-locked">Создатель комнаты запретил вам оценивать фильмы.</p>';
     if (left <= 0) return `<p class="note rate-locked">Ваша оценка <b>${mine}</b>, изменить её уже нельзя.</p>`;
     if (left !== Infinity) {
       // когда минута кончится, перерисуем шкалу закрытой
@@ -2794,15 +2807,43 @@ function initRoom(roomId) {
       ${list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>` : ''}
     </div>`;
   }
+  // подсветка выбранной цифры и подпись про минуту на исправление — без пересоздания кнопок
+  function patchScale(el, mine) {
+    for (const x of el.querySelectorAll('[data-score]')) x.classList.toggle('on', Number(x.dataset.score) === mine);
+    const hint = el.nextElementSibling?.classList.contains('rate-hint') ? el.nextElementSibling : null;
+    if (mine && !hint) el.insertAdjacentHTML('afterend', '<p class="note rate-hint">Поменять можно в течение минуты</p>');
+    if (!mine && hint) hint.remove();
+  }
+  let ratePend = 0, rateSent = null; // сколько своих оценок в пути и последняя отправленная
   document.addEventListener('click', async e => {
     const b = e.target.closest('.rate-scale [data-score]');
     if (!b) return;
     const hid = b.closest('[data-hid]').dataset.hid;
-    const score = b.classList.contains('on') ? 0 : Number(b.dataset.score); // повторный клик снимает оценку
+    const want = Number(b.dataset.score);
+    // второй тап по той же цифре, пока первый в пути, — это «точно нажалось?», а не «снять оценку»
+    if (ratePend && rateSent?.hid === hid && rateSent.score === want) return;
+    const score = b.classList.contains('on') ? 0 : want; // повторный клик снимает оценку
+    // подсветка сразу, не дожидаясь ответа сервера
+    patchScale(b.closest('.rate-scale'), score);
+    ratePend++; rateSent = { hid, score };
     try {
       await api(`/rooms/${roomId}/rate`, { method: 'POST', body: { hid, score, cid: me.cid, by: me.name } });
-      if (detailHid === hid) setTimeout(() => showHist(hid), 250);
-    } catch (err) { toast(err.message, true); }
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      // всё дошло (или нет): шкала и карточка встают по состоянию сервера
+      // (с паузой: ответ на запрос может прийти раньше нового состояния комнаты)
+      if (!--ratePend) {
+        rateSent = null;
+        setTimeout(() => {
+          if (ratePend) return;
+          const slot = $('#rateBox .rate-slot:nth-child(2)');
+          if (slot) slot.__html = null;
+          renderRate();
+          if (detailHid === hid) showHist(hid);
+        }, 250);
+      }
+    }
   });
   $('#fairOn').addEventListener('change', e => {
     state.fair = e.target.checked;
@@ -2919,7 +2960,8 @@ function initRoom(roomId) {
       ${isRoomOwner() && !you ? `<section class="profile-sec profile-own"><h3>Создатель комнаты</h3><div class="grp">
         <label class="check row"><input type="checkbox" role="switch" data-person-set="off" ${isOff(pid) ? '' : 'checked'}><span class="box"></span><span class="check-text">Участвует в колесе <button type="button" class="hint" data-hint="Если человека сегодня нет, выключите: его фильмы уйдут с колеса, но останутся в списке. Пока идёт выбывание, менять нельзя." aria-label="Подсказка: участвует в колесе">?</button></span></label>
         <label class="check row"><input type="checkbox" role="switch" data-person-set="noAdd" ${state.noAdd?.includes(pid) ? '' : 'checked'}><span class="box"></span><span class="check-text">Может добавлять фильмы</span></label>
-      </div></section>` : ''}
+        <label class="check row"><input type="checkbox" role="switch" data-person-set="noRate" ${state.noRate?.includes(pid) ? '' : 'checked'}><span class="box"></span><span class="check-text">Может оценивать фильмы <button type="button" class="hint" data-hint="Запрет действует на новые оценки. Уже поставленные снимает кнопка «Снять его оценки»." aria-label="Подсказка: может оценивать фильмы">?</button></span></label>
+      </div>${ratedBy(pid) ? `<button type="button" class="link-btn rate-clear" data-person-unrate>Снять его оценки (${ratedBy(pid)})</button>` : ''}</section>` : ''}
       <div class="profile-stats">
         <div><b>${n}</b><span>${you ? plural(n, 'ваш фильм', 'ваших фильма', 'ваших фильмов') : plural(n, 'фильм', 'фильма', 'фильмов')} в колесе</span></div>
         <div><b>${w}</b><span>${plural(w, 'раз выбрали', 'раза выбрали', 'раз выбрали')} ${you ? 'ваш' : 'его'} фильм</span></div>
@@ -2978,10 +3020,17 @@ function initRoom(roomId) {
     requestAnimationFrame(() => placeSeg($('#peTabs')));
   }
 
-  // переключатели создателя в чужом профиле: «Участвует в колесе», «Может добавлять фильмы»
+  // переключатели создателя в чужом профиле: «Участвует в колесе», «Может добавлять фильмы», «Может оценивать фильмы»
   $('#profileBody').addEventListener('change', e => {
     const t = e.target.closest('[data-person-set]');
     if (t) setPerson($('#profileBody').dataset.pid, { [t.dataset.personSet]: !t.checked });
+  });
+  // сколько фильмов человек оценил: кнопка «Снять его оценки» видна, только если есть что снимать
+  const ratedBy = pid => state.history.filter(h => h.ratings?.[pid]).length;
+  $('#profileBody').addEventListener('click', e => {
+    if (!e.target.closest('[data-person-unrate]')) return;
+    const pid = $('#profileBody').dataset.pid, n = ratedBy(pid);
+    if (confirm(`Снять все оценки, которые поставил(а) ${$('#profileBody').dataset.name || 'этот человек'}? Это ${n} ${plural(n, 'фильм', 'фильма', 'фильмов')}. Бонусы и штрафы авторов посчитаются без них, вернуть оценки нельзя.`)) setPerson(pid, { clearRatings: true });
   });
   // победная музыка: поиск по названию или ссылка; поле живёт, пока не перерисовали редактор
   let peFound = [], peTimer = null, peSeq = 0;
@@ -3106,13 +3155,15 @@ function initRoom(roomId) {
     catch (e) { toast(e.message, true); }
   }
 
-  // создатель: отключить человека из колеса или запретить ему добавлять фильмы
+  // создатель: отключить человека из колеса, запретить ему добавлять фильмы или оценивать, снять его оценки
   async function setPerson(pid, patch) {
     try {
       await api(`/rooms/${roomId}/person`, { method: 'POST', body: { pid, ...patch, cid: me.cid } });
-      const name = state.films.find(f => personOf(f) === pid)?.addedBy || people.find(p => p.pid === pid)?.name || 'Человек';
+      const name = state.films.find(f => personOf(f) === pid)?.addedBy || people.find(p => p.pid === pid)?.name || $('#profileBody').dataset.name || 'Человек';
       if (patch.off !== undefined) toast(patch.off ? `${name} не участвует: его фильмов нет на колесе` : `${name} снова на колесе`);
       if (patch.noAdd !== undefined) toast(patch.noAdd ? `${name} больше не может добавлять фильмы` : `${name} снова может добавлять фильмы`);
+      if (patch.noRate !== undefined) toast(patch.noRate ? `${name} больше не может оценивать фильмы` : `${name} снова может оценивать фильмы`);
+      if (patch.clearRatings) { toast(`Сняты оценки: ${name}. Бонусы авторов пересчитаны`); renderProfile(pid, $('#profileBody').dataset.name); }
     } catch (err) {
       toast(err.message, true);
       // переключатель в профиле вернуть как было
