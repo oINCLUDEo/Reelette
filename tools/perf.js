@@ -2,7 +2,7 @@
 // Комната как у компании: 77 фильмов с постерами, 9 человек с эффектами ников и рамками, голоса, выпавший фильм.
 // Сценарии: покой, наведение по кнопкам, обновления комнаты (чужие голоса), наведение + обновления, прокрут.
 // Потом подозреваемых выключают по одному и меряют «наведение + обновления» и прокрут снова.
-// Запуск: сервер на 3000 (node server.js), затем node tools/perf.js [метка] [--throttle=4] [--quick]
+// Запуск: сервер на 3000 (node server.js), затем node tools/perf.js [метка] [--throttle=4] [--quick] [--fx=lite]
 // Открывается настоящее окно Chrome (с видеокартой): headless рисует программно и врёт про стекло и размытие.
 // Окно — за краем экрана и без звука, чтобы не мешать (рисует оно при этом как обычно: проверено, видеокарта та же).
 'use strict';
@@ -12,6 +12,8 @@ const base = process.env.BASE || 'http://localhost:3000';
 const label = process.argv.find(a => !a.startsWith('-') && a !== process.argv[0] && a !== process.argv[1]) || 'now';
 const throttle = Number((process.argv.find(a => a.startsWith('--throttle=')) || '=1').split('=')[1]);
 const quick = process.argv.includes('--quick');
+// --fx=lite | --fx=full — лёгкий режим принудительно (?fx= в адресе комнаты)
+const fx = (process.argv.find(a => a.startsWith('--fx=')) || '').slice(5);
 const outDir = path.join(__dirname, 'shots', 'out');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const post = (p, b) => fetch(base + p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }).then(r => r.json());
@@ -87,7 +89,7 @@ const ABLATE = {
   await cdp.send('Performance.enable');
   if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
   const open = async css => {
-    await pg.goto(`${base}/r/${id}`); await sleep(3500); // постеры, шрифты, въезд управления
+    await pg.goto(`${base}/r/${id}${fx ? '?fx=' + fx : ''}`); await sleep(3500); // постеры, шрифты, въезд управления
     if (css) await pg.addStyleTag({ content: css });
     await pg.mouse.move(960, 1060); await sleep(600);
   };

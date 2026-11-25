@@ -44,31 +44,41 @@
     scenes.push(s);
   }
 
+  function measure(s, stageMode) {
+    s.geoAt = performance.now();
+    const { w, h } = s;
+    let geo = { cx: w / 2, cy: h / 2, R: Math.min(w, h) * 0.36 };
+    const c = s.cv.getBoundingClientRect();
+    if (s.anchor?.offsetParent) {
+      const a = s.anchor.getBoundingClientRect();
+      geo = { cx: a.left - c.left + a.width / 2, cy: a.top - c.top + a.height / 2, R: a.width / 2 };
+    }
+    // караоке и игра: колеса нет, светимся мягко за видео, без кольца
+    const kv = stageMode ? [...s.cv.parentElement.querySelectorAll('.k-video')].find(el => el.offsetParent) : null;
+    if (kv) {
+      const a = kv.getBoundingClientRect();
+      geo = { cx: a.left - c.left + a.width / 2, cy: a.top - c.top + a.height / 2, R: a.width * 0.42 };
+    }
+    s.geo = geo;
+  }
+  // задача сразу после отрисовки текущего кадра (rAF + сообщение: выполнится после того, как кадр нарисован)
+  const mc = new MessageChannel(), afterQ = [];
+  mc.port1.onmessage = () => afterQ.splice(0).forEach(f => f());
+  const afterPaint = f => { afterQ.push(f); if (afterQ.length === 1) mc.port2.postMessage(0); };
+
   function draw(s, t, dt) {
     const { ctx, w, h, dpr } = s;
     if (!w || !h) return;
     s.boost += (target - s.boost) * Math.min(1, dt * 2.2);
     const b = s.boost;
 
-    // центр и радиус колеса относительно холста. Замер раз в 250 мс, а не в каждом кадре:
-    // getBoundingClientRect после правок страницы заставлял браузер пересчитывать раскладку посреди кадра
+    // центр и радиус колеса относительно холста. Замер раз в 250 мс, а не в каждом кадре, и не посреди кадра, а сразу
+    // после его отрисовки (задача через MessageChannel): тогда раскладка уже посчитана и чтение положения ничего не стоит.
+    // Посреди кадра getBoundingClientRect заставлял браузер пересчитывать стили и раскладку — на прокруте это было дорого
     const stageMode = s.cv.closest('.stage')?.classList.contains('karaoke-on');
     const pnow = performance.now();
-    if (!s.geo || pnow - s.geoAt > 250) {
-      s.geoAt = pnow;
-      s.geo = { cx: w / 2, cy: h / 2, R: Math.min(w, h) * 0.36 };
-      const c = s.cv.getBoundingClientRect();
-      if (s.anchor?.offsetParent) {
-        const a = s.anchor.getBoundingClientRect();
-        s.geo = { cx: a.left - c.left + a.width / 2, cy: a.top - c.top + a.height / 2, R: a.width / 2 };
-      }
-      // караоке и игра: колеса нет, светимся мягко за видео, без кольца
-      const kv = stageMode ? [...s.cv.parentElement.querySelectorAll('.k-video')].find(el => el.offsetParent) : null;
-      if (kv) {
-        const a = kv.getBoundingClientRect();
-        s.geo = { cx: a.left - c.left + a.width / 2, cy: a.top - c.top + a.height / 2, R: a.width * 0.42 };
-      }
-    }
+    if (!s.geo) { s.geo = { cx: w / 2, cy: h / 2, R: Math.min(w, h) * 0.36 }; measure(s, stageMode); }
+    else if (pnow - s.geoAt > 250 && !s.geoAsk) { s.geoAsk = true; afterPaint(() => { s.geoAsk = false; measure(s, stageMode); }); }
     let { cx, cy, R } = s.geo;
     // свет не прыгает при смене режима, а переезжает и меняет размер за ~0,4 с; кольцо гаснет плавно
     const ringT = stageMode ? 0 : 1;

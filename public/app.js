@@ -342,6 +342,7 @@ function initRoom(roomId) {
     $('#toasts').append(el);
     setTimeout(close, 15000);
   }
+  let hotEls = []; // строка списка и карточка полки, подсвеченные как «под стрелкой»
   function setLite(on) { settings.lite = on; ls.set('lite', on); $('#liteOn').checked = on; applyLite(); }
   wheel = new Wheel($('#wheel'), {
     hubButton: true,
@@ -353,10 +354,15 @@ function initRoom(roomId) {
       $('#now').classList.toggle('fast', !slow);
       if (!outShown) { setCurrent(it ? it.title : ' '); if (slow) updateNow(it); }
       // строка фильма под стрелкой: подсветка переходит с прошлой на новую, без перебора всего списка
-      $$('.film.hot, #shelf .sh-card.on').forEach(el => el.classList.remove('hot', 'on'));
+      // подсвеченные запоминаем: снимать с них дешевле, чем искать по всему документу на каждой смене сектора.
+      // Если список с тех пор пересобрали, запомненные уже не в документе — тогда один раз ищем, как раньше
+      if (hotEls.every(el => el.isConnected)) hotEls.forEach(el => el.classList.remove('hot', 'on'));
+      else $$('.film.hot, #shelf .sh-card.on').forEach(el => el.classList.remove('hot', 'on'));
+      hotEls = [];
       if (it) {
-        $(`.film[data-id="${CSS.escape(it.id)}"]`)?.classList.add('hot');
-        $(`#shelf .sh-card[data-id="${CSS.escape(it.id)}"]`)?.classList.add('on');
+        const row = $(`.film[data-id="${CSS.escape(it.id)}"]`), card = $(`#shelf .sh-card[data-id="${CSS.escape(it.id)}"]`);
+        if (row) { row.classList.add('hot'); hotEls.push(row); }
+        if (card) { card.classList.add('on'); hotEls.push(card); }
       }
       // стрелка светится цветом автора фильма под ней (style.css .pointer)
       if (it?.color) $('#pointer').style.setProperty('--pg', it.color); else $('#pointer').style.removeProperty('--pg');
@@ -477,9 +483,12 @@ function initRoom(roomId) {
   function posterHue(url) {
     if (hueCache.has(url)) return Promise.resolve(hueCache.get(url));
     return new Promise(res => {
-      const img = new Image();
+      // колесо этот постер уже загрузило и раскодировало: берём его картинку, а не грузим заново
+      // (новая картинка раскодировалась целиком прямо посреди прокрута — на слабом процессоре ~0,3 с)
+      const ready = wheel?.images?.get(url);
+      const img = ready?.ok ? ready : new Image();
       const done = h => { hueCache.set(url, h); res(h); };
-      img.onload = () => {
+      const read = () => {
         try {
           const c = document.createElement('canvas');
           c.width = c.height = 16;
@@ -497,6 +506,8 @@ function initRoom(roomId) {
           done(Math.hypot(x, y) / 256 > 0.04 ? Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360) : null);
         } catch { done(null); } // картинка с чужого адреса без CORS: холст «грязный», тон не прочитать
       };
+      if (img === ready) { read(); return; }
+      img.onload = read;
       img.onerror = () => done(null);
       img.src = url;
     });
@@ -507,6 +518,10 @@ function initRoom(roomId) {
   function setCurrent(text, out = false) {
     const h = $('#current'), el = $('#currentTitle'), wasOut = h.classList.contains('out');
     h.classList.toggle('out', out);
+    // зачёркнутое выбывшее ↔ обычное название: CSS-переход цвета и черты (style.css #currentTitle) не должен доигрывать
+    // на новом названии — иначе следующий фильм ~0,3 с виден серым и перечёркнутым. Отменяем его только здесь,
+    // раз на выбывание: getAnimations() на каждой смене сектора стоил пересчёта стилей всей страницы (roll)
+    if (wasOut !== out && el.textContent !== text) el.getAnimations().forEach(a => { if (a instanceof CSSTransition) a.cancel(); });
     roll(el, text, wasOut && !out ? 'drop' : 'up');
   }
   // смена значения: старое уходит вверх и гаснет с размытием, новое поднимается следом (down — счёт вниз, drop — зачёркнутое выбывшее
@@ -517,7 +532,10 @@ function initRoom(roomId) {
     const now = performance.now(), dur = Math.min(460, (now - (el._rollAt || 0)) * 0.85);
     el._rollAt = now;
     el.parentNode.querySelectorAll('.roll-old').forEach(n => n.remove());
-    el.getAnimations().forEach(a => a.cancel());
+    // отменяем только свои анимации (roll и landFx кладут их в el._anims): getAnimations() на каждой смене сектора заставлял
+    // браузер пересчитать стили всей страницы посреди кадра — на слабом процессоре это полсекунды за прокрут
+    (el._anims || []).forEach(a => a.cancel());
+    el._anims = [];
     if (reduceMotion || dur < 160 || !el.textContent.trim() || !el.offsetParent) { el.textContent = text; return; }
     const old = el.cloneNode(true);
     old.removeAttribute('id');
@@ -530,8 +548,8 @@ function initRoom(roomId) {
     const s = how === 'up' ? -1 : 1; // down (счёт вниз) и drop уходят вниз
     old.animate([{ transform: 'none', opacity: 1, filter: 'blur(0)' }, { transform: `translateY(${s * 0.3}em)`, opacity: 0, filter: 'blur(6px)' }],
       { duration: dur * 0.5, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' }).onfinish = () => old.remove();
-    el.animate([{ transform: `translateY(${-s * 0.3}em)`, opacity: 0, filter: 'blur(6px)' }, { transform: 'none', opacity: 1, filter: 'blur(0)' }],
-      { duration: dur * 0.75, delay: dur * 0.25, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' });
+    el._anims.push(el.animate([{ transform: `translateY(${-s * 0.3}em)`, opacity: 0, filter: 'blur(6px)' }, { transform: 'none', opacity: 1, filter: 'blur(0)' }],
+      { duration: dur * 0.75, delay: dur * 0.25, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'backwards' }));
   }
   function flashOut(f) {
     outShown = true;
@@ -843,7 +861,8 @@ function initRoom(roomId) {
     burst($('#room'), r.left + r.width / 2, r.bottom, 0.45);
     window.setBackdropPulse?.(0.9);
     // название не пересобираем копиями: оно просто чуть подаётся вперёд и встаёт на место
-    $('#currentTitle').animate([{ transform: 'scale(1.035)' }, { transform: 'none' }], { duration: 700, easing: 'cubic-bezier(.2, .8, .2, 1)' });
+    const ct = $('#currentTitle');
+    (ct._anims ||= []).push(ct.animate([{ transform: 'scale(1.035)' }, { transform: 'none' }], { duration: 700, easing: 'cubic-bezier(.2, .8, .2, 1)' }));
   }
   // сердцебиение доползания в полуфинале и финале: свет вокруг колеса вспыхивает цветом фильма под стрелкой
   function heartFx() {
@@ -1278,6 +1297,22 @@ function initRoom(roomId) {
     const W = viewWeights(list);
     wheel.setItems(list.map(f => wheelItem(f, W.get(f.id))));
   }
+  // тон постеров считаем заранее, пока колесо стоит, в свободное время браузера: посреди прокрута выборка цвета
+  // раскодировала постер заново (~0,3 с за прокрут на слабом процессоре), а так там остаётся взять готовое из hueCache
+  let hueWarm = false;
+  function warmHues() {
+    if (hueWarm || spinningSid || state?.spin) return;
+    const next = wheel.items.find(it => it.poster && !hueCache.has(it.poster) && wheel.images.get(it.poster)?.ok);
+    if (!next) return;
+    hueWarm = true;
+    const idle = window.requestIdleCallback || (f => setTimeout(f, 200));
+    idle(() => {
+      // начался прокрут, пока ждали свободного времени, — досчитаем после него
+      if (spinningSid || state?.spin) { hueWarm = false; return; }
+      posterHue(next.poster).finally(() => { hueWarm = false; warmHues(); });
+    }, { timeout: 2000 });
+  }
+  setInterval(warmHues, 3000);
 
   function runSpin(spin) {
     clearTimeout(finalTimer); clearTimeout(winSfxTimer); // окно и фанфара прошлого финала не всплывают поверх нового прокрута
