@@ -1,6 +1,6 @@
 // Колесо на canvas. Угол хранится в оборотах: rot ≡ −(позиция под стрелкой).
 class Wheel {
-  constructor(canvas, { onTick, onCurrent, idleSpeed = 0, hubButton = false } = {}) {
+  constructor(canvas, { onTick, onCurrent, onSlow, idleSpeed = 0, hubButton = false } = {}) {
     this.hubButton = hubButton; // центр закрыт DOM-кнопкой, рисовать его не нужно
     this.cv = canvas;
     this.ctx = canvas.getContext('2d');
@@ -10,6 +10,8 @@ class Wheel {
     this.anim = null;
     this.onTick = onTick || (() => {});
     this.onCurrent = onCurrent || (() => {});
+    this.onSlow = onSlow; // похоже, устройство не тянет эффекты — один раз за жизнь страницы (app.js предлагает лёгкий режим)
+    this.bornAt = performance.now();
     this.idleSpeed = idleSpeed;
     this.images = new Map();
     this.dirty = true;
@@ -194,6 +196,7 @@ class Wheel {
       // первая ступенька — через ~120 мс, когда секторы уже заметно сдвинулись (сразу она рисовала почти неподвижную картинку)
       if (this.stepMode) this.builtAt = now - this.stepMs() + 120;
     }
+    this.calibrate(now, tweening);
     let byTween = false;
     if (tweening && !this.dirty && now - (this.builtAt || 0) > (this.stepMode ? this.stepMs() : 30)) { this.dirty = true; byTween = true; }
     if (!tweening && this.tweened) this.dirty = true; // последний кадр перетекания — точные размеры
@@ -258,12 +261,45 @@ class Wheel {
     this.warmMs = med;
     this.weak = this.weak ? perMp >= 20 : med >= 15 && perMp >= 30;
     if (this.weak && !this.stepMode) this.stepMode = true; // тормозит уже сейчас — дальше это перетекание идёт ступеньками
+    if (this.weak) this.saySlow();
   }
   // шаг ступенек: сборки занимают не больше пятой части времени (5 × цена сборки ступеньки, от 200 до 500 мс);
   // у выбывшего сектора перетекание длиннее (~2,7 с), шаг не меньше 350 мс — ступенек не больше восьми
   stepMs() {
     const s = Math.min(500, Math.max(200, 5 * Math.max(this.warmMs || 40, this.stepCost || 0)));
     return this.items.some(i => i.dying) ? Math.max(s, 350) : s;
+  }
+
+  // Сигнал «похоже, тормозит»: только подсказка. Лёгкий режим человек включает сам (решение владельца) — надёжно отличить
+  // слабый ноутбук от занятого обычного компьютера замер не может, а ложно замороженные эффекты хуже лишнего вопроса
+  saySlow() {
+    if (this.slowSaid) return;
+    this.slowSaid = true;
+    this.onSlow?.();
+  }
+
+  // Калибровка в покое: заметить слабое устройство до первого голоса (для подсказки). Тормозит в покое процессор (стили и перерисовка
+  // анимаций ников и рамок), поэтому меряем прямо его: небольшая постоянная задача на JS, пять прогонов по одному на кадр,
+  // берём самый быстрый — медленный процессор не выполнит её быстрее своей скорости, а случайная помеха минимум не портит.
+  // От комнаты, экрана и видеокарты не зависит (замер сборки колеса зависел: холст рисует видеокарта с отложенным выполнением).
+  // Один раз, через 4 с после входа, когда колесо стоит; даёт только подсказку, ступеньками управляет перетекание
+  calibrate(now, tweening) {
+    if (this.slowSaid || this.calibDone || this.anim || tweening || now - this.bornAt < 4000) return;
+    (this.calibMs ||= []).push(Wheel.cpuBench());
+    if (this.calibMs.length < 5) return;
+    this.calibDone = true;
+    this.calibMin = Math.min(...this.calibMs);
+    if (this.calibMin >= Wheel.CALIB_WEAK_MS) this.saySlow();
+  }
+  // постоянная задача на ~1,7–2,5 мс на обычном компьютере (i3-10105F)
+  static cpuBench() {
+    const t = performance.now();
+    let x = 0;
+    for (let i = 0; i < 50000; i++) x += Math.sqrt(i) * Math.sin(i);
+    const a = Array.from({ length: 750 }, (_, i) => (i * 7919) % 751);
+    a.sort((p, q) => p - q);
+    Wheel.sink = x + a[5]; // результат «используется», чтобы движок не выбросил вычисления
+    return performance.now() - t;
   }
 
   geom() {
@@ -476,6 +512,12 @@ class Wheel {
     }
   }
 }
+
+// порог калибровки, мс (минимум из пяти прогонов cpuBench). Замер 2026-11-25 в комнате, обычный Chrome: обычный компьютер
+// 1,7–1,8 мс (4K и маленькая комната — так же), он же под нагрузкой 8–12 потоков 2,7–2,8, процессор вдвое медленнее 3,9,
+// втрое — 5,5, вчетверо — 6,6–8. Порог посередине (в логарифмической шкале) между загруженным обычным и втрое медленным.
+// Присваиванием, а не static-полем класса: так работает и в Safari 14.0
+Wheel.CALIB_WEAK_MS = 4.4;
 
 function plural(n, one, few, many) {
   const m10 = n % 10, m100 = n % 100;

@@ -135,13 +135,32 @@
     // рисуем двумя группами: цвет задаётся дважды за кадр, прозрачность — через globalAlpha
     // (раньше строка rgba(...) собиралась и разбиралась заново для каждой пылинки в каждом кадре)
     const pr = 1 + fx.mid * 0.9;
-    for (const ring of [false, true]) {
+    // на слабом устройстве (fx-lite, wheel.js) — пачками: два цвета × 16 уровней прозрачности, не больше 32 заливок за кадр
+    // вместо заливки на каждую пылинку (сотни заливок заметно грузили покой). Мерцание дальней пыли там ступенчатее —
+    // на обычных устройствах рисуем как раньше, по пылинке
+    const lite = document.documentElement.classList.contains('fx-lite');
+    if (!lite) {
+      for (const ring of [false, true]) {
+        ctx.fillStyle = ring ? rgba(col.ring, 1) : '#fff';
+        for (const p of s.dust) {
+          if (p.ring !== ring) continue;
+          ctx.globalAlpha = p.a;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r * pr, 0, 6.283); ctx.fill();
+        }
+      }
+    } else for (const ring of [false, true]) {
       ctx.fillStyle = ring ? rgba(col.ring, 1) : '#fff';
+      const packs = new Map();
       for (const p of s.dust) {
         if (p.ring !== ring) continue;
-        ctx.globalAlpha = p.a;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * pr, 0, 6.283); ctx.fill();
+        const q = Math.round(p.a * 16);
+        if (!q) continue;
+        let path = packs.get(q);
+        if (!path) packs.set(q, path = new Path2D());
+        const rr = p.r * pr;
+        path.moveTo(p.x + rr, p.y); path.arc(p.x, p.y, rr, 0, 6.283);
       }
+      for (const [q, path] of packs) { ctx.globalAlpha = q / 16; ctx.fill(path); }
     }
     ctx.globalAlpha = 1;
   }

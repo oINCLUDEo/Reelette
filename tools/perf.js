@@ -4,6 +4,7 @@
 // Потом подозреваемых выключают по одному и меряют «наведение + обновления» и прокрут снова.
 // Запуск: сервер на 3000 (node server.js), затем node tools/perf.js [метка] [--throttle=4] [--quick]
 // Открывается настоящее окно Chrome (с видеокартой): headless рисует программно и врёт про стекло и размытие.
+// Окно — за краем экрана и без звука, чтобы не мешать (рисует оно при этом как обычно: проверено, видеокарта та же).
 'use strict';
 const { chromium } = require('playwright');
 const fs = require('node:fs'), path = require('node:path');
@@ -71,7 +72,7 @@ const ABLATE = {
 (async () => {
   const { id, owner } = await setup();
   // обычный Chrome, как у людей на вечере (чистый временный профиль); PW_CHANNEL=chromium — встроенный Playwright
-  const b = await chromium.launch({ headless: false, channel: process.env.PW_CHANNEL || 'chrome', args: ['--window-size=1940,1180', '--disable-features=CalculateNativeWinOcclusion', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
+  const b = await chromium.launch({ headless: false, channel: process.env.PW_CHANNEL || 'chrome', args: ['--mute-audio', '--window-position=-32000,-32000', '--window-size=1940,1180', '--disable-features=CalculateNativeWinOcclusion', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
   const ctx = await b.newContext({ viewport: { width: 1920, height: 1080 } });
   await ctx.addInitScript(([n, c]) => {
     localStorage.setItem('kk_name', JSON.stringify(n)); localStorage.setItem('kk_cid', JSON.stringify(c)); localStorage.setItem('kk_newsSeen', '"9999"');

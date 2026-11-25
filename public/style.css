@@ -1507,20 +1507,46 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 .nick.c-solid { color: var(--nc); -webkit-text-fill-color: var(--nc); }
 .nick.c-grad { background: var(--ng); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .nick.fx-glow { filter: drop-shadow(0 0 6px var(--ngl)); }
-.nick.fx-pulse { animation: nPulse 2.2s ease-in-out infinite; }
+.nick.fx-pulse { filter: drop-shadow(0 0 5px var(--ngl)); animation: nPulse 2.2s ease-in-out infinite; }
 @keyframes nPulse { 0%, 100% { filter: drop-shadow(0 0 0 transparent); } 50% { filter: drop-shadow(0 0 9px var(--ngl)); } }
-.nick.fx-shimmer { background: linear-gradient(110deg, var(--n1) 30%, #fff 46%, #fff 50%, var(--n2) 66%) 0 0 / 260% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: nShimmer 3s linear infinite; }
+.nick.fx-shimmer { background: linear-gradient(110deg, var(--n1) 30%, #fff 46%, #fff 50%, var(--n2) 66%) 50% 0 / 260% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: nShimmer 3s linear infinite; }
 @keyframes nShimmer { from { background-position: 130% 0; } to { background-position: -130% 0; } }
-.nick.fx-glitch { animation: nGlitch 3.2s infinite steps(1); }
+.nick.fx-glitch { text-shadow: 1px 0 rgba(255,45,111,.85), -1px 0 rgba(34,211,238,.85); animation: nGlitch 3.2s infinite steps(1); }
 @keyframes nGlitch { 0%, 86%, 100% { text-shadow: none; transform: none; } 88% { text-shadow: 2px 0 #FF2D6F, -2px 0 #22D3EE; transform: translateX(1px); } 90% { text-shadow: -2px 0 #FF2D6F, 2px 0 #22D3EE; transform: translateX(-1px); } 92% { text-shadow: 1px 0 #FF2D6F, -1px 0 #22D3EE; } }
 .nk-who b .nick, .k-star .nick { display: inline; }
+
+/* слабое устройство (колесо меряет само, app.js fx-lite): эффекты ников и рамок стоят статичным кадром — цвет, градиент,
+   свечение остаются, переливов и пульса нет. Эти анимации идут не на видеокарте: на слабом процессоре они одни держали
+   страницу занятой почти всё время даже в покое. Статичный кадр задан в самих правилах (виден, когда анимация стоит) */
+html.fx-lite .nick[class*="fx-"], html.fx-lite .nick[class*="fx-"] > span, html.fx-lite [class*="frame-"] { animation: none !important; }
+/* «Радуга» и «Голограмма» одним цветом не узнать (радуга выглядела как неон) — когда анимация стоит (лёгкий режим,
+   «уменьшить движение»), это ровное кольцо из своих цветов по кругу (решение владельца). У картинки кольцо — фон в отступе
+   2px, у буквенной аватарки (фон задан в style=) — псевдоэлемент с кольцевой маской; снаружи мягкое свечение */
+html.fx-lite .frame-rainbow.frame-rainbow { --ring: conic-gradient(#FF5A6E, #FFD54A, #3DDC97, #38BDF8, #C084FC, #FF5A6E); box-shadow: 0 0 10px rgba(255,213,74,.35); }
+html.fx-lite .frame-holo.frame-holo { --ring: conic-gradient(#F0ABFC, #67E8F9, #C4B5FD, #F0ABFC); box-shadow: 0 0 12px rgba(196,181,253,.45); }
+html.fx-lite img:is(.frame-rainbow, .frame-holo):is(.frame-rainbow, .frame-holo) { padding: 2px; background: var(--ring); }
+html.fx-lite span:is(.frame-rainbow, .frame-holo) { position: relative; }
+html.fx-lite span:is(.frame-rainbow, .frame-holo)::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--ring); pointer-events: none;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px)); mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px)); }
+@media (prefers-reduced-motion: reduce) {
+  :root .frame-rainbow.frame-rainbow { --ring: conic-gradient(#FF5A6E, #FFD54A, #3DDC97, #38BDF8, #C084FC, #FF5A6E); box-shadow: 0 0 10px rgba(255,213,74,.35); }
+  :root .frame-holo.frame-holo { --ring: conic-gradient(#F0ABFC, #67E8F9, #C4B5FD, #F0ABFC); box-shadow: 0 0 12px rgba(196,181,253,.45); }
+  img:is(.frame-rainbow, .frame-holo):is(.frame-rainbow, .frame-holo) { padding: 2px; background: var(--ring); }
+  span:is(.frame-rainbow, .frame-holo) { position: relative; }
+  span:is(.frame-rainbow, .frame-holo)::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--ring); pointer-events: none;
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px)); mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px)); }
+}
+/* подсказка «включите лёгкий режим»: уведомление с кнопками, контейнер уведомлений клики не ловит */
+.toast.lite-hint { pointer-events: auto; display: grid; gap: 10px; text-align: left; }
+.toast.lite-hint .lh-btns { display: flex; gap: 8px; }
+.toast.lite-hint .btn { height: 36px; padding: 0 16px; font-size: 13px; }
 
 /* ---------- рамки аватаров ---------- */
 .frame-accent { box-shadow: 0 0 0 2px var(--acc), 0 0 10px var(--glow) !important; }
 .frame-neon { box-shadow: 0 0 0 2px var(--ngl, var(--acc-hi)), 0 0 14px var(--ngl, var(--acc-hi)) !important; animation: fNeon 2.4s ease-in-out infinite; }
 @keyframes fNeon { 50% { box-shadow: 0 0 0 2px var(--ngl, var(--acc-hi)), 0 0 4px var(--ngl, var(--acc-hi)); } }
 .frame-gold { box-shadow: 0 0 0 2px #F5C542, 0 0 0 4px rgba(245,197,66,.25), 0 0 12px rgba(245,197,66,.55) !important; }
-.frame-rainbow { animation: fRainbow 4s linear infinite; }
+.frame-rainbow.frame-rainbow { box-shadow: 0 0 0 2px #FF5A6E, 0 0 12px #FF5A6E; animation: fRainbow 4s linear infinite; }
 @keyframes fRainbow { 0% { box-shadow: 0 0 0 2px #FF5A6E, 0 0 12px #FF5A6E; } 25% { box-shadow: 0 0 0 2px #FFD54A, 0 0 12px #FFD54A; } 50% { box-shadow: 0 0 0 2px #3DDC97, 0 0 12px #3DDC97; } 75% { box-shadow: 0 0 0 2px #38BDF8, 0 0 12px #38BDF8; } 100% { box-shadow: 0 0 0 2px #FF5A6E, 0 0 12px #FF5A6E; } }
 
 /* ---------- профиль: фон, статус, бейджи, редактор ---------- */
@@ -1541,8 +1567,11 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 .nick.nf-pacifico { font-family: 'Pacifico', cursive; font-weight: 400; letter-spacing: 0; }
 .nick.nf-russo { font-family: 'Russo One', sans-serif; font-weight: 400; letter-spacing: 0; }
 .nick.fx-wave > span { display: inline-block; animation: nWave 1.7s ease-in-out infinite; animation-delay: calc(var(--i) * 70ms); white-space: pre; }
+/* статичная волна (видна, когда анимация стоит): буквы чуть выше и ниже строки */
+.nick.fx-wave > span:nth-child(4n+2) { transform: translateY(-.14em); }
+.nick.fx-wave > span:nth-child(4n) { transform: translateY(.07em); }
 @keyframes nWave { 0%, 55%, 100% { transform: none; } 25% { transform: translateY(-.22em); } }
-.nick.fx-flicker { animation: nFlicker 4.5s infinite; filter: drop-shadow(0 0 6px var(--ngl)); }
+.nick.fx-flicker { animation: nFlicker 4.5s infinite; filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 5px var(--ngl)) drop-shadow(0 0 12px var(--ngl)); }
 @keyframes nFlicker { 0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; filter: drop-shadow(0 0 7px var(--ngl)); } 20%, 24%, 55% { opacity: .35; filter: none; } }
 .nick.fx-rainbow { background: linear-gradient(90deg, #FF5A6E, #FFD54A, #3DDC97, #38BDF8, #C084FC, #FF5A6E) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: nRainbow 3s linear infinite; }
 @keyframes nRainbow { to { background-position: -200% 0; } }
@@ -1551,12 +1580,12 @@ body.karaoke-on .k-side > .k-tabs-wrap { border-top: 1px solid var(--bd); paddin
 .nick-badge svg { width: .8em; height: .8em; }
 
 /* новые рамки */
-.frame-fire { animation: fFire 1.4s ease-in-out infinite; }
+.frame-fire.frame-fire { box-shadow: 0 0 0 2px #FF7A18, 0 -3px 12px #FF4D00, 0 0 18px rgba(255,77,0,.6); animation: fFire 1.4s ease-in-out infinite; }
 @keyframes fFire { 0%, 100% { box-shadow: 0 0 0 2px #FF7A18, 0 -3px 12px #FF4D00, 0 0 18px rgba(255,77,0,.6); } 50% { box-shadow: 0 0 0 2px #FFC93C, 0 -5px 16px #FF7A18, 0 0 10px rgba(255,201,60,.6); } }
 .frame-ice { box-shadow: 0 0 0 2px #BAE6FD, 0 0 0 4px rgba(125,211,252,.35), 0 0 16px rgba(125,211,252,.7) !important; }
-.frame-toxic { animation: fToxic 1.8s ease-in-out infinite; }
+.frame-toxic.frame-toxic { box-shadow: 0 0 0 2px #A3E635, 0 0 8px #84CC16; animation: fToxic 1.8s ease-in-out infinite; }
 @keyframes fToxic { 0%, 100% { box-shadow: 0 0 0 2px #A3E635, 0 0 8px #84CC16; } 50% { box-shadow: 0 0 0 2px #D9F99D, 0 0 20px #84CC16; } }
-.frame-holo { animation: fHolo 3s linear infinite; }
+.frame-holo.frame-holo { box-shadow: 0 0 0 2px #F0ABFC, 0 0 14px #F0ABFC; animation: fHolo 3s linear infinite; }
 @keyframes fHolo { 0% { box-shadow: 0 0 0 2px #F0ABFC, 0 0 14px #F0ABFC; } 33% { box-shadow: 0 0 0 2px #67E8F9, 0 0 14px #67E8F9; } 66% { box-shadow: 0 0 0 2px #C4B5FD, 0 0 14px #C4B5FD; } 100% { box-shadow: 0 0 0 2px #F0ABFC, 0 0 14px #F0ABFC; } }
 
 /* новые фоны профиля */

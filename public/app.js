@@ -309,7 +309,7 @@ function initRoom(roomId) {
   let provider = 'none';
   // серия «до победителя» по умолчанию включена: на выбывании колесо само крутит до финала
   // дуэль убрана: кто выбирал её последней, тот попадает в обычный режим
-  const settings = { mode: ls.get('mode', 'normal') === 'elimination' ? 'elimination' : 'normal', duration: ls.get('dur', 12), auto: ls.get('auto', true), sound: ls.get('sound', true), showOut: ls.get('showOut', false), flyChat: ls.get('flyChat', true), filmAccent: ls.get('filmAccent', false), music: ls.get('music', false), delay: 0 };
+  const settings = { mode: ls.get('mode', 'normal') === 'elimination' ? 'elimination' : 'normal', duration: ls.get('dur', 12), auto: ls.get('auto', true), sound: ls.get('sound', true), showOut: ls.get('showOut', false), flyChat: ls.get('flyChat', true), lite: ls.get('lite', false), filmAccent: ls.get('filmAccent', false), music: ls.get('music', false), delay: 0 };
   let people = [];
   let countdown = null; // секунд до старта, пока идёт отсчёт
   let countdownTimer = null;
@@ -322,9 +322,31 @@ function initRoom(roomId) {
     if (settings.sound) Sfx.tick();
   }
 
+  // Лёгкий режим — личная настройка: эффекты ников и рамок стоят статичным кадром, пыль вокруг колеса дешевле (style.css fx-lite).
+  // Сам сайт его не включает, а один раз предлагает, если колесо заметило, что устройство не тянет (решение владельца).
+  // ?fx=lite / ?fx=full в адресе — принудительно, для проверки
+  const fxForce = new URLSearchParams(location.search).get('fx');
+  const applyLite = () => document.documentElement.classList.toggle('fx-lite', fxForce ? fxForce === 'lite' : settings.lite);
+  applyLite();
+  function suggestLite() {
+    if (settings.lite || fxForce || ls.get('liteHinted', false)) return;
+    ls.set('liteHinted', true); // один раз на браузер: дальше — в настройках
+    const el = document.createElement('div');
+    el.className = 'toast lite-hint';
+    el.innerHTML = '<span>Похоже, компьютеру тяжело с эффектами. Если подтормаживает, включите лёгкий режим: ники и рамки перестанут анимироваться.</span><span class="lh-btns"><button type="button" class="btn btn-primary" data-lite-yes>Включить</button><button type="button" class="btn btn-ghost" data-lite-no>Не надо</button></span>';
+    const close = () => { el.style.transition = 'opacity .3s'; el.style.opacity = 0; setTimeout(() => el.remove(), 320); };
+    el.addEventListener('click', e => {
+      if (e.target.closest('[data-lite-yes]')) { setLite(true); toast('Лёгкий режим включён. Выключить — в настройках'); close(); }
+      else if (e.target.closest('[data-lite-no]')) close();
+    });
+    $('#toasts').append(el);
+    setTimeout(close, 15000);
+  }
+  function setLite(on) { settings.lite = on; ls.set('lite', on); $('#liteOn').checked = on; applyLite(); }
   wheel = new Wheel($('#wheel'), {
     hubButton: true,
     onTick: tick,
+    onSlow: suggestLite,
     onCurrent: it => {
       const slow = !wheel.anim || wheel.speed < 1.2;
       // на быстром ходу год с жанрами и «Добавил(а)» не прочитать: строки спрятаны и не пересобираются на каждом секторе
@@ -3609,6 +3631,8 @@ function initRoom(roomId) {
     paintId = undefined; paintFilm(wheel.items[wheel.currentIndex()], true); // перекрасить сразу
   });
   $('#flyChatOn').checked = settings.flyChat;
+  $('#liteOn').checked = settings.lite;
+  $('#liteOn').addEventListener('change', e => setLite(e.target.checked));
   $('#flyChatOn').addEventListener('change', e => { settings.flyChat = e.target.checked; ls.set('flyChat', settings.flyChat); });
   $('#showOutOn').addEventListener('change', e => { settings.showOut = e.target.checked; ls.set('showOut', settings.showOut); });
   $('#spinLockOn').addEventListener('change', e => {
