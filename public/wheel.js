@@ -17,8 +17,12 @@ class Wheel {
     this.tint = null; // цвет постера под стрелкой (app.js): подсветка сектора и свечение ламп
     this.calm = matchMedia('(prefers-reduced-motion: reduce)').matches; // без вспышек ламп
     this.readColors();
-    // подписи рисуются шрифтом интерфейса: когда он догрузился, кэш пересобирается
-    document.fonts?.ready.then(() => { this.dirty = true; });
+    this.textW = new Map(); // ширина подписи кеглем 100px: ширина текста растёт с кеглем линейно, мерить каждую сборку незачем
+    // подписи рисуются шрифтом интерфейса: когда он догрузился, ширины меряются заново и кэш пересобирается
+    // (и на каждую догрузку: Carlito приходит кусками по алфавитам, и «ł», «ż» могут догрузиться посреди вечера)
+    const refont = () => { this.textW.clear(); this.dirty = true; };
+    document.fonts?.ready.then(refont);
+    document.fonts?.addEventListener?.('loadingdone', refont);
     new ResizeObserver(() => this.resize()).observe(canvas);
     this.resize();
     this.last = performance.now();
@@ -53,7 +57,8 @@ class Wheel {
 
   // items: [{id, title, poster, weight, color}] в нужном порядке; color — цвет ника автора (кромка сектора). Пропавшие плавно сжимаются.
   setItems(list, { snap = false } = {}) {
-    const byId = new Map(this.items.map(i => [i.id, i]));
+    const prev = this.items;
+    const byId = new Map(prev.map(i => [i.id, i]));
     const next = [];
     const seen = new Set();
     for (const f of list) {
@@ -72,14 +77,21 @@ class Wheel {
       });
     } else next.forEach(i => (i.w = i.target));
     this.items = next;
-    this.dirty = true;
+    // кэш с постерами пересобирается, только если на колесе что-то поменялось: состояние комнаты приходит на любую мелочь
+    // (музыка, чат, оценки), а пересборка с постерами — самое дорогое в кадре. Новые веса перетекают в frame(), он и пересоберёт
+    const same = !snap && next.length === prev.length && next.every((n, i) => {
+      const o = prev[i];
+      return o.id === n.id && o.title === n.title && o.poster === n.poster && o.color === n.color && !o.dying === !n.dying;
+    });
+    if (!same) { this.dirty = true; this.shown = null; }
   }
 
   loadImage(url, attempt = 0) {
     if (this.images.has(url) && !attempt) return;
     const img = new Image();
     img.decoding = 'async';
-    img.onload = () => { img.ok = true; this.dirty = true; };
+    // только что догруженный постер делает сборки дорогими на любом компьютере — секунду после него скорость не меряем
+    img.onload = () => { img.ok = true; this.dirty = true; this.imgAt = performance.now(); };
     // не загрузилось (сервер или сеть моргнули): пробуем ещё, с паузой побольше и мимо кеша браузера
     img.onerror = () => { if (attempt < 4 && this.images.get(url) === img) setTimeout(() => this.loadImage(url, attempt + 1), 2000 * 3 ** attempt); };
     img.src = attempt ? `${url}${url.includes('?') ? '&' : '?'}r=${attempt}` : url;
@@ -139,13 +151,18 @@ class Wheel {
 
   static ease(t, k = 3.4) { return 1 - Math.pow(1 - t, k); }
 
+  // веса, которые сейчас нарисованы (на слабом устройстве картинка отстаёт от перетекания на ступеньку):
+  // фильм под стрелкой, название над колесом и подсветка считаются по ним, чтобы не расходиться с картинкой
+  wAt(i) { return this.shown?.length === this.items.length ? this.shown[i] : this.items[i].w; }
+  get shownTotal() { let t = 0; for (let i = 0; i < this.items.length; i++) t += this.wAt(i); return t; }
+
   currentIndex() {
-    const total = this.total;
+    const total = this.shownTotal;
     if (!total) return -1;
     const p = (((-this.rot) % 1) + 1) % 1 * total;
     let acc = 0;
     for (let i = 0; i < this.items.length; i++) {
-      acc += this.items[i].w;
+      acc += this.wAt(i);
       if (p < acc) return i;
     }
     return this.items.length - 1;
@@ -157,15 +174,28 @@ class Wheel {
     this.last = now;
 
     // плавное изменение весов
-    let tweening = false;
+    let tweening = false, snapped = false;
     for (const it of this.items) {
       const d = it.target - it.w;
       // выбывший сектор схлопывается медленнее, остальные перетекают в новые размеры
       if (Math.abs(d) > 0.001) { it.w += d * Math.min(1, dt * (it.dying ? 2.6 : 4.5)); tweening = true; }
-      else it.w = it.target;
+      else if (d) { it.w = it.target; snapped = true; }
     }
-    // перетекание весов: кэш с постерами и подписями пересобирается не чаще 30 раз в секунду, на глаз это так же плавно
-    if (tweening && now - (this.builtAt || 0) > 30) this.dirty = true;
+    // крошечная смена веса без перетекания: кэш теперь пересобирается только по делу (setItems), так что её надо заметить здесь
+    if (snapped && !tweening) this.dirty = true;
+    // перетекание весов: кэш с постерами и подписями пересобирается не чаще 30 раз в секунду, на глаз это так же плавно.
+    // На слабом устройстве — ступеньками (решение владельца): секторы перетекают в несколько шагов, зато страница не встаёт.
+    // Режим выбирается в начале перетекания; посреди него возможен только переход в ступеньки (см. judgeWarm).
+    // Каждое четвёртое на слабом идёт плавно — перемерить, вдруг устройство освободилось
+    if (tweening && !this.tweened) {
+      this.tweenN = (this.tweenN || 0) + 1;
+      this.stepMode = Boolean(this.weak) && this.tweenN % 4 !== 0;
+      this.tweenBuilds = 0; this.warm = [];
+      // первая ступенька — через ~120 мс, когда секторы уже заметно сдвинулись (сразу она рисовала почти неподвижную картинку)
+      if (this.stepMode) this.builtAt = now - this.stepMs() + 120;
+    }
+    let byTween = false;
+    if (tweening && !this.dirty && now - (this.builtAt || 0) > (this.stepMode ? this.stepMs() : 30)) { this.dirty = true; byTween = true; }
     if (!tweening && this.tweened) this.dirty = true; // последний кадр перетекания — точные размеры
     this.tweened = tweening;
     const before = this.items.length;
@@ -186,6 +216,17 @@ class Wheel {
     } else if (this.idleSpeed) this.rot += this.idleSpeed * dt;
     this.speed = this.anim && dt > 0 ? Math.abs(this.rot - prevRot) / dt : 0;
 
+    // кэш собираем до подсчёта фильма под стрелкой: оба по одним весам (см. wAt)
+    if (this.dirty) {
+      const t0 = performance.now();
+      this.buildCache();
+      // в замер скорости устройства идут только «тёплые» сборки: по ходу плавного перетекания, кроме первых двух, и когда постеры уже загрузились
+      const ms = performance.now() - t0;
+      if (byTween && ++this.tweenBuilds > 2 && !this.stepMode && now - (this.imgAt || 0) > 1000) { this.warm.push(ms); this.judgeWarm(); }
+      // сборка ступеньки дороже тёплой (кэш картинок успевает остыть) — шаг считаем по её настоящей цене
+      if (byTween && this.stepMode) this.stepCost = this.stepCost ? this.stepCost * 0.7 + ms * 0.3 : ms;
+      this.builtAt = now; this.dirty = false; this.stale = true;
+    }
     const idx = this.currentIndex();
     const id = this.items[idx]?.id ?? null;
     if (id !== this.curId) {
@@ -195,7 +236,6 @@ class Wheel {
       this.onCurrent(this.items[idx] || null);
     }
 
-    if (this.dirty) { this.buildCache(); this.builtAt = now; this.dirty = false; this.stale = true; }
     // в покое кадр не меняется: перерисовываем, только когда колесо крутится, сектор приподнят после остановки
     // или что-то поменялось (угол, сектор под стрелкой, цвет, размер, секторы)
     const sig = `${this.rot}|${idx}|${this.tint}|${this.cv.width}`;
@@ -203,6 +243,27 @@ class Wheel {
       this.sig = sig; this.stale = false;
       this.draw(now, idx);
     }
+  }
+
+  // Слабое устройство — по процессорному времени тёплой сборки кэша (медиана трёх и больше) на мегапиксель холста:
+  // не меньше 15 мс и не меньше 30 мс/Мп. Время кадра не годится: оно зависит от частоты экрана (30 Гц, энергосбережение) и от 4K.
+  // Тёплые — сборки по ходу плавного перетекания, кроме первых двух и секунды после догрузки постера. Первые тёплые всё равно
+  // дороже поздних (постеры заново раскодируются): на обычных компьютерах это до ~22 мс/Мп (1080p ~8–15 мс, 2K ~20–28, 4K —
+  // меньше на мегапиксель), на процессоре вчетверо медленнее — 37–140 мс/Мп (замер 2026-11-25, tools/perf.js и скрипты критиков).
+  // Выходим из режима, только когда заметно легче (меньше 20 мс/Мп), — чтобы не мигать на пороге
+  judgeWarm() {
+    if (this.warm.length < 3) return;
+    const med = [...this.warm].sort((x, y) => x - y)[this.warm.length >> 1];
+    const perMp = med / (this.cv.width * this.cv.height / 1e6);
+    this.warmMs = med;
+    this.weak = this.weak ? perMp >= 20 : med >= 15 && perMp >= 30;
+    if (this.weak && !this.stepMode) this.stepMode = true; // тормозит уже сейчас — дальше это перетекание идёт ступеньками
+  }
+  // шаг ступенек: сборки занимают не больше пятой части времени (5 × цена сборки ступеньки, от 200 до 500 мс);
+  // у выбывшего сектора перетекание длиннее (~2,7 с), шаг не меньше 350 мс — ступенек не больше восьми
+  stepMs() {
+    const s = Math.min(500, Math.max(200, 5 * Math.max(this.warmMs || 40, this.stepCost || 0)));
+    return this.items.some(i => i.dying) ? Math.max(s, 350) : s;
   }
 
   geom() {
@@ -217,10 +278,24 @@ class Wheel {
     const g = this.cache.getContext('2d');
     g.clearRect(0, 0, S, S);
     const total = this.total;
+    this.shown = this.items.map(i => i.w); // эти веса теперь на картинке
     if (!total) return;
     const segs = this.colors.seg;
     const lr = (this.labelRot || 0) * Math.PI * 2;
     const dpr = S / (this.cv?.clientWidth || S); // раз на сборку, а не на каждую подпись
+    // затемнение к центру одно на все секторы: градиент от центра, у всех одинаковый
+    const shadePoster = g.createRadialGradient(c, c, hub, c, c, R);
+    shadePoster.addColorStop(0, 'rgba(0,0,0,.78)');
+    shadePoster.addColorStop(0.55, 'rgba(0,0,0,.45)');
+    shadePoster.addColorStop(1, 'rgba(0,0,0,.2)');
+    const shadePlain = g.createRadialGradient(c, c, hub, c, c, R);
+    shadePlain.addColorStop(0, 'rgba(0,0,0,.35)');
+    shadePlain.addColorStop(1, 'rgba(255,255,255,.04)');
+    const textW = (text, fs) => {
+      let w = this.textW.get(text);
+      if (w === undefined) { const f = g.font; g.font = '700 100px Carlito, sans-serif'; w = g.measureText(text).width; g.font = f; this.textW.set(text, w); }
+      return w * fs / 100;
+    };
     let acc = 0;
     this.items.forEach((it, i) => {
       const a0 = -Math.PI / 2 + (acc / total) * Math.PI * 2;
@@ -248,16 +323,9 @@ class Wheel {
         g.drawImage(img, -iw / 2, -R - (ih - H) * 0.35, iw, ih);
         g.globalAlpha = 1;
         g.setTransform(1, 0, 0, 1, 0, 0);
-        const grd = g.createRadialGradient(c, c, hub, c, c, R);
-        grd.addColorStop(0, 'rgba(0,0,0,.78)');
-        grd.addColorStop(0.55, 'rgba(0,0,0,.45)');
-        grd.addColorStop(1, 'rgba(0,0,0,.2)');
-        g.fillStyle = grd; g.fillRect(0, 0, S, S);
+        g.fillStyle = shadePoster; g.fillRect(0, 0, S, S);
       } else {
-        const grd = g.createRadialGradient(c, c, hub, c, c, R);
-        grd.addColorStop(0, 'rgba(0,0,0,.35)');
-        grd.addColorStop(1, 'rgba(255,255,255,.04)');
-        g.fillStyle = grd; g.fillRect(0, 0, S, S);
+        g.fillStyle = shadePlain; g.fillRect(0, 0, S, S);
       }
       if (it.dying) { g.fillStyle = 'rgba(255, 60, 90, .5)'; g.fillRect(0, 0, S, S); }
       // кромка по ободу цветом автора (его цвет ника из профиля): видно, чьи фильмы на колесе
@@ -292,13 +360,13 @@ class Wheel {
       // на постере название целиком или никак: обрезанное «Мартовские…» только шумит. Длинное можно чуть ужать.
       // Сектору без постера подпись нужна, чтобы его различать, — там остаётся многоточие
       let text = it.title;
-      const tw = g.measureText(text).width;
+      const tw = textW(text, fs);
       if (tw > maxW) {
         const f2 = fs * maxW / tw;
         if (f2 >= fs * 0.75 && f2 / dpr >= 10.5 && f2 >= 9) g.font = `700 ${f2}px Carlito, sans-serif`;
         else if (img?.ok) { g.restore(); return; }
         else {
-          while (text.length > 1 && g.measureText(text + '…').width > maxW) text = text.slice(0, -1);
+          while (text.length > 1 && textW(text + '…', fs) > maxW) text = text.slice(0, -1);
           text = text.trimEnd() + '…';
         }
       }
@@ -333,9 +401,10 @@ class Wheel {
       // подсветка сегмента под стрелкой
       if (idx >= 0) {
         let acc = 0;
-        for (let i = 0; i < idx; i++) acc += this.items[i].w;
-        const a0 = -Math.PI / 2 + (acc / total) * Math.PI * 2;
-        const a1 = a0 + (this.items[idx].w / total) * Math.PI * 2;
+        const st = this.shownTotal;
+        for (let i = 0; i < idx; i++) acc += this.wAt(i);
+        const a0 = -Math.PI / 2 + (acc / st) * Math.PI * 2;
+        const a1 = a0 + (this.wAt(idx) / st) * Math.PI * 2;
         // приподнятый сектор: за 0,14 с выходит наружу с тенью, потом плавно садится на место
         const lt = this.landAt && !this.calm ? (now - this.landAt) / 1000 : 1;
         const lift = lt >= 1 ? 0 : lt < 0.14 ? 1 - (1 - lt / 0.14) ** 3 : (1 - (lt - 0.14) / 0.86) ** 2;
