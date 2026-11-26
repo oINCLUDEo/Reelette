@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reelette: панель, концепт A</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alan+Sans:wght@700&family=Carlito:wght@400;700&family=Pacifico&family=Press+Start+2P&family=Russo+One&family=Unbounded:wght@700&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   Концепт A. «Строгая система».
+   Одна анатомия строки: [ведущий 32] [текст: строка 1 / строка 2] [число 40] [действие 40].
+   Колонки стоят на одних вертикалях по всей панели: ведущий x 16–48, текст с x 60,
+   числа прижаты к x = ширина − 48, действие — последние 40 перед полем 8.
+   Модуль 8. Высоты: служебная 32 · управление 40 · человек/музыка 48 · фильм 56.
+   Шрифты: заголовок Lack 22/24 · строка Carlito Bold 15/20 · подпись Carlito 13/16 (числа — Bold 13).
+   Скругления: панель 28 → всё, что отстоит на 8, — 20 → внутри на 4 — 16.
+   ===================================================================== */
+@font-face { font-family: "Lack"; src: url("../public/fonts/lack.ttf") format("truetype"); font-weight: 100 900; font-style: normal; font-display: swap; }
+:root {
+  --bg: #141414; --tx: #E2E2E2; --t2: rgba(226,226,226,.64); --t3: rgba(226,226,226,.4);
+  --acc: #465DFF; --acc-hi: #8C9BFF; --glow: rgba(70,93,255,.45); --bad: #FF453A;
+  --fill: rgba(255,255,255,.07); --fill2: rgba(255,255,255,.12);
+  --f-ui: "Carlito", "Segoe UI", system-ui, sans-serif; --f-head: "Lack", "Carlito", sans-serif; --f-mark: "Alan Sans", "Carlito", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #0C0C0C; color: var(--tx); font: 400 15px/1.45 var(--f-ui); font-size-adjust: .5; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+h1, h2, p { margin: 0; }
+
+/* ---------- оболочка страницы концепта ---------- */
+.intro { max-width: 1240px; margin: 0 auto; padding: 48px 24px 24px; display: grid; gap: 24px; }
+.intro h1 { font: 400 40px/48px var(--f-head); letter-spacing: -.01em; }
+.intro h1 small { display: block; font: 700 13px/16px var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--acc-hi); margin-bottom: 8px; }
+.intro ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; max-width: 920px; }
+.intro li { display: grid; grid-template-columns: 136px 1fr; gap: 16px; font-size: 15px; line-height: 22px; color: var(--t2); }
+.intro li b { color: var(--tx); }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.tbtn { height: 40px; padding: 0 20px; border-radius: 20px; background: var(--fill); font: 700 14px/40px var(--f-ui); color: var(--tx); }
+.tbtn:hover, .tbtn.on { background: var(--tx); color: var(--bg); }
+.sec-t { max-width: 1240px; margin: 48px auto 16px; padding: 0 24px; }
+.sec-t h2 { font: 400 28px/32px var(--f-head); }
+.sec-t p { margin-top: 8px; color: var(--t2); max-width: 780px; }
+.fits { max-width: 1488px; margin: 0 auto; padding: 0 24px; display: grid; gap: 24px; }
+.fits.row { grid-template-columns: minmax(0, 1024fr) minmax(0, 390fr) minmax(0, 390fr); align-items: start; }
+.fit { position: relative; width: 100%; border-radius: 16px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06); }
+.dev { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; background: var(--bg); isolation: isolate; }
+.cap { margin-top: 8px; font: 700 14px/20px var(--f-ui); }
+.cap span { display: block; font-weight: 400; color: var(--t2); }
+.states { max-width: 1488px; margin: 0 auto; padding: 0 24px; display: grid; grid-template-columns: repeat(auto-fill, 330px); justify-content: center; gap: 32px 24px; }
+.st { position: relative; display: flex; flex-direction: column; gap: 8px; }
+.st .pad { position: relative; padding: 24px 0; border-radius: 28px; overflow: hidden; isolation: isolate; }
+.st .pad > .bg { position: absolute; inset: -40px; z-index: -1; background: center/cover; filter: blur(36px) brightness(.5) saturate(1.3); }
+.legend { max-width: 1240px; margin: 0 auto 80px; padding: 0 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; color: var(--t2); font-size: 14px; line-height: 21px; }
+.legend b { display: block; margin-bottom: 4px; font-size: 15px; color: var(--tx); }
+.legend code, .legend pre { font: 12px/18px ui-monospace, Consolas, monospace; color: var(--tx); }
+.legend pre { margin: 8px 0 0; padding: 12px; border-radius: 12px; background: var(--fill); white-space: pre-wrap; }
+
+/* ---------- кадр комнаты ---------- */
+.dev > .bg { position: absolute; inset: -80px; z-index: -1; background: center/cover; filter: blur(48px) brightness(.42) saturate(1.4); }
+.stage { position: absolute; border-radius: 28px; background: rgba(22,22,22,.42); border: 1px solid rgba(255,255,255,.08); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); }
+.stage .bar { position: absolute; left: 0; right: 0; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
+.stage .bar.t { top: 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.stage .bar.b { bottom: 0; border-top: 1px solid rgba(255,255,255,.06); }
+.cps { height: 36px; border-radius: 18px; background: var(--fill); display: flex; align-items: center; gap: 4px; padding: 0 4px; color: var(--t2); font: 700 13px/1 var(--f-ui); }
+.cps i { height: 28px; border-radius: 14px; padding: 0 12px; display: grid; place-items: center; font-style: normal; }
+.cps i.on { background: var(--tx); color: var(--bg); }
+.cps .dot { width: 28px; padding: 0; border-radius: 50%; background: var(--fill2); }
+.np-t { position: absolute; }
+.np-t b { display: block; font: 400 48px/52px var(--f-head); letter-spacing: -.01em; }
+.np-t span { display: block; margin-top: 8px; color: var(--t2); font-size: 15px; line-height: 20px; }
+.wheel { position: absolute; border-radius: 50%; background: #121212; box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 0 90px rgba(70,93,255,.38), 0 0 220px rgba(70,93,255,.18); }
+.wheel::before { content: ""; position: absolute; inset: 5%; border-radius: 50%; background: repeating-conic-gradient(from 3deg, #2C2C30 0 7deg, #1A1A1D 7deg 14deg, #3A3A40 14deg 21deg, #222226 21deg 28deg); box-shadow: inset 0 0 0 2px rgba(0,0,0,.4); }
+.wheel::after { content: ""; position: absolute; left: 50%; top: -1%; width: 7%; height: 9%; translate: -50% 0; background: #E2E2E2; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.hub { position: absolute; left: 50%; top: 50%; width: 22%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff, #D6D8E2); color: #141414; display: grid; place-content: center; text-align: center; box-shadow: 0 0 0 6px rgba(70,93,255,.25), 0 12px 40px rgba(0,0,0,.5); }
+.hub b { font: 400 24px/28px var(--f-ui); }
+.hub span { font: 400 11px/14px var(--f-ui); color: #555; }
+
+/* ---------- ПАНЕЛЬ ---------- */
+.pn { position: relative; display: flex; flex-direction: column; gap: 8px; min-height: 0; padding: 8px; border-radius: 28px; background: rgba(22,22,22,.56); border: 1px solid rgba(255,255,255,.08); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08); overflow: hidden; }
+.pn > * { flex: none; }
+.sec { display: flex; flex-direction: column; }
+
+/* строка: одна анатомия на всё */
+.r { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr) 40px 40px; grid-template-rows: 20px 16px; grid-template-areas: "ld l1 n1 ac" "ld l2 n2 ac"; align-content: center; align-items: center; min-height: 56px; padding: 0 8px; border-radius: 20px; }
+.r.one { grid-template-rows: 20px; grid-template-areas: "ld l1 n1 ac"; min-height: 48px; }
+.r.gh, .r.mu { min-height: 48px; }
+.r > .ld { grid-area: ld; justify-self: start; }
+.r > .l1 { grid-area: l1; min-width: 0; padding: 0 8px 0 12px; font: 700 15px/20px var(--f-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.r > .l2 { grid-area: l2; min-width: 0; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 8px; height: 16px; font: 400 13px/16px var(--f-ui); color: var(--t2); white-space: nowrap; }
+.r > .l2 .i { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.r > .n1 { grid-area: n1; justify-self: end; font: 700 13px/20px var(--f-ui); color: var(--t2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.r > .n2 { grid-area: n2; justify-self: end; display: flex; }
+.r > .ac { grid-area: ac; justify-self: center; display: grid; place-items: center; color: var(--t3); }
+.r.hv { cursor: pointer; transition: background .2s; }
+.r.hv:hover, .r.hov { background: var(--fill); }
+
+/* ведущая колонка: постер 32×48, аватар 32, значок 32 */
+.po { position: relative; width: 32px; height: 48px; border-radius: 6px; background: var(--s, #333) center/cover; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.av { position: relative; width: 32px; height: 32px; border-radius: 50%; background: center/cover; display: grid; place-items: center; font: 700 14px/1 var(--f-ui); color: #fff; font-style: normal; }
+.ic { width: 32px; height: 32px; display: grid; place-items: center; color: var(--tx); }
+.ic svg.logo { width: 28px; height: 28px; stroke: none; }
+.art { width: 32px; height: 32px; border-radius: 8px; background: var(--fill2) center/cover; display: grid; place-items: center; color: var(--t2); }
+
+/* шапка панели */
+.r.hd { grid-template-rows: 24px; min-height: 48px; }
+.r.hd .l1 { grid-column: 2 / 4; font: 400 22px/24px var(--f-head); letter-spacing: -.01em; } /* колонка чисел в шапке пустая — название занимает и её */
+
+/* служебная строка-заголовок секции: подпись у левого края колонки «ведущий», значение в колонке чисел, «?» в колонке действия */
+.sh { display: grid; grid-template-columns: minmax(0, 1fr) 40px 40px; align-items: center; height: 32px; padding: 0 8px; font: 700 13px/16px var(--f-ui); color: var(--t2); white-space: nowrap; }
+.sh > :first-child { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sh .n { justify-self: end; color: var(--tx); font-variant-numeric: tabular-nums; }
+.sh .ac { justify-self: center; }
+.hint { width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--t3); display: grid; place-items: center; font: 700 11px/1 var(--f-ui); color: var(--t2); cursor: help; }
+.dots { display: inline-flex; gap: 4px; }
+.dots i { width: 8px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.16); }
+.dots i.on { background: var(--acc); }
+.dots i.bn { margin-left: 4px; }
+.dots i.bn ~ i.bn { margin-left: 0; }
+.dots i.bn { background: none; box-shadow: inset 0 0 0 1.5px rgba(140,155,255,.55); }
+.dots i.bn.on { background: var(--acc-hi); box-shadow: none; }
+
+/* карточки: подложка без своих полей — поля по 8 дают сами строки, поэтому колонки совпадают со списком */
+.card { border-radius: 20px; background: var(--fill); }
+.scale { display: flex; gap: 2px; height: 40px; margin: 0 4px; padding: 4px; border-radius: 16px; background: rgba(0,0,0,.22); }
+.scale button { flex: 1; min-width: 0; border-radius: 12px; font: 700 14px/32px var(--f-ui); color: var(--t2); font-variant-numeric: tabular-nums; }
+.scale button:hover { background: var(--fill2); color: var(--tx); }
+.scale button.on { background: var(--acc); color: #fff; }
+.rl { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; min-height: 32px; padding: 4px 8px; font: 400 13px/16px var(--f-ui); color: var(--t2); }
+.rl b { font-weight: 700; color: var(--tx); }
+.rl .nm { color: var(--t2); }
+.rl .lnk { margin-left: auto; }
+.lnk { font: 700 13px/16px var(--f-ui); color: var(--t3); }
+.lnk:hover { color: var(--bad); }
+.lnk.go { color: var(--acc-hi); }
+.lnk.go:hover { color: #fff; }
+.note { padding: 0 8px 8px 8px; font: 400 13px/16px var(--f-ui); color: var(--t2); }
+
+/* вкладки и поле */
+.seg { display: flex; height: 40px; padding: 4px; border-radius: 20px; background: var(--fill); }
+.seg button { flex: 1; border-radius: 16px; font: 700 14px/32px var(--f-ui); color: var(--t2); }
+.seg button .c { font-weight: 400; margin-left: 4px; opacity: .7; font-variant-numeric: tabular-nums; }
+.seg button.on { background: var(--tx); color: var(--bg); }
+.sb { position: relative; display: flex; align-items: center; height: 40px; padding: 0 48px 0 52px; border-radius: 20px; background: var(--fill); font: 400 14px/40px var(--f-ui); color: var(--t3); }
+.sb > svg { position: absolute; left: 16px; top: 12px; color: var(--t2); }
+.sb > button { position: absolute; right: 12px; top: 4px; width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; color: var(--t2); }
+.sb > button:hover { background: var(--fill2); color: var(--tx); }
+
+/* список */
+.list { flex: 1 1 0; min-height: 0; margin-right: -8px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+.list > * { margin-right: calc(8px - var(--sb, 0px)); }
+.g:not(.closed) > .gb { padding-bottom: 8px; }
+.g.closed > .gb { display: none; }
+.gh { position: sticky; top: 0; z-index: 2; container-type: scroll-state; }
+.gh > .hb { position: absolute; inset: 0; z-index: -1; border-radius: 20px; pointer-events: none; }
+@container scroll-state(stuck: top) { .gh > .hb { background: rgba(26,26,26,.96); box-shadow: 0 8px 16px -8px rgba(0,0,0,.5); } }
+@supports not (container-type: scroll-state) { .g:not(.closed) > .gh > .hb { background: rgba(26,26,26,.9); } }
+.gh .ac svg { width: 12px; height: 12px; stroke-width: 2.6; transition: transform .3s; }
+.g.closed .gh .ac svg { transform: rotate(-90deg); }
+.g.off .gh > .ld, .g.off .gh > .l1 { opacity: .45; }
+.g.off .gh .n1 { color: var(--t3); }
+.g.off .gh .n1 svg { display: block; margin: 2px 0; }
+
+/* число и множитель */
+.mod { height: 16px; padding: 0 4px; border-radius: 4px; font: 700 11px/16px var(--f-ui); font-variant-numeric: tabular-nums; cursor: help; }
+.mod.up { color: var(--acc-hi); background: rgba(70,93,255,.24); }
+.mod.dn { color: #FF8A80; background: rgba(255,69,58,.16); }
+.gh .n1 { color: var(--tx); }
+
+/* голос */
+.vt { display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 40px; height: 32px; border-radius: 16px; color: rgba(226,226,226,.2); font: 700 12px/1 var(--f-ui); font-variant-numeric: tabular-nums; transition: color .2s, background .2s; }
+.vt svg { width: 16px; height: 16px; }
+.vt span:empty { display: none; }
+.r:hover .vt, .r.hov .vt, .touch .vt { color: var(--t2); }
+.vt.has { color: var(--t2); }
+.vt.me { color: var(--acc-hi); }
+.vt.me svg { fill: currentColor; }
+.vt:hover { background: var(--fill2); color: var(--tx); }
+
+/* состояния строки фильма */
+.r.hot { background: color-mix(in srgb, var(--acc) 26%, transparent); }
+.r.hot .n1 { color: var(--tx); }
+.r.out > :not(.ac) { opacity: .42; }
+.r.out .vt { opacity: .42; }
+.r.gone > .l1 { text-decoration: line-through; text-decoration-color: rgba(226,226,226,.6); }
+.r.out .n1, .r.out .n1 { color: var(--t3); }
+
+/* инструменты создателя: на месте второй строки, только при наведении (на сенсорных — всегда, справа во второй строке) */
+.own { display: none; align-items: center; gap: 4px; flex: none; }
+.ow .r:hover .l2 > .i, .ow .r.hov .l2 > .i { display: none; }
+.ow .r:hover .l2 > .own, .ow .r.hov .l2 > .own { display: inline-flex; }
+.touch.ow .r .l2 > .i { display: block; }
+.touch.ow .r .l2 > .own { display: inline-flex; margin-left: auto; }
+.stp { color: var(--t2); }
+.stp button { width: 20px; height: 20px; margin: -2px 0; border-radius: 10px; background: var(--fill2); display: grid; place-items: center; color: var(--tx); }
+.stp button:hover { background: var(--tx); color: var(--bg); }
+.stp button svg { width: 10px; height: 10px; stroke-width: 3; }
+.stp b { min-width: 12px; text-align: center; font: 700 13px/16px var(--f-ui); color: var(--tx); }
+.ob { gap: 4px; font: 700 13px/16px var(--f-ui); color: var(--tx); }
+.ob svg { width: 14px; height: 14px; }
+.ob:hover { color: var(--acc-hi); }
+.touch .ob span { display: none; } /* на сенсорных глаз всегда виден — только значок, чтобы не теснить счётчик */
+.del { position: absolute; left: -4px; top: -4px; width: 20px; height: 20px; border-radius: 50%; display: none; place-items: center; background: rgba(0,0,0,.78); color: #fff; box-shadow: 0 0 0 1.5px rgba(255,255,255,.2); }
+.del svg { width: 10px; height: 10px; stroke-width: 3; }
+.r:hover .del, .r.hov .del, .touch .del { display: grid; }
+.del:hover { background: var(--bad); }
+
+/* музыка */
+.mu .ac button, .mu .n1 button { width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; color: var(--tx); }
+.mu .n1 { justify-self: center; grid-row: 1 / 3; }
+.mu .ac button:hover, .mu .n1 button:hover { background: var(--fill2); }
+.mu .ac svg, .mu .n1 svg { width: 18px; height: 18px; }
+.mu .listen { grid-column: 3 / 5; grid-row: 1 / 3; justify-self: end; height: 32px; padding: 0 16px; border-radius: 16px; background: var(--acc); color: #fff; font: 700 13px/32px var(--f-ui); }
+.eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; }
+.eq i { width: 2px; background: var(--acc-hi); border-radius: 1px; }
+
+/* шторка телефона */
+.grab { display: block; width: 36px; height: 4px; margin: 0 auto; border-radius: 2px; background: rgba(255,255,255,.28); }
+
+/* наложение сетки: колонки строки и модуль 8 */
+.show-grid .pn::after { content: ""; position: absolute; inset: 0; z-index: 50; pointer-events: none; border-radius: inherit;
+  background:
+    linear-gradient(rgba(70,93,255,.22), rgba(70,93,255,.22)) left 16px top 0 / 32px 100% no-repeat,
+    linear-gradient(#FF453A, #FF453A) left 60px top 0 / 1px 100% no-repeat,
+    linear-gradient(rgba(48,209,88,.18), rgba(48,209,88,.18)) right 48px top 0 / 40px 100% no-repeat,
+    linear-gradient(rgba(255,176,32,.2), rgba(255,176,32,.2)) right 8px top 0 / 40px 100% no-repeat,
+    repeating-linear-gradient(180deg, rgba(255,69,58,.14) 0 1px, transparent 1px 8px); }
+
+/* ---------- ники: цвет, шрифт, эффект (как на сайте) ---------- */
+.nick-wrap { display: inline-flex; align-items: center; max-width: 100%; min-width: 0; white-space: nowrap; vertical-align: bottom; }
+.nick-wrap > .nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nick { --n1: var(--tx); --n2: var(--tx); --ngl: var(--acc); }
+.nick.c-solid { color: var(--nc); -webkit-text-fill-color: var(--nc); }
+.nick.c-grad { background: var(--ng); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.nick.fx-glow { filter: drop-shadow(0 0 6px var(--ngl)); }
+.nick.fx-shimmer { background: linear-gradient(110deg, var(--n1) 30%, #fff 46%, #fff 50%, var(--n2) 66%) 50% 0 / 260% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: nShimmer 3s linear infinite; }
+@keyframes nShimmer { from { background-position: 130% 0; } to { background-position: -130% 0; } }
+.nick.fx-glitch { text-shadow: 1px 0 rgba(255,45,111,.85), -1px 0 rgba(34,211,238,.85); animation: nGlitch 3.2s infinite steps(1); }
+@keyframes nGlitch { 0%, 86%, 100% { text-shadow: none; transform: none; } 88% { text-shadow: 2px 0 #FF2D6F, -2px 0 #22D3EE; transform: translateX(1px); } 90% { text-shadow: -2px 0 #FF2D6F, 2px 0 #22D3EE; transform: translateX(-1px); } }
+.nick.fx-wave > span { display: inline-block; animation: nWave 1.7s ease-in-out infinite; animation-delay: calc(var(--i) * 70ms); white-space: pre; }
+.nick.fx-wave > span:nth-child(4n+2) { transform: translateY(-.14em); }
+.nick.fx-wave > span:nth-child(4n) { transform: translateY(.07em); }
+@keyframes nWave { 0%, 55%, 100% { transform: none; } 25% { transform: translateY(-.22em); } }
+.nick.fx-rainbow { background: linear-gradient(90deg, #FF5A6E, #FFD54A, #3DDC97, #38BDF8, #C084FC, #FF5A6E) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: nRainbow 3s linear infinite; }
+@keyframes nRainbow { to { background-position: -200% 0; } }
+.nick.nf-unbounded { font-family: 'Unbounded', var(--f-head); font-weight: 700; font-size: .86em; letter-spacing: -.02em; }
+.nick.nf-pixel { font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: .62em; letter-spacing: 0; line-height: 1.4; }
+.nick.nf-pacifico { font-family: 'Pacifico', cursive; font-weight: 400; }
+.nick.nf-russo { font-family: 'Russo One', sans-serif; font-weight: 400; }
+.nick-ico { margin-left: .3em; font-size: .85em; flex: none; }
+.nick-badge { display: inline-grid; place-items: center; flex: none; width: 16px; height: 16px; margin-left: 4px; border-radius: 4px; background: var(--fill2); color: var(--acc-hi); font-style: normal; }
+.nick-badge svg { width: 10px; height: 10px; fill: currentColor; stroke: none; }
+
+/* рамки аватаров (как на сайте) */
+.frame-accent { box-shadow: 0 0 0 2px var(--acc), 0 0 10px var(--glow); }
+.frame-neon { box-shadow: 0 0 0 2px var(--ngl, var(--acc-hi)), 0 0 14px var(--ngl, var(--acc-hi)); animation: fNeon 2.4s ease-in-out infinite; }
+@keyframes fNeon { 50% { box-shadow: 0 0 0 2px var(--ngl, var(--acc-hi)), 0 0 4px var(--ngl, var(--acc-hi)); } }
+.frame-gold { box-shadow: 0 0 0 2px #F5C542, 0 0 0 4px rgba(245,197,66,.25), 0 0 12px rgba(245,197,66,.55); }
+.frame-rainbow { box-shadow: 0 0 0 2px #FF5A6E, 0 0 12px #FF5A6E; animation: fRainbow 4s linear infinite; }
+@keyframes fRainbow { 0%, 100% { box-shadow: 0 0 0 2px #FF5A6E, 0 0 12px #FF5A6E; } 25% { box-shadow: 0 0 0 2px #FFD54A, 0 0 12px #FFD54A; } 50% { box-shadow: 0 0 0 2px #3DDC97, 0 0 12px #3DDC97; } 75% { box-shadow: 0 0 0 2px #38BDF8, 0 0 12px #38BDF8; } }
+.frame-fire { box-shadow: 0 0 0 2px #FF7A18, 0 -3px 12px #FF4D00, 0 0 18px rgba(255,77,0,.6); animation: fFire 1.4s ease-in-out infinite; }
+@keyframes fFire { 50% { box-shadow: 0 0 0 2px #FFC93C, 0 -5px 16px #FF7A18, 0 0 10px rgba(255,201,60,.6); } }
+.frame-ice { box-shadow: 0 0 0 2px #BAE6FD, 0 0 0 4px rgba(125,211,252,.35), 0 0 16px rgba(125,211,252,.7); }
+.frame-toxic { box-shadow: 0 0 0 2px #A3E635, 0 0 8px #84CC16; animation: fToxic 1.8s ease-in-out infinite; }
+@keyframes fToxic { 50% { box-shadow: 0 0 0 2px #D9F99D, 0 0 20px #84CC16; } }
+.frame-holo { box-shadow: 0 0 0 2px #F0ABFC, 0 0 14px #F0ABFC; animation: fHolo 3s linear infinite; }
+@keyframes fHolo { 0%, 100% { box-shadow: 0 0 0 2px #F0ABFC, 0 0 14px #F0ABFC; } 33% { box-shadow: 0 0 0 2px #67E8F9, 0 0 14px #67E8F9; } 66% { box-shadow: 0 0 0 2px #C4B5FD, 0 0 14px #C4B5FD; } }
+
+/* лёгкий режим: эффекты стоят, «Радуга» и «Голограмма» — ровное кольцо из своих цветов */
+.fx-lite .nick, .fx-lite .nick > span, .fx-lite [class*="frame-"] { animation: none !important; }
+.fx-lite .frame-rainbow { --ring: conic-gradient(#FF5A6E, #FFD54A, #3DDC97, #38BDF8, #C084FC, #FF5A6E); box-shadow: 0 0 10px rgba(255,213,74,.35); }
+.fx-lite .frame-holo { --ring: conic-gradient(#F0ABFC, #67E8F9, #C4B5FD, #F0ABFC); box-shadow: 0 0 12px rgba(196,181,253,.45); }
+.fx-lite :is(.frame-rainbow, .frame-holo)::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; background: var(--ring);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px)); mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px)); }
+
+@media (max-width: 1100px) { .fits.row { grid-template-columns: 1fr 1fr; } .fits.row > :first-child { grid-column: 1 / -1; } }
+@media (max-width: 640px) {
+  .intro { padding: 32px 16px 16px; } .intro h1 { font-size: 32px; line-height: 40px; }
+  .intro li { grid-template-columns: 1fr; gap: 0; }
+  .sec-t, .fits, .states, .legend { padding: 0 16px; }
+  .fits.row { grid-template-columns: 1fr; }
+  .states { grid-template-columns: minmax(0, 330px); }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="logo" viewBox="0 0 32 32"><circle cx="16" cy="17" r="13.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M16 17L16.00 7.00A10 10 0 0 1 23.07 9.93Z" fill="currentColor"/><path d="M16 17L26.00 17.00A10 10 0 0 1 23.07 24.07Z" fill="currentColor"/><path d="M16 17L16.00 27.00A10 10 0 0 1 8.93 24.07Z" fill="currentColor"/><path d="M16 17L6.00 17.00A10 10 0 0 1 8.93 9.93Z" fill="currentColor"/><circle cx="16" cy="17" r="3.4" fill="currentColor"/><circle cx="16" cy="17" r="1.4" fill="#141414"/><path d="M16 9.5 13.6 3.8a2.7 2.7 0 1 1 4.8 0Z" fill="currentColor"/></symbol>
+</svg>
+
+<header class="intro">
+  <h1><small>Концепт A · строгая система</small>Левая панель: один список вместо десяти разных блоков</h1>
+  <ol>
+    <li><b>Идея</b><span>Панель собрана как список в приложениях Apple. Шапка, оценка, люди, фильмы, «Выпадало» и музыка — это одна и та же строка с одними колонками. Глаз видит четыре вертикали, а не двадцать разных значков.</span></li>
+    <li><b>Сетка</b><span>Колонки строки: ведущий 32 (постер, аватар, знак, обложка) · текст в две строки · число 40 · действие 40. Ведущий начинается на x 16, текст на x 60, числа прижаты к одной правой линии. Карточки (оценка, музыка) не имеют своих полей: поля по 8 дают сами строки, поэтому колонки не сдвигаются нигде, даже в поле поиска.</span></li>
+    <li><b>Ритм</b><span>Модуль 8. Четыре высоты: служебная строка 32, управление 40, человек и музыка 48, фильм 56. Расстояние между блоками 8. Скругления концентричные: 28 → 20 → 16.</span></li>
+    <li><b>Иерархия</b><span>Три уровня текста: название комнаты Lack 22, строка Carlito Bold 15, подпись Carlito 13 (числа в ней жирные). Один акцент Laser Blue: ваш голос, ваши голоса, фильм под стрелкой, выбранная оценка, бонус. Красным отмечен только штраф ×0,5.</span></li>
+    <li><b>Что убрано</b><span>Плашки у каждой шапки группы, «(вы)» и счётчик в строке ника, значки, разбросанные по ширине, вторая строка кнопок оценки и пустые сердечки на каждой строке. Глаз и вес создателя появляются при наведении на месте второй строки. Множитель стоит под процентом, «?» — в колонке действия.</span></li>
+    <li><b>Почему это лечит</b><span>«Разрозненно» — это когда у каждого блока свои поля, высоты и места значков. Здесь правило одно, и любой новый элемент обязан в него лечь. Перегруз уходит, потому что на экране остаётся только то, что нужно для решения: название, шанс, голос. Остальное ждёт наведения.</span></li>
+  </ol>
+  <div class="tools"><button class="tbtn" id="gridBtn" type="button">Показать сетку</button></div>
+</header>
+
+<div class="sec-t"><h2>Комната 1440×900</h2><p>Колонки 1–3 из 12, поля и интервалы 24. Режим «Выбывание», группы свёрнуты, кроме группы с фильмом под стрелкой. Только что выпал «Большой куш», его ещё не оценили.</p></div>
+<div class="fits"><div class="fit" data-w="1440" data-h="900"><div class="dev" id="d1440"></div></div></div>
+
+<div class="sec-t"><h2>1024, телефон 390</h2><p>На 1024 панель занимает 4 колонки, анатомия та же. На телефоне это шторка снизу: в свёрнутом виде видны шапка и музыка, в раскрытом — всё. На сенсорных устройствах вес и удаление у создателя видны всегда, справа во второй строке.</p></div>
+<div class="fits row">
+  <div><div class="fit" data-w="1024" data-h="768"><div class="dev" id="d1024"></div></div><p class="cap">1024×768<span>Панель 4 колонки, оценка уже поставлена и свернулась в строку</span></p></div>
+  <div><div class="fit" data-w="390" data-h="844"><div class="dev" id="dPh1"></div></div><p class="cap">390 · шторка свёрнута<span>Шапка с числом фильмов и музыка</span></p></div>
+  <div><div class="fit" data-w="390" data-h="844"><div class="dev" id="dPh2"></div></div><p class="cap">390 · шторка раскрыта, вы создатель<span>Вес и удаление видны без наведения</span></p></div>
+</div>
+
+<div class="sec-t"><h2>Состояния</h2><p>Каждое состояние показано в натуральную величину на ширине панели 1440 (330 px). Обведённые строки показывают наведение.</p></div>
+<div class="states" id="states"></div>
+
+<div class="sec-t"><h2>Как это ложится на код</h2></div>
+<div class="legend">
+  <div><b>Строка — постоянный скелет</b>Разметку строки создают один раз на фильм и держат в Map по id. При голосе меняются <code>textContent</code> у <code>.n1</code> и счётчика сердечка и класс <code>me/has</code>. Строки не пересоздаются, и innerHTML на весь список больше не нужен.
+<pre>&lt;div class="r hv" data-id&gt;
+  &lt;i class="ld po"&gt;&lt;/i&gt;
+  &lt;b class="l1"&gt;Психо&lt;/b&gt;
+  &lt;span class="l2"&gt;&lt;span class="i"&gt;1960 · 1 ч 49 мин&lt;/span&gt;
+    &lt;span class="own stp"&gt;…&lt;/span&gt;&lt;/span&gt;
+  &lt;span class="n1"&gt;6,2%&lt;/span&gt;  ← текстовый узел
+  &lt;span class="n2"&gt;&lt;/span&gt;
+  &lt;span class="ac"&gt;&lt;button class="vt"&gt;♥&lt;span&gt;2&lt;/span&gt;&lt;/button&gt;&lt;/span&gt;
+&lt;/div&gt;</pre></div>
+  <div><b>Шапка группы — тот же скелет</b>Узлы: <code>.n1</code> — доля, <code>.n2</code> — множитель, <code>.l2 .i</code> — «7 из 12 на колесе». На выбывании меняется только этот текст. Группа свернута через класс <code>closed</code>, тело при этом не перерисовывается. Состояния строки (<code>hot</code>, <code>out</code>, <code>gone</code>) — классы, а не новая разметка. «Под стрелкой» переключает класс у двух строк.</div>
+  <div><b>Дёшево на слабых</b>На строках нет размытия фона, анимированных теней и своих подложек. Размытие есть у самой панели, а у прилипшей шапки группы фон появляется только в момент прилипания (<code>scroll-state</code>, Chrome 133+). Без поддержки у раскрытой группы фон постоянный. Ширина полосы прокрутки меряется один раз (<code>--sb</code>), чтобы колонки списка не уезжали от колонок карточек.</div>
+</div>
+
+<script>
+const KP = id => `https://kinopoiskapiunofficial.tech/images/posters/kp_small/${id}.jpg`;
+const I = {
+  heart: '<svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10.3A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3Z"/></svg>',
+  chev: '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
+  up: '<svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg>',
+  right: '<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>',
+  eye: '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24"><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.6 3.3M6.6 6.9C4 8.6 2.5 12 2.5 12s3.5 6.5 9.5 6.5a9 9 0 0 0 4.4-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
+  minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>',
+  listAdd: '<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>',
+  pause: '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke-width="3"/></svg>',
+  next: '<svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg>',
+  note: '<svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+  star: '<svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/></svg>',
+};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const num = (x, d) => x.toFixed(d).replace('.', ',');
+const pct = s => `${num(s * 100, s < .1 ? 1 : 0)}%`;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 12 || h > 14) ? b : c; };
+const rt = m => `${Math.floor(m / 60)} ч ${m % 60} мин`;
+const GR = { sunset: 'linear-gradient(90deg,#FF5A6E,#FFB347)', neon: 'linear-gradient(90deg,#22D3EE,#A855F7)', ice: 'linear-gradient(90deg,#E0F2FE,#7DD3FC,#A5B4FC)' };
+
+// ---- данные: 10 человек, 77 фильмов (постеры Кинопоиска 300–376) ----
+// флаги: g — выбыл, s — уже смотрели, m — ваш голос, w2 — вес 2
+const PEOPLE = [
+  { id: 'mc', name: 'MCFLY', me: 1, mod: 1.5, color: 'grad:neon', fx: 'shimmer', font: 'unbounded', icon: '🐸', frame: 'neon', ava: 362, films: ['Престиж|2006|130||2m', 'Оппенгеймер|2023|180||1', 'Мартовские иды|2011|101|g|0', 'Морпехи|2005|123||0', 'По наклонной|2020|86|g|0', 'Бронсон|2008|92||1', 'Пианист|2002|150||3', 'Побег из Шоушенка|1994|142|s|0', 'Разрушение|2015|101|g|0', 'Драйв|2011|100||0', 'Остров проклятых|2010|138||1', 'Отель «Гранд Будапешт»|2014|99|g|0'] },
+  { id: 'gl', name: 'GLENN', mod: .5, frame: 'ice', films: ['Могила светлячков|1988|89||1', 'Легенда|2015|132||0', 'Здравствуй, мир|2019|98||0', 'Для тебя я стану кошкой|2020|104|g|0', 'Дрянные девчонки|2004|97||2', 'Чужой|1979|117||1', 'Евротур|2004|92|g|0', 'Оленья кожа|2019|77||0', '72 метра|2004|132||0', 'Пленницы|2013|153||1', 'Большой Лебовски|1998|117||2'] },
+  { id: 'to', name: 'тоха', color: '#3DDC97', fx: 'glow', icon: '🍸', badge: 1, frame: 'toxic', ava: 305, films: ['Большой куш|2000|104|s|0', 'Карты, деньги, два ствола|1998|107||1', 'Джентльмены|2019|113||2', 'Бойцовский клуб|1999|139||1', 'Семь|1995|127|g|0', 'Зодиак|2007|157|g|0', 'Исчезнувшая|2014|149||1', 'Однажды в Голливуде|2019|161||0', 'Бесславные ублюдки|2009|153||1', 'Криминальное чтиво|1994|154||3m'] },
+  { id: 'ni', name: 'nisshokuryu', color: 'grad:sunset', font: 'pixel', icon: '👑', frame: 'fire', ava: 331, films: ['Психо|1960|109||2', 'Сияние|1980|146||1m', 'Нечто|1982|109||0', 'Реинкарнация|2018|127|g|0', 'Солнцестояние|2019|148||1', 'Маяк|2019|109|w2|0', 'Ведьма|2015|92||0', 'Оно|2017|135|s|0', 'Прочь|2017|104||1', 'Звонок|1998|96||0'] },
+  { id: 'on', name: 'ОНОР ‹сыра горькая›', color: '#FF2D6F', fx: 'glitch', font: 'pixel', frame: 'holo', ava: 318, films: ['Агенты А.Н.К.Л.|2015|116||0', 'Гнев человеческий|2021|119||1', 'Достать ножи|2019|130|g|0', 'Мальчишник в Вегасе|2009|100||2', 'Дэдпул|2016|108||0', 'Джон Уик|2014|101||1', 'Kingsman: Секретная служба|2014|129||0', 'Хищник|1987|107|g|0'] },
+  { id: 'se', name: 'Serhio', fx: 'wave', frame: 'rainbow', ava: 349, films: ['Интерстеллар|2014|169||3', 'Начало|2010|148||1', 'Матрица|1999|136|g|0', 'Бегущий по лезвию 2049|2017|163||1', 'Дюна|2021|155||0', 'Прибытие|2016|116||1'] },
+  { id: 'sc', name: 'soundcloud hero', off: 1, color: '#FDE68A', font: 'pixel', icon: '👑', frame: 'gold', films: ['Ла-Ла Ленд|2016|128||1', 'Одержимость|2014|107||0', 'Рокетмен|2019|121||0', 'Богемская рапсодия|2018|134||1', 'Элвис|2022|159||0', 'Звезда родилась|2018|136||0'] },
+  { id: 'ti', name: 'tipoya', color: '#C084FC', font: 'russo', icon: '💀', frame: 'accent', films: ['Унесённые призраками|2001|125||2', 'Твоё имя|2016|106||0', 'Мой сосед Тоторо|1988|86|g|0', 'Ходячий замок|2004|119||1', 'Акира|1988|124|g|0'] },
+  { id: 'ma', name: 'Marcellus', color: '#7DD3FC', font: 'pacifico', films: ['Крёстный отец|1972|175||1', 'Славные парни|1990|146|g|0', 'Лицо со шрамом|1983|170|g|0', 'Отступники|2006|151||1', 'Ирландец|2019|209|g|0'] },
+  { id: 'il', name: 'ilyga', fx: 'rainbow', badge: 1, frame: 'gold', ava: 371, films: ['Шрек|2001|90||0', 'Рататуй|2007|111|g|0', 'ВАЛЛ-И|2008|98||1', 'Вверх|2009|96|g|0'] },
+];
+const HOT = 'Психо';
+let kp = 300;
+for (const p of PEOPLE) p.films = p.films.map(s => {
+  const [t, y, m, fl, v] = s.split('|');
+  return { t, y, m: +m, gone: fl.includes('g'), seen: fl.includes('s'), w: fl.includes('w2') ? 2 : 1, v: parseInt(v), mine: v.includes('m'), poster: KP(kp++), by: p };
+});
+const ALL = PEOPLE.flatMap(p => p.films);
+const onWheel = f => !f.gone && !f.seen && !f.by.off;
+const wOf = f => (f.w * 100 + 4 * Math.min(f.v, 4)) * (f.by.mod || 1);
+const TOTAL = ALL.filter(onWheel).reduce((a, f) => a + wOf(f), 0);
+const ACTIVE = ALL.filter(onWheel).length;
+const ME = PEOPLE[0];
+const hueOf = s => [...s].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+
+function nick(p) {
+  const c = p.color || '';
+  let cls = '', st = '';
+  if (c.startsWith('grad:')) { cls = 'c-grad'; st = `--ng:${GR[c.slice(5)]};--n1:#FF5A6E;--n2:#FFB347;--ngl:#22D3EE`; }
+  else if (c) { cls = 'c-solid'; st = `--nc:${c};--n1:${c};--n2:${c};--ngl:${c}`; }
+  const fx = p.fx ? ` fx-${p.fx}` : '', font = p.font ? ` nf-${p.font}` : '';
+  const text = p.fx === 'wave' ? [...p.name].map((ch, i) => `<span style="--i:${i}">${esc(ch)}</span>`).join('') : esc(p.name);
+  return `<span class="nick-wrap"><span class="nick ${cls}${fx}${font}" style="${st}">${text}</span>${p.icon ? `<span class="nick-ico">${p.icon}</span>` : ''}${p.badge ? `<i class="nick-badge" title="Знаток">${I.star}</i>` : ''}</span>`;
+}
+const ava = p => `<i class="ld av${p.frame ? ' frame-' + p.frame : ''}" style="${p.ava ? `background-image:url(${KP(p.ava)})` : `background-color:hsl(${hueOf(p.name)} 45% 38%)`};${p.color && !p.color.startsWith('grad') ? `--ngl:${p.color}` : ''}">${p.ava ? '' : esc(p.name[0].toUpperCase())}</i>`;
+
+// ---- строка: одна разметка на всё ----
+const row = ({ cls = '', lead = '', l1 = '', l2 = '', own = '', n1 = '', n2 = '', ac = '' }) =>
+  `<div class="r ${cls}">${lead}<b class="l1">${l1}</b>${cls.includes('one') ? '' : `<span class="l2"><span class="i">${l2}</span>${own}</span>`}<span class="n1">${n1}</span><span class="n2">${n2}</span><span class="ac">${ac}</span></div>`;
+
+function filmRow(f, o = {}) {
+  const off = f.by.off;
+  const out = f.gone || f.seen || off;
+  const hot = !o.noHot && f.t === HOT;
+  const meta = f.seen ? 'уже смотрели' : f.gone ? 'выбыл' : off ? 'автор не участвует' : `${f.y} · ${rt(f.m)}`;
+  const canDel = o.owner || f.by.me;
+  return row({
+    cls: `hv${hot ? ' hot' : ''}${out ? ' out' : ''}${f.gone ? ' gone' : ''}${o.hov && o.hov === f.t ? ' hov' : ''}`,
+    lead: `<i class="ld po" style="background-image:url(${f.poster})">${canDel ? `<button class="del" title="Удалить">${I.x}</button>` : ''}</i>`,
+    l1: esc(f.t), l2: meta,
+    own: o.owner && !out ? `<span class="own stp">вес <button title="Меньше">${I.minus}</button><b>${f.w}</b><button title="Больше">${I.plus}</button></span>` : '',
+    n1: out ? '—' : pct(wOf(f) / TOTAL),
+    ac: `<button class="vt${f.mine ? ' me' : ''}${f.v ? ' has' : ''}" title="${f.mine ? 'Снять свой голос' : 'Хочу посмотреть: около +4% колеса'}">${I.heart}<span>${f.v || ''}</span></button>`,
+  });
+}
+
+function group(p, o = {}) {
+  const open = o.open?.includes(p.id);
+  const left = p.films.filter(f => !f.gone && !f.seen).length, all = p.films.length;
+  const share = p.off ? 0 : p.films.filter(onWheel).reduce((a, f) => a + wOf(f), 0) / TOTAL;
+  const count = p.off ? `не участвует · ${all} ${plural(all, 'фильм', 'фильма', 'фильмов')}` : left < all ? `${left} из ${all} на колесе` : `${all} ${plural(all, 'фильм', 'фильма', 'фильмов')}`;
+  const tip = p.mod ? `${p.mod > 1 ? 'Бонус' : 'Штраф'} ${'×' + num(p.mod, 1)} к шансам: фильм этого человека получил среднюю ${p.mod > 1 ? '8,6' : '5,2'}. Действует, пока снова не выпадет его фильм.` : '';
+  const head = row({
+    cls: `gh hv${o.hov === p.id ? ' hov' : ''}`,
+    lead: '<i class="hb"></i>' + ava(p),
+    l1: nick(p),
+    l2: (p.me ? 'Вы · ' : '') + count,
+    own: o.owner ? `<button class="own ob" title="${p.off ? 'Вернуть в колесо' : 'Отключить из колеса: сегодня его нет'}">${p.off ? I.eye + '<span>Вернуть в колесо</span>' : I.eyeOff + '<span>Не участвует сегодня</span>'}</button>` : '',
+    n1: p.off ? I.eyeOff : pct(share),
+    n2: p.mod ? `<button class="mod ${p.mod > 1 ? 'up' : 'dn'}" title="${esc(tip)}">×${num(p.mod, 1)}</button>` : '',
+    ac: I.chev,
+  });
+  const films = [...p.films.filter(onWheel), ...p.films.filter(f => !onWheel(f))];
+  return `<div class="g${open ? '' : ' closed'}${p.off ? ' off' : ''}">${head}<div class="gb">${open ? films.slice(0, o.limit || 99).map(f => filmRow(f, o)).join('') : ''}</div></div>`;
+}
+
+// ---- блоки панели ----
+const headRow = (sub) => row({ cls: sub ? 'mu' : 'one hd', lead: `<i class="ld ic"><svg class="logo"><use href="#logo"/></svg></i>`, l1: 'Лудка колесо', l2: sub || '', ac: sub ? I.up : I.chev });
+const RATE = { t: 'Большой куш', poster: ALL.find(f => f.t === 'Большой куш').poster, by: PEOPLE[2], list: [['GLENN', 9], ['Serhio', 7], ['ilyga', 8], ['ОНОР', 8]] };
+function rateOpen(o = {}) {
+  const avg = RATE.list.reduce((a, x) => a + x[1], 0) / RATE.list.length;
+  const mine = o.mine || 0;
+  const list = mine ? [['вы', mine], ...RATE.list] : RATE.list;
+  return `<div class="sec"><div class="sh"><span>Оцените фильм</span><span class="n"></span><span class="ac"><i class="hint" title="Средняя оценка даст фильмам тохи бонус или штраф до следующего выпадения его фильма: ниже 6 — ×0,5 и 1 голос вместо 3; 8–9,9 — ×1,5 и +2 голоса; 10 — ×2 и +4 голоса.">?</i></span></div>
+    <div class="card">${row({ cls: 'hv', lead: `<i class="ld po" style="background-image:url(${RATE.poster})"></i>`, l1: RATE.t, l2: `добавил(а) ${nick(RATE.by)}`, n1: num(avg, 1), ac: '' })}
+    <div class="scale">${Array.from({ length: 10 }, (_, i) => `<button class="${i + 1 === mine ? 'on' : ''}">${i + 1}</button>`).join('')}</div>
+    ${mine ? '<p class="rl">Поменять можно в течение минуты</p>' : ''}
+    <div class="rl">${list.map(([n, s]) => `<span><span class="nm">${n}</span> <b>${s}</b></span>`).join('')}${o.owner ? '<button class="lnk">Снять оценки</button>' : ''}</div></div></div>`;
+}
+const rateDone = (l2, n1) => `<div class="card">${row({ cls: 'hv', lead: `<i class="ld po" style="background-image:url(${RATE.poster})"></i>`, l1: RATE.t, l2, n1, ac: I.chev })}</div>`;
+const tabs = (h) => `<div class="seg"><button class="${h ? '' : 'on'}">Фильмы<span class="c">77</span></button><button class="${h ? 'on' : ''}">Выпадало<span class="c">30</span></button></div>`;
+const search = `<div class="sb">${I.search}Фильм или ссылка на YouTube<button title="Добавить списком">${I.listAdd}</button></div>`;
+const votesHead = () => `<div class="sh" title="Сердечко у фильма — ваш голос: около +4% колеса этому фильму, на фильм не больше одного своего. +2 голоса за хорошую оценку вашего фильма."><span>Ваши голоса <span class="dots"><i></i><i></i><i></i><i class="bn on"></i><i class="bn on"></i></span></span><span class="n">2/5</span><span class="ac"><i class="hint">?</i></span></div>`;
+function music(kind = 'play') {
+  if (kind === 'empty') return `<div class="card">${row({ cls: 'mu hv', lead: `<i class="ld art">${I.note}</i>`, l1: 'Музыка', l2: 'Поиск трека или наши треки', ac: I.right })}</div>`;
+  const r = row({ cls: 'mu hv', lead: `<i class="ld art" style="background-image:url(${KP(344)})"></i>`, l1: 'Ворона', l2: `<span class="eq"><i style="height:6px"></i><i style="height:10px"></i><i style="height:4px"></i></span> наши треки · в очереди 3`,
+    n1: kind === 'listen' ? '' : `<button title="Следующий трек у всех">${I.next}</button>`, ac: kind === 'listen' ? '' : `<button title="Пауза у всех">${I.pause}</button>` });
+  return `<div class="card">${kind === 'listen' ? r.replace('<span class="n1"></span>', '<button class="listen" title="Браузер ждёт клика, чтобы включить звук">Слушать</button><span class="n1"></span>') : r}</div>`;
+}
+const HIST = [
+  ['Большой куш', 'вчера, 23:40', 8.0, 1], ['Побег из Шоушенка', '3 дня назад', 9.1], ['Оно', '5 дней назад', 6.4], ['Солярис', '8 ноября', null, 1],
+  ['Олдбой', '6 ноября', 7.8], ['Достучаться до небес', '2 ноября', 8.6], ['Брат', '30 октября', 9.4], ['Трудности перевода', '27 октября', 5.2, 1],
+].map(([t, d, a, r], i) => ({ t, d, a, r, poster: ALL.find(f => f.t === t)?.poster || KP(330 + i * 5) }));
+const histRow = h => row({ cls: 'hv', lead: `<i class="ld po" style="background-image:url(${h.poster})"></i>`, l1: esc(h.t), l2: h.d, own: '', n1: h.a === null ? '—' : num(h.a, 1), ac: I.right })
+  .replace(`<span class="i">${h.d}</span>`, `<span class="i">${h.d}</span>${h.r ? '<button class="lnk go">Оценить</button>' : ''}`);
+
+function panel(o = {}) {
+  const rate = o.rate === 'open' ? rateOpen(o) : o.rate === 'done' ? rateDone('ваша 8 · средняя 8,0', '') : '';
+  const listInner = o.tab === 'hist' ? HIST.map(histRow).join('') : PEOPLE.map(p => group(p, o)).join('');
+  return `<div class="pn${o.owner ? ' ow' : ''}${o.touch ? ' touch' : ''}" style="${o.style || ''}">
+    ${o.grab ? '<i class="grab"></i>' : ''}${headRow(o.peek)}${rate}${tabs(o.tab === 'hist')}
+    ${o.tab === 'hist' ? '' : search}
+    <div class="sec" style="flex:1 1 0;min-height:0">${o.tab === 'hist' ? '' : votesHead()}<div class="list">${listInner}</div></div>
+    ${music()}</div>`;
+}
+
+// ---- сцена-силуэт ----
+const bgOf = () => `<i class="bg" style="background-image:url(${ALL.find(f => f.t === HOT).poster})"></i>`;
+function stage(x, y, w, h, wheel, title = true) {
+  return `<div class="stage" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px">
+    <div class="bar t"><span class="cps"><i>Обычный</i><i class="on">Выбывание</i></span><span class="cps"><i class="dot"></i><i class="dot"></i><i class="dot"></i></span></div>
+    ${title ? `<div class="np-t" style="left:24px;top:${h / 2 - 60}px"><b>Психо</b><span>1960, 1 ч 49 мин, ужасы, триллер<br>Добавил(а) nisshokuryu</span></div>` : ''}
+    <div class="wheel" style="left:${wheel[0]}px;top:${wheel[1]}px;width:${wheel[2]}px;height:${wheel[2]}px"><div class="hub"><b>Крутить</b><span>${ACTIVE} на колесе</span></div></div>
+    <div class="bar b"><span style="font:700 13px var(--f-ui);color:var(--t2)">Колесо выбивает по фильму, последний побеждает</span><span class="cps" style="width:300px"></span></div></div>`;
+}
+
+// 1440×900: панель — колонки 1–3 (330), сцена — 4–12
+document.getElementById('d1440').innerHTML = bgOf() + `<div style="position:absolute;left:24px;top:24px;width:330px;height:852px;display:flex">${panel({ rate: 'open', open: ['ni'], owner: true, style: 'flex:1' })}</div>`
+  + stage(378, 24, 1038, 852, [400, 116, 620]);
+// 1024×768: панель на 4 колонки (309)
+document.getElementById('d1024').innerHTML = bgOf() + `<div style="position:absolute;left:24px;top:24px;width:309px;height:720px;display:flex">${panel({ rate: 'done', open: [], owner: true, style: 'flex:1' })}</div>`
+  + stage(357, 24, 643, 720, [150, 150, 440], false);
+// телефон
+const phoneStage = `<div style="position:absolute;left:16px;right:16px;top:12px;height:44px;display:flex;justify-content:space-between;align-items:center"><span class="cps"><i class="on">Выбывание</i></span><span class="cps"><i class="dot"></i><i class="dot"></i></span></div>
+  <div class="wheel" style="left:39px;top:96px;width:312px;height:312px"><div class="hub"><b style="font-size:17px;line-height:20px">Крутить</b><span>${ACTIVE} на колесе</span></div></div>
+  <div class="np-t" style="left:16px;top:440px;right:16px;text-align:center"><b style="font-size:34px;line-height:40px">Психо</b><span>1960, 1 ч 49 мин · nisshokuryu</span></div>`;
+document.getElementById('dPh1').innerHTML = bgOf() + phoneStage + `<div style="position:absolute;left:8px;right:8px;bottom:8px;display:flex">${panel({ peek: `${ACTIVE} на колесе из 77`, grab: 1, style: 'flex:1' }).replace(/<div class="seg">[\s\S]*?(?=<div class="card"><div class="r mu)/, '')}</div>`;
+document.getElementById('dPh2').innerHTML = bgOf() + phoneStage + `<div style="position:absolute;left:8px;right:8px;top:56px;bottom:8px;display:flex">${panel({ rate: 'done', open: ['mc'], owner: true, touch: true, grab: 1, style: 'flex:1' })}</div>`;
+
+// ---- состояния ----
+const ST = [
+  ['Анатомия строки', 'Сетка включена: синий — ведущий 32, красная линия — начало текста x 60, зелёный — число 40, жёлтый — действие 40, горизонтали — модуль 8.',
+    `<div class="pn">${headRow()}${votesHead()}${group(ME, { open: ['mc'], limit: 3 })}${music()}</div>`],
+  ['Развёрнутая группа, вы создатель', 'Под стрелкой «Психо» (фон акцента). Наведение на «Сияние» — вместо года и длительности вес − 2 +, на постере крестик. Выбывшие и уже смотрели — внизу, приглушены.',
+    `<div class="pn ow">${group(PEOPLE[3], { open: ['ni'], owner: true, hov: 'Сияние' })}</div>`],
+  ['Свёрнутые группы', 'Доля и множитель в одной колонке у всех. Наведение у создателя на шапку GLENN: вместо «10 из 11 на колесе» — «Не участвует сегодня». soundcloud hero не участвует: вместо доли перечёркнутый глаз.',
+    `<div class="pn ow">${votesHead()}<div class="list" style="flex:none">${PEOPLE.map(p => group(p, { owner: true, hov: 'gl' })).join('')}</div></div>`],
+  ['Оценка до', 'Шкала 1–10 одной строкой-сегментом, у создателя «Снять оценки». Средняя — в колонке чисел, «?» — в колонке действия.',
+    `<div class="pn">${rateOpen({ owner: true })}</div>`],
+  ['Оценка: минута на правку', 'Выбранная оценка залита акцентом, остальные оценки списком ниже.',
+    `<div class="pn">${rateOpen({ mine: 8 })}</div>`],
+  ['Оценка после · свой фильм · запрет', 'Свёрнутый блок — обычная строка с постером. Клик раскрывает его обратно.',
+    `<div class="pn">${rateDone('ваша 8 · средняя 8,0', '')}${rateDone('ваш фильм · средняя 8,0', '')}${rateDone('оценки для вас закрыты', '')}</div>`],
+  ['Выпадало', 'Средняя оценка стоит в той же колонке, что шансы в списке. «Оценить» — ссылка во второй строке.',
+    `<div class="pn">${tabs(true)}<div class="list" style="flex:none">${HIST.map(histRow).join('')}</div></div>`],
+  ['Музыка', 'Играет · браузер ждёт клика («Слушать» занимает колонки числа и действия) · пусто.',
+    `<div class="pn">${music()}${music('listen')}${music('empty')}</div>`],
+  ['Лёгкий режим', 'Эффекты ников и рамок стоят статичным кадром. «Радуга» и «Голограмма» показаны ровным кольцом. Вид держится на колонках, а не на движении.',
+    `<div class="pn fx-lite">${PEOPLE.slice(0, 6).map(p => group(p)).join('')}</div>`],
+];
+document.getElementById('states').innerHTML = ST.map(([t, d, html], i) => `<div class="st"><div class="pad${i === 0 ? ' show-grid' : ''}"><i class="bg" style="background-image:url(${KP(300 + i * 7)})"></i>${html}</div><p class="cap">${t}<span>${d}</span></p></div>`).join('');
+
+// ---- масштаб кадров и ширина полосы прокрутки ----
+function fit() {
+  document.querySelectorAll('.fit').forEach(f => {
+    const d = f.firstElementChild, w = +f.dataset.w, h = +f.dataset.h;
+    const s = Math.min(1, f.clientWidth / w);
+    Object.assign(d.style, { width: w + 'px', height: h + 'px', transform: `scale(${s})` });
+    f.style.height = h * s + 'px';
+    f.style.maxWidth = w + 'px';
+  });
+}
+document.querySelectorAll('.list').forEach(l => l.style.setProperty('--sb', l.offsetWidth - l.clientWidth + 'px'));
+fit();
+addEventListener('resize', fit);
+document.getElementById('gridBtn').addEventListener('click', e => e.currentTarget.classList.toggle('on', document.body.classList.toggle('show-grid')));
+</script>
+</body>
+</html>

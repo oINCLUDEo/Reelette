@@ -105,14 +105,13 @@
         </div>
       </div>
       <div class="lp-pane" data-lpp="films">
-        <div class="quick-add">
-          <div class="search-box">
-            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-            <input id="quickSearch" placeholder="Фильм или ссылка на YouTube" autocomplete="off" aria-label="Найти фильм или вставить ссылку на ролик YouTube" aria-controls="quickResults" aria-expanded="false">
-          </div>
+        <div class="quick-add search-box">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <input id="quickSearch" placeholder="Фильм или ссылка на YouTube" autocomplete="off" aria-label="Найти фильм или вставить ссылку на ролик YouTube" aria-controls="quickResults" aria-expanded="false">
           <button id="addBtn" class="icon-btn" title="Добавить списком" aria-label="Добавить списком"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg></button>
         </div>
-        <div class="my-votes" id="myVotes" tabindex="0"></div>
+        <div class="sh my-votes" id="myVotes" tabindex="0"></div>
+        <div class="share-bar" id="shareBar" aria-hidden="true"></div>
         <div id="filmList" class="film-list"></div>
         <div id="filmEmpty" class="empty" hidden>
           <p>Колесо пустое. <span class="m">Найдите фильм в поле выше или добавьте списком.</span></p>
@@ -126,12 +125,11 @@
         <button class="nav-icon np-replay" id="ytReplay" type="button" hidden aria-label="Сыграть ещё раз"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
         <div class="yt-card" id="ytCard" hidden>
           <button class="yt-thumb" id="ytThumb" type="button" title="Очередь, громкость и добавить трек" aria-label="Открыть музыку: очередь и громкость"></button>
-          <div class="yt-info"><b id="ytTitle"></b><span id="ytBy"></span></div>
+          <button class="yt-info" id="ytChange" type="button" title="Очередь, громкость и добавить трек"><b id="ytTitle"></b><span><span id="ytBy"></span><span id="ytQCount" hidden></span></span></button>
           <button class="yt-unmute nav-unmute" id="ytUnmute" type="button" hidden title="Браузер ждёт клика, чтобы включить звук">Слушать</button>
           <div class="yt-ctrl">
-            <button class="nav-icon" id="ytToggle"></button>
             <button class="nav-icon" id="ytNext" title="Следующий трек у всех" aria-label="Следующий трек у всех"><svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg></button>
-            <button class="nav-icon q-btn" id="ytChange" title="Очередь и добавить трек" aria-label="Очередь и добавить трек"><svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h8"/><path d="M19 15v6M16 18h6"/></svg><i id="ytQCount" hidden></i></button>
+            <button class="nav-icon" id="ytToggle"></button>
           </div>
         </div>
       </div>

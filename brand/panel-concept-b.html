@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reelette: панель, концепт B</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400&family=Alan+Sans:wght@700&family=Unbounded:wght@700&family=Press+Start+2P&family=Pacifico&family=Russo+One&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   Концепт B «Люди в центре». Одна сущность — карточка человека, внутри неё его фильмы.
+   Сетка карточки и строки общая: [40 знак][текст][48 значение][32 действие], поля 8.
+   Две вертикали: x=8 (аватар, постер, шкала) и x=56 (весь текст). Справа — колонка значений.
+   Высоты: карточка 56, строка фильма 40, контролы 40, подпись 24. Модуль 8, интервал карточек 4.
+   Скругления концентричные: панель 28 → карточка 20 → строка 12 → постер 4.
+   ===================================================================== */
+@font-face { font-family: "Lack"; src: url("../public/fonts/lack.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
+:root {
+  --bg: #0E0E0E; --sheetB: #1A1A1A; --s2: #282828;
+  --tx: #E2E2E2; --tx2: #A6A6A6; --tx3: #8A8A8A;
+  --acc: #465DFF; --acc-hi: #8C9BFF; --glow: rgba(70,93,255,.45);
+  --ok: #30D158; --bad: #FF453A;
+  --fill: rgba(255,255,255,.08);
+  --glass: color-mix(in srgb, var(--sheetB) 38%, transparent); --glass-bd: rgba(255,255,255,.08);
+  --card: color-mix(in srgb, #262626 78%, transparent);   /* карточка плотнее стекла: на ней не нужен blur */
+  --card-body: rgba(255,255,255,.03);
+  --f-ui: "Carlito", "Segoe UI", system-ui, sans-serif;
+  --f-head: "Lack", "Carlito", sans-serif;
+  --f-mark: "Alan Sans", "Carlito", sans-serif;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #0A0A0A; color: var(--tx); font: 400 15px/1.5 var(--f-ui); font-size-adjust: .5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+button, input { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+h1, h2, h3, p { margin: 0; }
+h1, h2 { font-family: var(--f-head); font-weight: 400; font-synthesis: none; letter-spacing: -.01em; }
+
+/* ---------- страница концепта ---------- */
+.page { max-width: 1488px; margin: 0 auto; padding: 40px 24px 80px; }
+.intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 24px 48px; margin-bottom: 40px; }
+.intro .mark { font: 700 13px/16px var(--f-mark); letter-spacing: .14em; color: var(--tx3); margin-bottom: 12px; }
+.intro h1 { font-size: 40px; line-height: 48px; }
+.intro h1 + p { margin-top: 12px; color: var(--tx2); max-width: 44ch; }
+.intro ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; counter-reset: i; }
+.intro li { position: relative; padding-left: 32px; color: var(--tx2); line-height: 22px; counter-increment: i; }
+.intro li::before { content: counter(i); position: absolute; left: 0; top: 1px; width: 20px; height: 20px; border-radius: 10px; background: var(--fill); font: 700 12px/20px var(--f-ui); text-align: center; color: var(--tx); }
+.intro li b { color: var(--tx); }
+.sec { margin-top: 64px; }
+.sec-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 20px; }
+.sec-h h2 { font-size: 28px; line-height: 32px; }
+.sec-h p { color: var(--tx3); max-width: 80ch; }
+.scaler { position: relative; overflow: hidden; border-radius: 16px; box-shadow: 0 30px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06); }
+.scaler > .frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.duo { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.duo > figure { margin: 0; flex: 1 1 300px; max-width: 390px; }
+figcaption { margin-top: 12px; font-size: 14px; line-height: 20px; color: var(--tx3); }
+figcaption b { display: block; color: var(--tx); font-size: 15px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 32px 24px; align-items: start; }
+.tile { margin: 0; min-width: 0; }
+.tile-bd { position: relative; display: grid; justify-items: center; padding: 24px 0; border-radius: 20px; overflow: hidden; isolation: isolate; background:
+  radial-gradient(60% 50% at 20% 10%, rgba(140,60,90,.55), transparent 70%),
+  radial-gradient(60% 60% at 90% 80%, rgba(50,70,160,.5), transparent 70%), #111; }
+.tile-bd.b2 { background: radial-gradient(60% 50% at 80% 10%, rgba(40,110,100,.5), transparent 70%), radial-gradient(70% 60% at 10% 90%, rgba(120,80,40,.5), transparent 70%), #111; }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+.spec-card { display: grid; justify-items: center; align-content: start; gap: 16px; }
+.spec ul { margin: 0; padding: 0 0 0 18px; color: var(--tx2); font-size: 14px; line-height: 22px; }
+.spec ul b { color: var(--tx); }
+pre { margin: 0; padding: 20px; border-radius: 20px; background: #141414; border: 1px solid rgba(255,255,255,.06); overflow-x: auto; font: 13px/20px ui-monospace, Consolas, monospace; color: #C9C9C9; }
+pre i { font-style: normal; color: var(--tx3); }
+@media (max-width: 900px) { .intro { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .page { padding: 24px 16px 64px; } .intro h1 { font-size: 32px; line-height: 40px; } .tiles { grid-template-columns: 1fr; } }
+
+/* ---------- комната (рамка) ---------- */
+.frame { overflow: hidden; isolation: isolate; background: var(--bg); }
+.frame .bgp { position: absolute; inset: -10%; z-index: -1; background-size: cover; background-position: center; filter: blur(70px) saturate(1.5) brightness(.55); }
+.frame .bgv { position: absolute; inset: 0; z-index: -1; background: radial-gradient(60% 60% at 70% 50%, rgba(70,93,255,.18), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.45)); }
+.room { display: grid; column-gap: 24px; padding: 24px; }
+.room.d1440 { width: 1440px; height: 900px; grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.room.d1024 { width: 1024px; height: 768px; grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.room.d1440 > .lp { grid-column: 1 / 4; } .room.d1440 > .stage { grid-column: 4 / 13; }
+.room.d1024 > .lp { grid-column: 1 / 5; } .room.d1024 > .stage { grid-column: 5 / 13; }
+.room > * { min-width: 0; min-height: 0; }
+
+/* сцена — силуэт, чтобы видно было, как панель живёт рядом */
+.stage { position: relative; border-radius: 28px; background: var(--glass); border: 1px solid var(--glass-bd); -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%); }
+.st-bar { position: absolute; left: 24px; right: 24px; height: 64px; display: flex; align-items: center; gap: 8px; }
+.st-bar.t { top: 0; border-bottom: 1px solid rgba(255,255,255,.07); } .st-bar.b { bottom: 0; border-top: 1px solid rgba(255,255,255,.07); }
+.cap { flex: none; white-space: nowrap; height: 40px; border-radius: 20px; background: var(--fill); display: flex; align-items: center; padding: 4px; gap: 4px; font-size: 13px; font-weight: 700; color: var(--tx2); }
+.cap span { padding: 0 14px; line-height: 32px; border-radius: 16px; }
+.cap span.on { background: rgba(255,255,255,.14); color: var(--tx); }
+.cap .tg { width: 36px; height: 20px; border-radius: 10px; background: var(--acc); position: relative; margin: 0 6px 0 0; }
+.cap .tg::after { content: ""; position: absolute; right: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+.st-bar .sp { flex: 1; }
+.st-bar .ic { width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; color: var(--tx2); }
+.st-av { width: 32px; height: 32px; border-radius: 50%; background-size: cover; box-shadow: 0 0 0 2px #1a1a1a; margin-left: -8px; }
+.st-now { position: absolute; left: 24px; top: 50%; transform: translateY(-50%); width: 300px; }
+.st-now h3 { font: 400 48px/52px var(--f-head); font-synthesis: none; }
+.st-now p { margin-top: 8px; font-size: 15px; line-height: 20px; color: var(--tx2); }
+.st-now .left { margin-top: 16px; font-size: 13px; color: var(--tx3); }
+.st-now .left i { display: block; height: 2px; margin-top: 6px; border-radius: 1px; background: linear-gradient(90deg, var(--acc) 17%, rgba(255,255,255,.1) 17%); }
+.wheel { position: absolute; border-radius: 50%; display: grid; place-items: center;
+  background: repeating-conic-gradient(from -3.75deg, #2B2B30 0 3.75deg, #1E1E22 3.75deg 7.5deg);
+  box-shadow: 0 0 0 16px #19191C, 0 0 0 17px rgba(255,255,255,.06), 0 0 90px 20px rgba(70,93,255,.35); }
+.wheel::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(closest-side, transparent 30%, rgba(0,0,0,.25) 31%, transparent 60%), conic-gradient(from -3.75deg, rgba(140,155,255,.35) 0 7.5deg, transparent 7.5deg); }
+.wheel::after { content: ""; position: absolute; left: 50%; top: -30px; width: 28px; height: 36px; margin-left: -14px; background: #E9E9EE; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.hub { position: relative; width: 30%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #FFFFFF, #CFCFD6); color: #141414; display: grid; place-content: center; text-align: center; box-shadow: 0 0 0 6px rgba(70,93,255,.25); }
+.hub b { font: 400 26px/28px var(--f-head); font-synthesis: none; }
+.hub small { font-size: 11px; color: #555; }
+
+/* ---------- ПАНЕЛЬ ---------- */
+.lp { position: relative; width: var(--pw, 330px); height: var(--ph, auto); display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: 28px;
+  background: var(--glass); border: 1px solid var(--glass-bd); -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08); font-size: 15px; line-height: 20px; }
+.room > .lp { width: auto; height: auto; }
+.lp::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,.5), rgba(255,255,255,.1) 28%, transparent 50%, rgba(255,255,255,.08) 72%, rgba(255,255,255,.32));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.lp > * { flex: none; }
+
+/* шапка: знак и комната */
+.lh { display: flex; align-items: center; gap: 4px; height: 48px; padding-left: 10px; }
+.lh .logo { width: 28px; height: 28px; color: var(--tx); stroke-width: 1.6; }
+.room-t { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px 0 8px; border-radius: 20px; font: 400 21px/24px var(--f-head); font-synthesis: none; text-align: left; white-space: nowrap; }
+.room-t span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.room-t svg { width: 12px; height: 12px; color: var(--tx3); stroke-width: 3; }
+.room-t:hover { background: var(--fill); }
+
+/* вкладки, поиск, голоса — тихие контролы на одной высоте 40 */
+.seg { display: grid; grid-template-columns: 1fr 1fr; height: 40px; padding: 2px; border-radius: 20px; background: var(--fill); }
+.seg button { border-radius: 18px; font-size: 14px; font-weight: 700; color: var(--tx3); }
+.seg button.on { background: rgba(255,255,255,.14); color: var(--tx); }
+.seg button i { font-style: normal; font-weight: 400; color: var(--tx3); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.tools { display: flex; gap: 8px; }
+.search { flex: 1; min-width: 0; position: relative; display: flex; align-items: center; height: 40px; border-radius: 20px; background: var(--fill); padding: 0 14px 0 40px; font-size: 14px; color: var(--tx3); white-space: nowrap; overflow: hidden; }
+.search svg { position: absolute; left: 14px; width: 16px; height: 16px; }
+.ib { width: 40px; height: 40px; border-radius: 20px; background: var(--fill); display: grid; place-items: center; color: var(--tx2); flex: none; }
+.ib svg { width: 17px; height: 17px; }
+.votes { display: flex; align-items: center; gap: 8px; height: 24px; padding: 0 8px; font-size: 13px; color: var(--tx3); cursor: help; }
+.votes b { font-weight: 700; color: var(--tx2); }
+.votes .dots { display: flex; gap: 4px; }
+.votes .dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.18); }
+.votes .dots i.on { background: var(--acc-hi); }
+.votes .r { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+/* список людей */
+.people { flex: 1 1 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.16) transparent; }
+.people > * { flex: none; }
+
+/* КАРТОЧКА: голова 56 + тело со строками */
+.pc { border-radius: 20px; }
+.pc.open { background: var(--card-body); }
+.ph { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr) 48px 32px; align-items: center; height: 56px; padding: 0 8px; border-radius: 20px; background: var(--card); cursor: pointer; text-align: left; width: 100%; }
+.pc.open .ph { position: sticky; top: 0; z-index: 2; }
+.ph:hover { background: color-mix(in srgb, #303030 84%, transparent); }
+.av { justify-self: center; width: 36px; height: 36px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; font: 700 15px var(--f-ui); color: #fff; }
+.pt { min-width: 0; padding: 0 8px; display: grid; }
+.pt .n { display: flex; align-items: center; gap: 6px; min-width: 0; height: 20px; font-size: 15px; font-weight: 700; }
+.pt .n .me { flex: none; font-size: 11px; font-weight: 700; color: var(--tx3); }
+.pt .m { display: flex; align-items: center; gap: 4px; height: 16px; font-size: 13px; line-height: 16px; color: var(--tx3); white-space: nowrap; min-width: 0; }
+.pt .m span { overflow: hidden; text-overflow: ellipsis; }
+.pt .m svg { width: 10px; height: 10px; stroke-width: 3; transition: transform .3s var(--ease); }
+.pc:not(.open) .pt .m svg { transform: rotate(-90deg); }
+.pt .m .hotm { color: var(--tx); font-weight: 700; }
+.pv { display: grid; justify-items: end; align-content: center; }
+.pv .pct { font-size: 15px; line-height: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mod { height: 16px; padding: 0 5px; border-radius: 6px; font-size: 11px; line-height: 16px; font-weight: 700; cursor: help; }
+.mod.up { color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); }
+.mod.down { color: var(--bad); background: color-mix(in srgb, var(--bad) 15%, transparent); }
+.act { justify-self: center; width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; color: var(--tx3); }
+.act svg { width: 16px; height: 16px; }
+.act:hover { background: var(--fill); color: var(--tx); }
+.ph .eye { opacity: 0; }
+.ph:hover .eye, .ph.hv .eye, .ph .eye:focus-visible, .pc.off .eye { opacity: 1; }
+/* полоса доли: у всех карточек одна шкала (всё колесо), отрезок человека стоит после отрезков тех, кто выше — сумма = колесо */
+.trk { position: absolute; left: 56px; right: 40px; bottom: 5px; height: 2px; border-radius: 1px; background: rgba(255,255,255,.07); }
+.trk i { position: absolute; top: 0; bottom: 0; left: calc(var(--a) * 100%); width: max(3px, calc(var(--w) * 100%)); border-radius: 1px; background: var(--tx2); transition: left .5s var(--ease), width .5s var(--ease); }
+.pc.hot .trk i { background: var(--acc-hi); box-shadow: 0 0 6px var(--glow); }
+.pc.off .ph > :not(.eye) { opacity: .45; }
+.pc.off .trk { display: none; }
+/* тело раскрывается по высоте, строки в DOM есть всегда — сворачивание не пересоздаёт их */
+.pb { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .4s var(--ease); }
+.pc.open .pb { grid-template-rows: 1fr; }
+.pb > div { overflow: hidden; padding: 0 8px; }
+.pc.open .pb > div { padding: 4px 8px 8px; }
+
+/* СТРОКА ФИЛЬМА: та же сетка, что у головы карточки */
+.fr { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto 48px 32px; align-items: center; height: 40px; border-radius: 12px; }
+.fr:hover, .fr.hv { background: rgba(255,255,255,.05); }
+.fp { justify-self: center; width: 24px; height: 36px; border-radius: 4px; background: #333 center/cover; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.ft { min-width: 0; padding: 0 8px; display: grid; }
+.ft b { font-size: 14px; line-height: 20px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ft span { font-size: 12px; line-height: 16px; color: var(--tx3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fr .pct { justify-self: end; font-size: 13px; font-weight: 700; color: var(--tx2); font-variant-numeric: tabular-nums; }
+.hv-b { justify-self: center; display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-width: 32px; height: 32px; border-radius: 16px; color: var(--tx3); font-size: 12px; font-weight: 700; }
+.hv-b svg { width: 15px; height: 15px; }
+.hv-b b:empty { display: none; }
+.hv-b:not(.has):not(.on) { opacity: .5; }
+.fr:hover .hv-b, .fr.hv .hv-b { opacity: 1; }
+.hv-b.has { color: var(--tx2); }
+.hv-b.on { color: var(--acc-hi); }
+.hv-b.on svg { fill: currentColor; }
+.stp { display: none; align-items: center; gap: 0; height: 24px; padding: 0 2px; margin-right: 4px; border-radius: 12px; background: var(--fill); }
+.stp button { width: 20px; height: 20px; border-radius: 10px; display: grid; place-items: center; color: var(--tx2); }
+.stp svg { width: 11px; height: 11px; stroke-width: 2.6; }
+.stp b { min-width: 14px; text-align: center; font-size: 12px; }
+.fr:hover .stp, .fr.hv .stp { display: flex; }
+.del { position: absolute; left: 6px; top: 1px; width: 16px; height: 16px; border-radius: 50%; display: none; place-items: center; background: rgba(0,0,0,.75); color: #fff; }
+.del svg { width: 9px; height: 9px; stroke-width: 3; }
+.fr:hover .del, .fr.hv .del { display: grid; }
+.fr.hot { background: color-mix(in srgb, var(--acc) 22%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc-hi) 40%, transparent); }
+.fr.hot .pct { color: var(--tx); }
+.fr.out { opacity: .4; }
+.fr.elim .ft b { text-decoration: line-through; }
+@media (hover: none) { .stp { display: flex; } .ph .eye { opacity: 1; } .hv-b:not(.has):not(.on) { opacity: 1; } }
+
+/* ОЦЕНКА — та же карточка: постер на месте аватара, средняя в колонке значений */
+.rate .ph { cursor: default; }
+.rate .fp { width: 26px; height: 40px; }
+.rate .pt .n { font-size: 15px; }
+.rate .pt .n em { font-style: normal; color: var(--acc-hi); }
+.hint { width: 20px; height: 20px; border-radius: 10px; background: var(--fill); font-size: 12px; font-weight: 700; color: var(--tx2); }
+.rb { padding: 0 8px 8px; }
+.scale { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; height: 36px; padding: 2px; border-radius: 18px; background: var(--fill); }
+.scale button { border-radius: 16px; font-size: 14px; font-weight: 700; color: var(--tx2); font-variant-numeric: tabular-nums; }
+.scale button:hover { background: rgba(255,255,255,.1); color: var(--tx); }
+.scale button.on { background: var(--acc); color: #fff; }
+.rated { display: flex; flex-wrap: wrap; gap: 2px 10px; padding: 8px 0 0 48px; font-size: 12px; line-height: 16px; color: var(--tx3); }
+.rated span b { color: var(--tx2); }
+.rated .clr { margin-left: auto; color: var(--tx2); text-decoration: underline; text-decoration-color: rgba(255,255,255,.25); text-underline-offset: 3px; }
+.rate.open { background: var(--card-body); }
+
+/* МУЗЫКА — та же карточка: обложка на месте аватара */
+.np .ph { grid-template-columns: 40px minmax(0, 1fr) auto; cursor: default; }
+.np .cov { justify-self: center; width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #3a2f6b, #c0587e 60%, #f2b07a); }
+.np .cov.e { display: grid; place-items: center; background: rgba(255,255,255,.08); color: var(--tx2); }
+.np .ctl { display: flex; }
+.np .ctl .act { position: relative; color: var(--tx2); }
+.np .ctl .act i { position: absolute; right: 2px; top: 2px; min-width: 14px; height: 14px; border-radius: 7px; background: var(--acc); color: #fff; font: 700 9px/14px var(--f-ui); font-style: normal; }
+.listen { height: 32px; padding: 0 14px; border-radius: 16px; background: var(--acc); color: #fff; font-size: 13px; font-weight: 700; }
+
+/* ВЫПАДАЛО: строки той же анатомии */
+.hist { flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 0 0; scrollbar-width: none; }
+.hist .fr { cursor: pointer; padding: 0 8px; grid-template-columns: 40px minmax(0, 1fr) 48px 32px; height: 48px; border-radius: 16px; }
+.hist .fp { width: 28px; height: 40px; }
+.hist .sc { justify-self: end; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hist .rm { grid-column: 3 / 5; justify-self: end; margin-right: 4px; height: 24px; padding: 0 10px; border-radius: 12px; background: color-mix(in srgb, var(--acc) 22%, transparent); color: var(--acc-hi); font-size: 12px; font-weight: 700; }
+
+/* ШТОРКА (<1024) */
+.peek { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px; border-radius: 20px; text-align: left; position: relative; }
+.peek::before { content: ""; position: absolute; left: 50%; top: -2px; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: rgba(255,255,255,.25); }
+.peek b { font: 400 21px/24px var(--f-head); font-synthesis: none; }
+.peek span { color: var(--tx3); font-size: 13px; }
+.peek svg { margin-left: auto; width: 16px; height: 16px; color: var(--tx3); }
+.lp.sheet { position: absolute; left: 8px; right: 8px; bottom: 8px; width: auto; border-radius: 28px; }
+.lp.sheet.up { top: 64px; }
+.lp.sheet.up .peek svg { transform: rotate(180deg); }
+.mtop { position: absolute; left: 16px; right: 16px; top: 8px; height: 48px; display: flex; align-items: center; gap: 8px; }
+.mtop .logo { width: 26px; height: 26px; stroke-width: 1.6; }
+.mtop b { font: 400 20px/24px var(--f-head); font-synthesis: none; flex: 1; }
+
+/* ---------- ники и рамки (как в style.css сайта) ---------- */
+.nk { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; white-space: nowrap; }
+.nk > .nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nick { --n1: var(--tx); --n2: var(--tx); --ngl: var(--acc); }
+.nick.c-solid { color: var(--nc); -webkit-text-fill-color: var(--nc); }
+.nick.c-grad { background: var(--ng); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.nick.fx-glow { filter: drop-shadow(0 0 6px var(--ngl)); }
+.nick.fx-shimmer { background: linear-gradient(110deg, var(--n1) 30%, #fff 46%, #fff 50%, var(--n2) 66%) 50% 0 / 260% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: nShimmer 3s linear infinite; }
+@keyframes nShimmer { from { background-position: 130% 0; } to { background-position: -130% 0; } }
+.nick.fx-glitch { animation: nGlitch 3.2s infinite steps(1); }
+@keyframes nGlitch { 0%, 86%, 100% { text-shadow: none; transform: none; } 88% { text-shadow: 2px 0 #FF2D6F, -2px 0 #22D3EE; transform: translateX(1px); } 90% { text-shadow: -2px 0 #FF2D6F, 2px 0 #22D3EE; transform: translateX(-1px); } }
+.nick.fx-wave > span { display: inline-block; animation: nWave 1.7s ease-in-out infinite; animation-delay: calc(var(--i) * 70ms); white-space: pre; }
+.nick.fx-wave > span:nth-child(4n+2) { transform: translateY(-.14em); }
+.nick.fx-wave > span:nth-child(4n) { transform: translateY(.07em); }
+@keyframes nWave { 0%, 55%, 100% { transform: none; } 25% { transform: translateY(-.22em); } }
+.nick.fx-rainbow { background: linear-gradient(90deg, #FF5A6E, #FFD54A, #3DDC97, #38BDF8, #C084FC, #FF5A6E) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: nRainbow 3s linear infinite; }
+@keyframes nRainbow { to { background-position: -200% 0; } }
+.nick.nf-unbounded { font-family: 'Unbounded', var(--f-head); font-weight: 700; font-size: .86em; letter-spacing: -.02em; }
+.nick.nf-pixel { font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: .7em; letter-spacing: 0; line-height: 1.4; }
+.nick.nf-pacifico { font-family: 'Pacifico', cursive; font-weight: 400; letter-spacing: 0; }
+.nick.nf-russo { font-family: 'Russo One', sans-serif; font-weight: 400; letter-spacing: 0; }
+.nick-ico { margin-left: .3em; font-size: .85em; flex: none; }
+.nick-badge { flex: none; display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: .3em; border-radius: 5px; background: var(--s2); color: var(--acc-hi); }
+.nick-badge svg { width: 11px; height: 11px; }
+.frame-accent { box-shadow: 0 0 0 2px var(--acc), 0 0 10px var(--glow); }
+.frame-neon { box-shadow: 0 0 0 2px var(--ngl, var(--acc-hi)), 0 0 14px var(--ngl, var(--acc-hi)); animation: fNeon 2.4s ease-in-out infinite; }
+@keyframes fNeon { 50% { box-shadow: 0 0 0 2px var(--ngl, var(--acc-hi)), 0 0 4px var(--ngl, var(--acc-hi)); } }
+.frame-gold { box-shadow: 0 0 0 2px #F5C542, 0 0 0 4px rgba(245,197,66,.25), 0 0 12px rgba(245,197,66,.55); }
+.frame-rainbow { box-shadow: 0 0 0 2px #FF5A6E, 0 0 12px #FF5A6E; animation: fRainbow 4s linear infinite; }
+@keyframes fRainbow { 0%, 100% { box-shadow: 0 0 0 2px #FF5A6E, 0 0 12px #FF5A6E; } 25% { box-shadow: 0 0 0 2px #FFD54A, 0 0 12px #FFD54A; } 50% { box-shadow: 0 0 0 2px #3DDC97, 0 0 12px #3DDC97; } 75% { box-shadow: 0 0 0 2px #38BDF8, 0 0 12px #38BDF8; } }
+.frame-fire { box-shadow: 0 0 0 2px #FF7A18, 0 -3px 12px #FF4D00, 0 0 18px rgba(255,77,0,.6); animation: fFire 1.4s ease-in-out infinite; }
+@keyframes fFire { 50% { box-shadow: 0 0 0 2px #FFC93C, 0 -5px 16px #FF7A18, 0 0 10px rgba(255,201,60,.6); } }
+.frame-ice { box-shadow: 0 0 0 2px #BAE6FD, 0 0 0 4px rgba(125,211,252,.35), 0 0 16px rgba(125,211,252,.7); }
+.frame-toxic { box-shadow: 0 0 0 2px #A3E635, 0 0 8px #84CC16; animation: fToxic 1.8s ease-in-out infinite; }
+@keyframes fToxic { 50% { box-shadow: 0 0 0 2px #D9F99D, 0 0 20px #84CC16; } }
+.frame-holo { box-shadow: 0 0 0 2px #F0ABFC, 0 0 14px #F0ABFC; animation: fHolo 3s linear infinite; }
+@keyframes fHolo { 33% { box-shadow: 0 0 0 2px #67E8F9, 0 0 14px #67E8F9; } 66% { box-shadow: 0 0 0 2px #C4B5FD, 0 0 14px #C4B5FD; } }
+/* лёгкий режим (на сайте html.fx-lite): всё стоит, «Радуга» и «Голограмма» — ровное кольцо своих цветов */
+.fx-lite .nick, .fx-lite .nick > span, .fx-lite [class*="frame-"] { animation: none !important; }
+.fx-lite .frame-rainbow { padding: 2px; background: conic-gradient(#FF5A6E, #FFD54A, #3DDC97, #38BDF8, #C084FC, #FF5A6E); box-shadow: 0 0 10px rgba(255,213,74,.35); }
+.fx-lite .frame-holo { padding: 2px; background: conic-gradient(#F0ABFC, #67E8F9, #C4B5FD, #F0ABFC); box-shadow: 0 0 12px rgba(196,181,253,.45); }
+@media (prefers-reduced-motion: reduce) { .nick, .nick > span, [class*="frame-"] { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="intro">
+  <div>
+    <div class="mark">REELETTE · ЛЕВАЯ ПАНЕЛЬ · КОНЦЕПТ B</div>
+    <h1>Люди в центре</h1>
+    <p>На вечере компания думает людьми: чьи фильмы, у кого бонус, кто не пришёл. Поэтому в панели одна главная сущность — карточка человека, а фильмы живут внутри неё.</p>
+  </div>
+  <ol>
+    <li><b>Одна сущность вместо шести.</b> Карточка человека повторяется 10 раз, а оценка последнего фильма и музыка собраны по той же анатомии: знак слева, две строки текста, значение справа. Отдельных «плашек со своими правилами» больше нет.</li>
+    <li><b>Сетка карточки:</b> [40 знак][текст][48 значение][32 действие], поля 8. Две вертикали на всю панель: x=8 (аватары, постеры, шкала, вкладки) и x=56 (весь текст). Строка фильма — та же сетка: постер под аватаром, название под ником, процент под долей, сердце под глазом.</li>
+    <li><b>Ритм:</b> карточка 56, строка 40, контролы 40, подпись 24, интервал карточек 4, блоков 8. Скругления 28 → 20 → 12 → 4.</li>
+    <li><b>Иерархия:</b> человек (15 жирный, плотная карточка) → его фильмы (14, без фона). В колонке значений одно число на строку: доля человека, шанс фильма, средняя оценка.</li>
+    <li><b>Доля колеса — полоса под ником.</b> У всех карточек одна шкала, отрезок человека начинается там, где кончился предыдущий: лестница сверху вниз складывается в целое колесо. Под стрелкой — отрезок синий, единственный акцент списка.</li>
+    <li><b>Что ушло:</b> отдельный шеврон, «глаз» на виду у каждого (теперь при наведении, у «не участвует» — всегда), счётчик «7/12» с цветной дробью, 10 кнопок в два ряда (стала одна шкала), белая вкладка. Голоса — одна тихая строка-подпись.</li>
+  </ol>
+</header>
+
+<section class="sec">
+  <div class="sec-h"><h2>Комната 1440 × 900</h2><p>Выбывание идёт: 48 из 58 на колесе. Под стрелкой «Психо» — карточка nisshokuryu раскрыта, строка подсвечена, его отрезок доли синий. Оценка «Большого куша» ещё открыта.</p></div>
+  <div class="scaler" data-w="1440" data-h="900"><div class="frame room d1440" id="hero"></div></div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>Анатомия</h2><p>Три вещи одной формы. Отличается только то, что стоит в квадрате 40 слева.</p></div>
+  <div class="spec">
+    <div class="spec-card"><div class="tile-bd" style="width:100%"><div class="lp" data-frag="anat-card" style="--pw:330px"></div></div>
+      <ul><li><b>Знак 40:</b> аватар 36 с рамкой профиля, клик — профиль.</li><li><b>Строка 1:</b> ник с цветом, шрифтом, эффектом, значком; «вы» 11 серым.</li><li><b>Строка 2:</b> «9 из 10 на колесе» (тает на выбывании) + шеврон 10.</li><li><b>Значение 48:</b> доля %, под ней ×1,5 / ×0,5 с подсказкой.</li><li><b>Действие 32:</b> «глаз» создателя.</li><li><b>Полоса 2px</b> от x=56 до правого края значения.</li></ul></div>
+    <div class="spec-card"><div class="tile-bd b2" style="width:100%"><div class="lp" data-frag="anat-row" style="--pw:330px"></div></div>
+      <ul><li><b>Постер 24×36</b> по центру колонки 40 — ровно под аватаром.</li><li><b>Название 14/20</b>, под ним год · длительность или «выбыл» / «уже смотрели» 12/16.</li><li><b>Вес − 1 +</b> у создателя вклинивается перед процентом при наведении (на сенсорных всегда).</li><li><b>Шанс 13</b> под долей человека, <b>сердце</b> под «глазом».</li><li>Удалить — крестик на углу постера при наведении.</li></ul></div>
+    <div class="spec-card"><div class="tile-bd" style="width:100%"><div class="lp" data-frag="anat-other" style="--pw:330px"></div></div>
+      <ul><li><b>Оценка:</b> постер на месте аватара, средняя в колонке значений, «?» в колонке действия, шкала 1–10 одной капсулой.</li><li><b>Музыка:</b> обложка на месте аватара, трек и канал двумя строками, кнопки справа.</li></ul></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>Состояния</h2><p>Всё ниже — та же разметка, что в комнате. Карточки нажимаются (раскрыть / свернуть).</p></div>
+  <div class="tiles">
+    <figure class="tile"><div class="tile-bd"><div class="lp" data-frag="expanded" style="--pw:330px"></div></div>
+      <figcaption><b>Развёрнутая группа, создатель навёл на строку</b>Вес − 1 + и крестик появляются только под курсором. Выбывшие и просмотренные — внизу группы, приглушены.</figcaption></figure>
+    <figure class="tile"><div class="tile-bd b2"><div data-panel='{"h":852,"open":[],"rate":"rated"}'></div></div>
+      <figcaption><b>Все группы свёрнуты</b>Как у владельца сейчас: 10 человек помещаются почти целиком. Полосы-лестница показывают раздел колеса без чтения цифр. «Не участвует» — без полосы, «глаз» виден всегда.</figcaption></figure>
+    <figure class="tile"><div class="tile-bd"><div class="lp" data-frag="rates" style="--pw:330px"></div></div>
+      <figcaption><b>Оценка: до, своя минута, после, свой фильм, запрет</b>Свёрнутая оценка — обычная карточка 56. У создателя под оценками «Снять оценки».</figcaption></figure>
+    <figure class="tile"><div class="tile-bd b2"><div data-panel='{"h":700,"tab":"history","rate":"rated"}'></div></div>
+      <figcaption><b>Выпадало</b>Те же строки, крупнее (48): кто добавил и когда, средняя в колонке значений или метка «Оценить».</figcaption></figure>
+    <figure class="tile"><div class="tile-bd"><div class="lp" data-frag="music" style="--pw:330px"></div></div>
+      <figcaption><b>Музыка: пусто, играет, браузер ждёт клика</b>Карточка той же формы, всегда последняя в панели.</figcaption></figure>
+    <figure class="tile"><div class="tile-bd b2"><div class="lp fx-lite" data-frag="lite" style="--pw:330px"></div></div>
+      <figcaption><b>Лёгкий режим</b>Эффекты ников и рамок стоят кадром, «Радуга» — кольцо своих цветов. Иерархия держится на размере, весе и сетке, а не на движении: панель выглядит так же собранно.</figcaption></figure>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>1024 × 768 — панель на 4 колонки</h2><p>Ширина 309 вместо 330: сетка карточки та же, сжимается только колонка текста.</p></div>
+  <div class="scaler" data-w="1024" data-h="768" style="max-width:1024px"><div class="frame room d1024" id="r1024"></div></div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>Телефон 390 — шторка</h2><p>Свёрнута: заголовок и музыка. Раскрыта: то же содержимое, что на компьютере; шапка комнаты — в верхней строке экрана.</p></div>
+  <div class="duo">
+    <figure><div class="scaler" data-w="390" data-h="844"><div class="frame" id="ph1" style="width:390px;height:844px"></div></div><figcaption><b>Свёрнута</b></figcaption></figure>
+    <figure><div class="scaler" data-w="390" data-h="844"><div class="frame" id="ph2" style="width:390px;height:844px"></div></div><figcaption><b>Раскрыта</b></figcaption></figure>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>Точечное обновление</h2><p>Каждая карточка и строка создаются один раз и потом только правятся. Голос меняет 2 текстовых узла и 1 переменную, а не весь список.</p></div>
+  <pre><i>&lt;!-- карточка: создаётся один раз на человека, ключ data-pid --&gt;</i>
+&lt;article class="pc" data-pid="nis"&gt;
+  &lt;button class="ph"&gt; ава · ник · &lt;span class="cnt"&gt;8 из 10&lt;/span&gt; · &lt;b class="pct"&gt;13%&lt;/b&gt; · &lt;i class="mod"&gt;&lt;/i&gt; · глаз
+    &lt;span class="trk"&gt;&lt;i style="--a:.297;--w:.13"&gt;&lt;/i&gt;&lt;/span&gt;&lt;/button&gt;
+  &lt;div class="pb"&gt;&lt;div&gt;
+    &lt;div class="fr" data-id="f42"&gt; постер · название · мета · вес · &lt;b class="pct"&gt;3,9%&lt;/b&gt; · &lt;button class="hv-b on"&gt;♥&lt;b&gt;3&lt;/b&gt;&lt;/button&gt;&lt;/div&gt;
+  &lt;/div&gt;&lt;/div&gt;
+&lt;/article&gt;
+
+<i>// обновление комнаты: Map pid → узлы карточки, Map id → узлы строки</i>
+set(ref.pct, text)            <i>// textContent, только если строка изменилась</i>
+ref.seg.style.setProperty('--a', a); ref.seg.style.setProperty('--w', w)   <i>// полоса доли — две переменные</i>
+row.classList.toggle('hot' | 'out' | 'elim', …); heart.classList.toggle('on', mine)
+<i>// фильм добавлен / удалён — создать или убрать одну строку; порядок — insertBefore, только если ключ порядка сменился</i>
+<i>// подсветка «под стрелкой» на прокруте — снять .hot с одной строки и поставить на другую (+ .hot карточки), без перерисовки</i></pre>
+</section>
+
+</div>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="2.6"/><path d="M12 2.5v6.9M12 14.6v6.9M2.5 12h6.9M14.6 12h6.9M5.3 5.3l4.9 4.9M13.8 13.8l4.9 4.9M18.7 5.3l-4.9 4.9M10.2 13.8l-4.9 4.9"/></symbol>
+</svg>
+
+<script>
+// Данные как в комнате владельца: 10 человек, 77 фильмов, выбывание идёт (48 на колесе из 58)
+const KP = n => `https://kinopoiskapiunofficial.tech/images/posters/kp_small/${n}.jpg`;
+const PEOPLE = [
+  { id: 'mc', name: 'mcqueen', me: 1, share: 14, img: KP(372), frame: 'neon', color: 'grad:linear-gradient(90deg,#8C9BFF,#C084FC)', n1: '#8C9BFF', fx: 'glow' },
+  { id: 'glenn', name: 'GLENN', share: 7.4, mod: .5, img: KP(366), font: 'russo' },
+  { id: 'nis', name: 'nisshokuryu', share: 13, img: KP(361), frame: 'rainbow', color: '#FF8FC8', font: 'pixel', ico: '👑' },
+  { id: 'toha', name: 'тоха', share: 21, mod: 1.5, img: KP(357), frame: 'toxic', color: '#3DDC97', fx: 'glow', ico: '🍸' },
+  { id: 'sc', name: 'soundcloud here', off: 1, frame: 'holo', color: '#FF6B6B', font: 'pixel', fx: 'glitch' },
+  { id: 'gnom', name: 'GNOM <сыра гор>', share: 9.6, img: KP(368), frame: 'fire', color: 'grad:linear-gradient(90deg,#FF7A18,#FFD54A)', n1: '#FF7A18', n2: '#FFD54A', font: 'unbounded', fx: 'shimmer' },
+  { id: 'tip', name: 'tipoya', share: 7, color: '#C4B5FD', fx: 'wave', ico: '💀' },
+  { id: 'ser', name: 'Serhio', share: 17, img: KP(352), frame: 'gold' },
+  { id: 'mar', name: 'Marcellus', share: 5.5, color: 'grad:linear-gradient(90deg,#E2E2E2,#8A8A8A)' },
+  { id: 'ilya', name: 'ilya', share: 5.5, img: KP(344), frame: 'ice', color: '#A5B4FC', font: 'pacifico', badge: 1 },
+];
+// [название, год, мин, статус: '' на колесе | 'x' выбыл | 'w' уже смотрели]
+const FILMS = {
+  mc: [['Престиж',2006,130],['Могила светлячков',1988,89],['Легенда',2015,132],['Оппенгеймер',2023,180],['Мартовские иды',2011,101],['Бронсон',2008,92],['Пианист',2002,150],['Морпехи',2005,125,'x'],['Драйв',2011,100,'x'],['Сияние',1980,146,'x'],['Начало',2010,148,'w'],['Отступники',2006,151,'w']],
+  glenn: [['Чужой',1979,117],['Евротур',2004,92],['Оленья кожа',2019,77],['72 метра',2004,136],['Пленницы',2013,153],['Большой Лебовски',1998,117],['Смерть Сталина',2017,107],['Зодиак',2007,157],['Олдбой',2003,120],['Семь',1995,127],['Бойцовский клуб',1999,139,'w']],
+  nis: [['Психо',1960,109],['Побег из Шоушенка',1994,142],['Разрушение',2015,101],['Дрянные девчонки',2004,97],['Здравствуй, мир',2019,97],['Паразиты',2019,131],['Одержимость',2013,107],['Ла-Ла Ленд',2016,128],['Убийство в Восточном экспрессе',2017,114,'x'],['Остров проклятых',2010,138,'w']],
+  toha: [['Карты, деньги, два ствола',1998,107],['Джентльмены',2019,113],['Рок-н-рольщик',2008,114],['Ван-Пис: Красный',2022,115],['Криминальное чтиво',1994,154],['Бешеные псы',1992,99],['Город грехов',2005,124],['Джанго освобождённый',2012,165],['Однажды в… Голливуде',2019,161],['Большой куш',2000,104,'w']],
+  sc: [['Твин Пикс: Сквозь огонь',1992,135],['Малхолланд Драйв',2001,147],['Солярис',1972,167],['Сталкер',1979,163],['Акира',1988,124],['Призрак в доспехах',1995,83],['Ходячий замок',2004,119],['Унесённые призраками',2001,125]],
+  gnom: [['Брат',1997,96],['Брат 2',2000,127],['Жмурки',2005,111],['Груз 200',2007,89],['Бумер',2003,117],['Дурак',2014,116],['Левиафан',2014,140,'x']],
+  tip: [['Для тебя я стану кошкой',2020,104],['Твоё имя',2016,106],['Дюна',2021,155,'x'],['Матрица',1999,136,'x'],['Джокер',2019,122,'w'],['Интерстеллар',2014,169,'w']],
+  ser: [['Старикам тут не место',2007,122],['Фарго',1996,98],['Нефть',2007,158],['Таксист',1976,114],['Славные парни',1990,146,'w']],
+  mar: [['Бегущий по лезвию 2049',2017,163],['Прибытие',2016,116,'x'],['Исчезнувшая',2014,149,'w'],['Убийца',2023,118,'x']],
+  ilya: [['Магнолия',1999,188],['Мастер',2012,138,'x'],['Призрачная нить',2017,130,'w'],['Охотник на оленей',1978,183,'w']],
+};
+const HOT = 'Психо', MINE = new Set(['Психо', 'Криминальное чтиво']), HEAVY = { 'Пленницы': 2 }, VOTES = [0, 1, 0, 0, 2, 0, 1, 0, 0, 1, 0, 3];
+let k = 0;
+for (const p of PEOPLE) FILMS[p.id] = FILMS[p.id].map(([t, y, m, st = ''], i) => {
+  const f = { t, y, m, st, poster: KP(300 + k++), w: HEAVY[t] || 1, v: st ? 0 : VOTES[(k * 5 + i) % VOTES.length] };
+  if (t === HOT) f.v = 3; if (MINE.has(t)) f.v = Math.max(f.v, 1);
+  return f;
+});
+// доля человека делится между его фильмами на колесе по весу и голосам (100 × вес + 4 за голос, до 4 голосов)
+let acc = 0;
+for (const p of PEOPLE) {
+  const on = FILMS[p.id].filter(f => !f.st && !p.off);
+  const sum = on.reduce((s, f) => s + 100 * f.w + 4 * Math.min(f.v, 4), 0);
+  on.forEach(f => { f.pct = p.share * (100 * f.w + 4 * Math.min(f.v, 4)) / sum; });
+  if (!p.off) { p.a = acc / 100; acc += p.share; }
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+const pctF = v => (v < 10 && Math.round(v * 10) % 10 ? v.toFixed(1).replace('.', ',') : Math.round(v)) + '%';
+const plural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
+const rt = m => (m >= 60 ? `${Math.floor(m / 60)} ч${m % 60 ? ` ${m % 60} мин` : ''}` : `${m} мин`);
+const I = {
+  heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/></svg>',
+  eye: '<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+  chev: '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
+  minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>', plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>',
+  list: '<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>',
+  pause: '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke-width="3"/></svg>',
+  next: '<svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg>',
+  queue: '<svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h8M19 15v6M16 18h6"/></svg>',
+  note: '<svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+  star: '<svg viewBox="0 0 24 24"><path d="m12 3 2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7z" fill="currentColor" stroke="none"/></svg>',
+};
+const logo = '<svg class="logo"><use href="#logo"/></svg>';
+
+function nick(p) {
+  const grad = p.color?.startsWith('grad:');
+  const cls = [grad ? 'c-grad' : p.color ? 'c-solid' : '', p.fx ? `fx-${p.fx}` : '', p.font ? `nf-${p.font}` : ''].join(' ');
+  const st = grad ? `--ng:${p.color.slice(5)};--n1:${p.n1};--n2:${p.n2 || p.n1};--ngl:${p.n1}` : p.color ? `--nc:${p.color};--n1:${p.color};--n2:${p.color};--ngl:${p.color}` : '';
+  const text = p.fx === 'wave' ? [...p.name].map((c, i) => `<span style="--i:${i}">${esc(c)}</span>`).join('') : esc(p.name);
+  return `<span class="nk"><span class="nick ${cls}" style="${st}">${text}</span>${p.ico ? `<span class="nick-ico">${p.ico}</span>` : ''}${p.badge ? `<i class="nick-badge">${I.star}</i>` : ''}</span>`;
+}
+function ava(p) {
+  const fr = p.frame ? ` frame-${p.frame}` : '';
+  const vars = p.color && !p.color.startsWith('grad:') ? `--ngl:${p.color};` : p.n1 ? `--ngl:${p.n1};` : '';
+  return p.img ? `<img class="av${fr}" style="${vars}" src="${p.img}" alt="">`
+    : `<span class="av${fr}" style="${vars}background:hsl(${[...p.name].reduce((h, c) => h + c.charCodeAt(0) * 7, 0) % 360} 40% 38%)">${esc(p.name[0].toUpperCase())}</span>`;
+}
+function row(f, p, o) {
+  const out = f.st || p.off;
+  const meta = f.st === 'x' ? 'выбыл' : f.st === 'w' ? 'уже смотрели' : `${f.y} · ${rt(f.m)}`;
+  const cls = `${f.st ? ' out' : ''}${f.st === 'x' ? ' elim' : ''}${f.t === HOT && !p.off ? ' hot' : ''}${o.hover === f.t ? ' hv' : ''}`;
+  return `<div class="fr${cls}" data-id="${esc(f.t)}">
+    <i class="fp" style="background-image:url(${f.poster})"></i>
+    <div class="ft"><b>${esc(f.t)}</b><span>${meta}</span></div>
+    ${o.owner && !f.st ? `<div class="stp"><button title="Меньше">${I.minus}</button><b>${f.w}</b><button title="Больше">${I.plus}</button></div>` : '<span></span>'}
+    <b class="pct">${out ? '—' : pctF(f.pct)}</b>
+    <button class="hv-b${MINE.has(f.t) ? ' on' : ''}${f.v ? ' has' : ''}" title="${MINE.has(f.t) ? 'Снять свой голос' : 'Хочу посмотреть: около +4% колеса этому фильму'}">${I.heart}<b>${f.v || ''}</b></button>
+    ${o.owner ? `<button class="del" title="Удалить">${I.x}</button>` : ''}
+  </div>`;
+}
+function card(p, o) {
+  const fl = FILMS[p.id], tot = fl.length, on = p.off ? 0 : fl.filter(f => !f.st).length;
+  const open = o.open?.includes(p.id), hot = !p.off && fl.some(f => f.t === HOT);
+  const meta = p.off ? `${tot} ${plural(tot, 'фильм', 'фильма', 'фильмов')} · не участвует`
+    : hot && !open ? `<b class="hotm">${HOT}</b>&nbsp;под стрелкой`
+    : on < tot ? `${on} из ${tot} на колесе` : `${tot} ${plural(tot, 'фильм', 'фильма', 'фильмов')}`;
+  const mod = p.mod ? `<i class="mod ${p.mod > 1 ? 'up' : 'down'}" title="${p.mod > 1 ? 'Бонус ×1,5 к шансам и +2 голоса: «Большой куш» получил среднюю 8,3' : 'Штраф ×0,5 к шансам, голосов всего 1: «Бойцовский клуб» получил среднюю 5,4'}. Действует, пока снова не выпадет фильм этого человека.">×${String(p.mod).replace('.', ',')}</i>` : '';
+  return `<article class="pc${open ? ' open' : ''}${hot ? ' hot' : ''}${p.off ? ' off' : ''}" data-pid="${p.id}">
+    <div class="ph${o.hoverHead === p.id ? ' hv' : ''}" role="button" tabindex="0" aria-expanded="${Boolean(open)}">
+      ${ava(p)}
+      <div class="pt"><span class="n">${nick(p)}${p.me ? '<span class="me">вы</span>' : ''}</span><span class="m"><span>${meta}</span>${I.chev}</span></div>
+      <div class="pv"><b class="pct">${p.off ? '—' : pctF(p.share)}</b>${mod}</div>
+      ${o.owner ? `<button class="act eye" title="${p.off ? 'Вернуть в колесо' : 'Отключить из колеса: сегодня его нет'}">${p.off ? I.eyeOff : I.eye}</button>` : '<span></span>'}
+      ${p.off ? '' : `<span class="trk"><i style="--a:${p.a.toFixed(3)};--w:${(p.share / 100).toFixed(3)}"></i></span>`}
+    </div>
+    <div class="pb"><div>${fl.map(f => row(f, p, o)).join('')}</div></div>
+  </article>`;
+}
+const RATED = [['GLENN', 8], ['Serhio', 9], ['nisshokuryu', 8], ['GNOM', 8]];
+function rateCard(s, o = {}) {
+  const f = FILMS.toha.find(x => x.t === 'Большой куш');
+  const head = (l1, l2, val, act) => `<div class="ph"><i class="fp" style="background-image:url(${f.poster})"></i><div class="pt"><span class="n">${l1}</span><span class="m"><span>${l2}</span></span></div><div class="pv"><b class="pct">${val}</b></div>${act}</div>`;
+  const hint = '<button class="act" title="Средняя оценка даст фильмам тохи бонус или штраф до следующего выпадения его фильма: ниже 6 — ×0,5 и 1 голос вместо 3; 8–9,9 — ×1,5 и +2 голоса; 10 — ×2 и +4 голоса."><span class="hint" style="display:grid;place-items:center">?</span></button>';
+  if (s === 'open' || s === 'mine') {
+    const sel = s === 'mine' ? 8 : 0;
+    return `<section class="pc rate open">${head('<span><em>Оцените</em> фильм</span>', s === 'mine' ? 'ваша 8 · поменять ещё 0:42' : 'Большой куш · тоха', '8,3', hint)}
+      <div class="rb"><div class="scale">${Array.from({ length: 10 }, (_, i) => `<button class="${i + 1 === sel ? 'on' : ''}">${i + 1}</button>`).join('')}</div>
+      <div class="rated">${RATED.map(([n, v]) => `<span>${n} <b>${v}</b></span>`).join('')}${o.owner !== false ? '<button class="clr">Снять оценки</button>' : ''}</div></div></section>`;
+  }
+  const l2 = { rated: 'ваша 8 · 5 оценок', own: 'ваш фильм · 4 оценки', banned: 'оценки для вас закрыты' }[s];
+  return `<section class="pc rate">${head('Большой куш', l2, '8,3', `<button class="act" title="Подробнее">${I.chev}</button>`)}</section>`;
+}
+function music(s) {
+  if (s === 'empty') return `<section class="pc np"><div class="ph"><span class="cov e">${I.note}</span><div class="pt"><span class="n">Музыка</span><span class="m"><span>Поиск трека или наши треки</span></span></div><span></span></div></section>`;
+  const ctl = s === 'unmute' ? '<button class="listen">Слушать</button>'
+    : `<div class="ctl"><button class="act" title="Пауза">${I.pause}</button><button class="act" title="Следующий трек у всех">${I.next}</button><button class="act" title="Очередь и добавить трек">${I.queue}<i>3</i></button></div>`;
+  return `<section class="pc np"><div class="ph"><span class="cov"></span><div class="pt"><span class="n">andy warhol</span><span class="m"><span>Kai Angel · ставит тоха</span></span></div>${ctl}</div></section>`;
+}
+const HIST = [['Большой куш', 'тоха · только что', 8.3], ['Остров проклятых', 'nisshokuryu · вчера', 7.6], ['Начало', 'mcqueen · вчера', 8.4], ['Бойцовский клуб', 'GLENN · 3 дня назад', 5.4], ['Славные парни', 'Serhio · 5 дней назад', 7.9], ['Джокер', 'tipoya · неделю назад', null, 1], ['Исчезнувшая', 'Marcellus · неделю назад', 7.1], ['Отступники', 'mcqueen · 2 недели назад', 8.8], ['Интерстеллар', 'tipoya · 2 недели назад', 9.1], ['Призрачная нить', 'ilya · 3 недели назад', 6.2], ['Охотник на оленей', 'ilya · месяц назад', 7.3]];
+const posterOf = t => Object.values(FILMS).flat().find(f => f.t === t).poster;
+function history() {
+  return `<div class="hist">${HIST.map(([t, by, a, rate]) => `<div class="fr"><i class="fp" style="background-image:url(${posterOf(t)})"></i><div class="ft"><b>${t}</b><span>${by}</span></div>${rate ? '<button class="rm">Оценить</button>' : `<b class="sc">${a.toFixed(1).replace('.', ',')}</b><span></span>`}</div>`).join('')}</div>`;
+}
+function panel(o) {
+  o = { owner: true, open: ['nis'], rate: 'open', tab: 'films', music: 'play', ...o };
+  const head = o.sheet ? `<button class="peek"><b>Фильмы</b><span>48 на колесе из 77</span><svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></button>`
+    : `<header class="lh">${logo}<button class="room-t" title="Настройки комнаты"><span>Лудка колесо</span>${I.chev}</button></header>`;
+  if (o.sheet === 'peek') return `<aside class="lp sheet">${head}${music(o.music)}</aside>`;
+  const films = `<div class="tools"><div class="search">${I.search}Фильм или ссылка на YouTube</div><button class="ib" title="Добавить списком">${I.list}</button></div>
+    <div class="votes" title="Сердечко у фильма — ваш голос: около +4% колеса этому фильму, на фильм не больше одного своего."><b>Ваши голоса</b><span class="dots"><i class="on"></i><i></i><i></i></span><span class="r">осталось 1 из 3</span></div>
+    <div class="people">${PEOPLE.map(p => card(p, o)).join('')}</div>`;
+  return `<aside class="lp${o.sheet ? ' sheet up' : ''}${o.lite ? ' fx-lite' : ''}" style="${o.w ? `--pw:${o.w}px;` : ''}${o.h ? `--ph:${o.h}px;` : ''}">${head}${rateCard(o.rate)}
+    <div class="seg"><button class="${o.tab === 'films' ? 'on' : ''}">Фильмы<i>77</i></button><button class="${o.tab === 'history' ? 'on' : ''}">Выпадало<i>30</i></button></div>
+    ${o.tab === 'films' ? films : history()}${music(o.music)}</aside>`;
+}
+function stage(o = {}) {
+  const avs = PEOPLE.filter(p => p.img).slice(0, 3).map(p => `<i class="st-av" style="background-image:url(${p.img})"></i>`).join('');
+  const d = o.wheel || 600;
+  return `<section class="stage">
+    <div class="st-bar t"><div class="cap"><span>Обычный</span><span class="on">Выбывание</span></div><div class="cap"><span>До победителя</span><i class="tg"></i></div><div class="sp"></div><div style="display:flex;padding-left:8px">${avs}</div><div class="cap"><span class="ic">✦</span><span class="ic">⌁</span><span class="ic">⚙</span></div></div>
+    <div class="st-now" style="${o.nowTop ? `top:${o.nowTop}px;transform:none` : ''}"><h3>Психо</h3><p>1960, 1 ч 49 мин, ужасы, триллер<br>Добавил(а) <b>nisshokuryu</b></p><div class="left">Осталось 48 из 58<i></i></div></div>
+    <div class="wheel" style="width:${d}px;height:${d}px;left:${o.wl}px;top:${o.wt}px"><div class="hub"><b>Крутить</b><small>48 на колесе</small></div></div>
+    <div class="st-bar b">${o.short ? '' : '<span style="font-size:13px;color:var(--tx3)">Колесо выбивает по фильму, последний побеждает</span>'}<div class="sp"></div><div class="cap" style="padding:0 12px;gap:12px">👏 🔥 😂 😍 💀 🎉</div><div class="cap" style="width:180px;padding-left:16px;font-weight:400;color:var(--tx3)">Написать всем…</div></div>
+  </section>`;
+}
+const bg = `<i class="bgp" style="background-image:url(${posterOf('Психо')})"></i><i class="bgv"></i>`;
+
+// комнаты
+document.getElementById('hero').innerHTML = bg + panel({}) + stage({ wheel: 560, wl: 416, wt: 146 });
+document.getElementById('r1024').innerHTML = bg + panel({ rate: 'rated', open: ['nis'] }) + stage({ wheel: 380, wl: 131, wt: 268, nowTop: 88, short: 1 });
+document.getElementById('ph1').innerHTML = bg + `<div class="mtop">${logo}<b>Лудка колесо</b></div><div class="wheel" style="width:330px;height:330px;left:30px;top:220px"><div class="hub"><b style="font-size:18px">Крутить</b><small>48 на колесе</small></div></div><div class="st-now" style="left:24px;top:88px;transform:none"><h3 style="font-size:36px;line-height:40px">Психо</h3><p style="font-size:13px;margin-top:4px">1960, 1 ч 49 мин · nisshokuryu</p></div>` + panel({ sheet: 'peek' });
+document.getElementById('ph2').innerHTML = bg + `<div class="mtop">${logo}<b>Лудка колесо</b></div>` + panel({ sheet: 'open', rate: 'rated', open: ['nis'], owner: true });
+// панели-состояния
+document.querySelectorAll('[data-panel]').forEach(el => { el.outerHTML = panel({ w: 330, ...JSON.parse(el.dataset.panel) }); });
+const P = id => PEOPLE.find(p => p.id === id), OW = { owner: true };
+const FR = {
+  'anat-card': () => card(P('toha'), { ...OW, hoverHead: 'toha' }),
+  'anat-row': () => `<div class="pc open"><div class="pb"><div style="padding:4px 0">${[FILMS.nis[0], FILMS.nis[1], FILMS.nis[8]].map(f => row(f, P('nis'), { ...OW, hover: 'Побег из Шоушенка' })).join('')}</div></div></div>`,
+  'anat-other': () => rateCard('rated') + music('play'),
+  expanded: () => card(P('nis'), { ...OW, open: ['nis'], hover: 'Побег из Шоушенка' }) + card(P('mc'), { ...OW, open: ['mc'] }),
+  rates: () => rateCard('open') + rateCard('mine') + rateCard('rated') + rateCard('own') + rateCard('banned'),
+  music: () => music('empty') + music('play') + music('unmute'),
+  lite: () => ['nis', 'sc', 'gnom', 'tip', 'ilya'].map(id => card(P(id), OW)).join(''),
+};
+document.querySelectorAll('[data-frag]').forEach(el => { el.innerHTML = FR[el.dataset.frag](); });
+
+// карточки раскрываются по клику (в живом списке — только класс, строки не пересоздаются)
+document.addEventListener('click', e => {
+  const h = e.target.closest('.pc:not(.rate):not(.np) > .ph');
+  if (!h || e.target.closest('button')) return;
+  const c = h.parentElement; c.classList.toggle('open'); h.setAttribute('aria-expanded', c.classList.contains('open'));
+});
+// рамки комнат масштабируются под ширину страницы
+function fit() {
+  document.querySelectorAll('.scaler').forEach(s => {
+    const w = +s.dataset.w, h = +s.dataset.h, k = Math.min(1, s.parentElement.clientWidth / w);
+    s.style.width = `${w * k}px`; s.style.height = `${h * k}px`; s.firstElementChild.style.transform = `scale(${k})`;
+  });
+}
+addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>

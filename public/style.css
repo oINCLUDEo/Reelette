@@ -264,12 +264,16 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 
 /* панель фильмов: сверху комната, в середине список, внизу музыка */
 .films-panel { grid-column: 1 / 4; grid-row: 1 / -1; display: flex; flex-direction: column; gap: 8px; min-height: 0; padding: 8px; border-radius: 28px; transition: opacity .8s var(--ease), filter .8s var(--ease), translate .8s var(--ease); }
-.side-head { flex: none; display: flex; align-items: center; gap: 2px; height: 48px; padding-left: 10px; }
+/* шапка панели — строка: знак на колонке ведущего, название комнаты с x 60, стрелка в колонке действия */
+.side-head { flex: none; display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; height: 48px; padding: 0 0 0 8px; }
+.side-head .brand { width: 32px; height: 32px; display: grid; place-items: center; }
 .side-head .brand svg, .m-top .brand svg { width: 26px; height: 26px; }
 /* название комнаты открывает настройки: заголовок со стрелкой, без рамки */
 .room-title { flex: 1; min-width: 0; position: relative; display: block; height: 40px; padding: 0 32px 0 10px; border-radius: 20px; font: 800 20px/40px var(--f-head); letter-spacing: -.03em; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: background .2s; }
 .room-title::after { content: ""; position: absolute; right: 12px; top: 50%; width: 12px; height: 12px; margin-top: -6px; background: var(--tx3); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center/contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center/contain no-repeat; }
 .room-title:hover { background: var(--fill); }
+.side-head .room-title { padding: 0 48px 0 12px; font-size: 22px; letter-spacing: -.01em; }
+.side-head .room-title::after { right: 22px; }
 .peek-head, .m-top, .sheet-scrim { display: none; }
 
 /* сцена — подсетка на колонках 4–12: её линии совпадают с общей сеткой */
@@ -385,31 +389,38 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .ghost.recap-chip { height: 44px; padding: 0 18px; border-radius: 22px; font-size: 14px; font-weight: 700; }
 
 /* ---------- общая музыка: «сейчас играет» внизу панели фильмов, очередь — во всплывающей панели рядом ---------- */
-.np { flex: none; display: flex; align-items: center; gap: 4px; min-height: 64px; padding: 8px; border-radius: 20px; background: var(--fill); }
-.np-empty { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; border-radius: 14px; }
-.np .art { width: 48px; height: 48px; flex: none; display: grid; place-items: center; border-radius: 12px; background: rgba(255,255,255,.08); color: var(--tx2); transition: background .2s, color .2s; }
+/* та же строка, что в списке: обложка 32 на колонке ведущего, название и автор, «следующий» и пауза в колонках числа и действия */
+.np { flex: none; display: grid; grid-template-columns: 32px minmax(0, 1fr) 40px 40px; align-items: center; min-height: 48px; padding: 0 8px; border-radius: 20px; background: var(--fill); }
+.np-empty { grid-column: 1 / 4; grid-row: 1; display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; min-height: 48px; text-align: left; }
+.np .art { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.08); color: var(--tx2); transition: background .2s, color .2s; }
+.np .art svg { width: 16px; height: 16px; }
 .np-empty:hover .art { background: rgba(255,255,255,.14); color: var(--tx); }
-.np .nt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.np .nt b { font-size: 14px; font-weight: 600; line-height: 20px; }
-.np .nt small { font-size: 12px; line-height: 16px; color: var(--tx2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.np-replay { width: 40px; height: 40px; border-radius: 20px; flex: none; }
-.np-replay svg { width: 17px; height: 17px; }
-.yt-card { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; }
-.yt-thumb { width: 48px; height: 48px; flex: none; border-radius: 12px; background: var(--s2) center/cover no-repeat; transition: transform .2s; }
-.yt-thumb:hover { transform: scale(1.04); }
-.yt-info { flex: 1; min-width: 0; }
-.yt-info b { display: block; font-size: 14px; font-weight: 600; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.yt-info span { display: block; font-size: 12px; line-height: 16px; color: var(--tx2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.yt-ctrl { display: flex; gap: 2px; flex: none; }
-.yt-ctrl .nav-icon { width: 36px; height: 36px; border-radius: 18px; color: var(--tx); }
-.yt-ctrl .nav-icon:hover { background: var(--fill); }
-.q-btn { position: relative; }
-.q-btn i { position: absolute; top: 1px; right: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--acc); color: var(--on-acc); font: 800 10px/16px var(--f-ui); font-style: normal; }
+.np .nt { min-width: 0; display: flex; flex-direction: column; padding: 0 8px 0 12px; }
+.np .nt b { font: 700 15px/20px var(--f-ui); }
+.np .nt small { font: 400 13px/16px var(--f-ui); color: var(--tx2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-replay { grid-column: 4; grid-row: 1; justify-self: center; width: 32px; height: 32px; border-radius: 16px; }
+.np-replay svg { width: 16px; height: 16px; }
+.yt-card { grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: 32px minmax(0, 1fr) 40px 40px; align-items: center; min-height: 48px; }
+.yt-thumb { width: 32px; height: 32px; border-radius: 8px; background: var(--s2) center/cover no-repeat; transition: transform .2s; }
+.yt-thumb:hover { transform: scale(1.06); }
+.yt-info { min-width: 0; display: flex; flex-direction: column; padding: 0 8px 0 12px; text-align: left; }
+.yt-info b { font: 700 15px/20px var(--f-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yt-info > span { display: flex; min-width: 0; font: 400 13px/16px var(--f-ui); color: var(--tx2); white-space: nowrap; }
+#ytBy { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#ytQCount { flex: none; }
+.yt-info:hover b { text-decoration: underline; text-decoration-color: var(--tx3); text-underline-offset: 3px; }
+#ytQCount::before { content: "·"; margin: 0 4px; }
+.yt-ctrl { display: contents; }
+.yt-ctrl .nav-icon { justify-self: center; width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; color: var(--tx); }
+#ytNext { grid-column: 3; }
+#ytToggle { grid-column: 4; }
+.yt-ctrl .nav-icon:hover { background: rgba(255,255,255,.14); }
+.yt-ctrl svg { width: 18px; height: 18px; }
 .yt-unmute { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.6); color: #fff; font-weight: 800; font-size: 14px; }
 .yt-unmute:hover { background: rgba(0,0,0,.45); }
-/* «Слушать» — когда браузер ждёт клика, чтобы включить звук */
-.np .nav-unmute { position: static; inset: auto; height: 36px; padding: 0 16px; border-radius: 18px; background: var(--acc); color: var(--on-acc); font: 700 13px var(--f-ui); flex: none; display: inline-grid; place-items: center; }
-.np .nav-unmute[hidden] { display: none; }
+/* «Слушать» — когда браузер ждёт клика, чтобы включить звук: встаёт на место «следующего» и паузы */
+.np .nav-unmute { grid-column: 3 / 5; grid-row: 1; justify-self: end; position: static; inset: auto; height: 32px; padding: 0 16px; border-radius: 16px; background: var(--acc); color: var(--on-acc); font: 700 13px/32px var(--f-ui); display: inline-grid; place-items: center; }
+.np .nav-unmute:not([hidden]) ~ .yt-ctrl { display: none; }
 .np .nav-unmute:hover { background: var(--acc-hi); }
 
 /* панель музыки: место задаёт placeYtPanel в app.js — над строкой «сейчас играет» */
@@ -492,21 +503,28 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .recent-list .forget:hover { color: var(--tx); background: var(--s3); }
 .recent-list .forget svg { width: 14px; height: 14px; }
 
-/* ---------- панель фильмов: вкладки, поиск, голоса, список ---------- */
+/* ---------- панель фильмов ----------
+   Одна анатомия строки на всё: [ведущий 32] [текст: строка 1 / строка 2] [число 40] [действие 40], поля строки 8.
+   Колонки стоят на одних вертикалях по всей панели: ведущий с x 16, текст с x 60, числа у одной правой линии.
+   Карточки (оценка, музыка) своих полей не имеют — поля дают сами строки, поэтому колонки не сдвигаются.
+   Высоты: служебная 32 · управление 40 · человек и музыка 48 · фильм 56. Интервал 8. Скругления 28 → 20 → 16.
+   Текст: строка Carlito Bold 15/20, подпись Carlito 13/16 (числа Bold). Один акцент — ваш голос, ваши голоса,
+   фильм под стрелкой, выбранная оценка, бонус; красным только штраф */
 .films-panel > .rate-box, .panel-head { flex: none; }
-.lp-tabs { width: 100%; height: 44px; padding: 4px; border-radius: 22px; background: var(--fill); }
-.lp-tabs button { height: 36px; border-radius: 18px; font-size: 14px; }
-.lp-tabs .tabs-ind { border-radius: 18px; }
-.lp-tabs button .m { margin-left: 4px; color: inherit; opacity: .5; }
+.lp-tabs { width: 100%; height: 40px; padding: 4px; border-radius: 20px; background: var(--fill); }
+.lp-tabs button { height: 32px; border-radius: 16px; font: 700 14px/32px var(--f-ui); }
+.lp-tabs .tabs-ind { border-radius: 16px; }
+.lp-tabs button .m { margin-left: 4px; font-weight: 400; color: inherit; opacity: .7; }
 .lp-pane { display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
 .lp-pane[hidden] { display: none; }
-.quick-add { display: flex; gap: 8px; flex: none; }
-.quick-add .search-box { flex: 1; min-width: 0; }
-.quick-add .search-box svg { left: 14px; }
-.quick-add .search-box input { height: 40px; padding-left: 40px; border-radius: 20px; background: var(--fill); border-color: transparent; }
-.quick-add .search-box input:focus { border-color: var(--acc); }
-#addBtn { width: 40px; height: 40px; border-radius: 20px; background: var(--fill); }
-#addBtn:hover { background: rgba(255,255,255,.14); }
+/* поле: значок на колонке ведущего, текст с x 60, «Добавить списком» в колонке действия */
+.quick-add { flex: none; }
+.quick-add > svg { left: 16px; width: 16px; height: 16px; color: var(--tx2); }
+.quick-add input { height: 40px; padding: 0 48px 0 52px; border-radius: 20px; background: var(--fill); border-color: transparent; }
+.quick-add input:focus { border-color: var(--acc); }
+#room .quick-add #addBtn.icon-btn { position: absolute; right: 12px; top: 4px; width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; color: var(--tx2); }
+#addBtn svg { position: static; transform: none; width: 16px; height: 16px; color: inherit; }
+#addBtn:hover { background: rgba(255,255,255,.14); color: var(--tx); }
 .quick-results { position: fixed; z-index: var(--z-results); overflow-y: auto; padding: 6px; border-radius: 20px; background: var(--sheetB); border: 1px solid var(--bd); box-shadow: 0 24px 60px rgba(0,0,0,.55); display: flex; flex-direction: column; gap: 2px; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
 .quick-results[hidden] { display: none; }
 .quick-results .res:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
@@ -520,140 +538,158 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .res:hover .plus { background: var(--sq); color: var(--sq-tx); }
 .res.added .plus { background: var(--ok); color: #fff; }
 
-/* голоса — одной строкой, объяснение в подсказке */
-.my-votes { flex: none; display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 12px; border-radius: 16px; font-size: 13px; font-weight: 600; color: var(--tx2); cursor: help; outline-offset: 0; }
+/* служебная строка: подпись слева, значение в колонке чисел, «?» в колонке действия */
+.films-panel .sh { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) 40px 40px; align-items: center; height: 32px; padding: 0 8px; border-radius: 16px; font: 700 13px/16px var(--f-ui); color: var(--tx2); white-space: nowrap; }
+.sh .lb { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sh .n { justify-self: end; color: var(--tx); font-variant-numeric: tabular-nums; }
+.sh .ac { justify-self: center; display: grid; place-items: center; }
+.sh :is(.q, .hint) { width: 16px; height: 16px; margin: 0; border-radius: 50%; background: none; box-shadow: inset 0 0 0 1.5px var(--tx3); display: grid; place-items: center; font: 700 11px/1 var(--f-ui); font-style: normal; color: var(--tx2); }
+.sh .hint:is(:hover, :focus-visible) { background: none; color: var(--tx); box-shadow: inset 0 0 0 1.5px var(--tx2); }
+/* голоса: точки (бонусные — контуром после базовых), «осталось/всего», объяснение в подсказке */
+.my-votes { cursor: help; outline-offset: 0; }
 .my-votes:hover { background: var(--fill); }
-.my-votes .dots { display: flex; gap: 5px; }
-.my-votes .dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.18); transition: background .3s, box-shadow .3s; }
-.my-votes .dots i.on { background: var(--acc); box-shadow: 0 0 8px var(--glow); }
-.my-votes .dots i.win.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
-.my-votes .m { margin-left: auto; font-weight: 500; }
+.my-votes .dots { display: inline-flex; gap: 4px; }
+.my-votes .dots i { width: 8px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.16); transition: background .3s, box-shadow .3s; }
+.my-votes .dots i.on { background: var(--acc); }
+.my-votes .dots i.bn { background: none; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--acc-hi) 55%, transparent); }
+.my-votes .dots i.bn.on { background: var(--acc-hi); box-shadow: none; }
+.my-votes .dots i:not(.bn) + i.bn { margin-left: 4px; }
+/* доли колеса по людям: кусок в цвете ника, ширина — доля; проценты — в шапках групп */
+.share-bar { flex: none; display: flex; gap: 2px; height: 4px; margin: -4px 8px 0; }
+.share-bar:empty { display: none; }
+.share-bar i { min-width: 2px; border-radius: 2px; background: var(--c); transition: flex-grow .4s var(--ease); }
 
-/* список: группы по тем, кто добавил */
-.film-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
-.film-group { margin-bottom: 4px; }
-.film-group.closed { margin-bottom: 0; }
-.group-head { position: sticky; top: 0; z-index: 2; width: 100%; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 20px; background: color-mix(in srgb, var(--sheetB) 82%, transparent); text-align: left; cursor: pointer; user-select: none; transition: background .2s; }
-.group-head:hover { background: color-mix(in srgb, var(--s2) 88%, transparent); }
-.g-chev { width: 12px; height: 12px; color: var(--tx3); flex: none; transition: transform .35s var(--ease); }
-.film-group.closed .g-chev { transform: rotate(-90deg); }
-.g-person { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; border-radius: 8px; }
-.g-person:hover b .nick { text-decoration: underline; text-decoration-color: var(--tx3); text-underline-offset: 3px; }
-.group-head img, .group-head .g-ava { width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center; font: 800 10.5px var(--f-ui); color: #fff; object-fit: cover; }
-.group-head b { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; }
-.group-head b .m { flex: none; font-weight: 500; }
-.group-head .g-count { flex: none; font: 600 13px var(--f-ui); color: var(--tx3); font-variant-numeric: tabular-nums; }
-.group-head .g-count.part { color: var(--tx2); }
-.group-head .g-count i { font-style: normal; color: var(--tx3); }
-.group-head em { flex: none; min-width: 40px; text-align: right; font: 700 13px var(--f-ui); font-style: normal; color: var(--acc-hi); font-variant-numeric: tabular-nums; }
-/* человек сегодня не участвует: группа приглушена у всех, у создателя в шапке переключатель-глаз */
-.g-off { flex: none; width: 28px; height: 28px; border-radius: 14px; display: grid; place-items: center; color: var(--tx3); transition: background .2s, color .2s; }
-.g-off svg { width: 16px; height: 16px; }
-.g-off:hover { background: var(--fill); color: var(--tx); }
-.g-off.on { color: var(--bad); }
-.g-offtag { flex: none; font: 600 12px var(--f-ui); color: var(--tx3); }
-.film-group.off .g-person, .film-group.off .group-head em { opacity: .45; }
+/* список: полоса прокрутки стоит в поле панели, строки на тех же колонках, что карточки выше (--sb меряет app.js) */
+.film-list, .history-list { flex: 1; min-height: 0; margin-right: -8px; overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+.film-list > *, .history-list > * { margin-right: max(0px, 8px - var(--sb, 0px)); }
+
+/* строка */
+.films-panel .r { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr) 40px 40px; grid-template-rows: 20px 16px; grid-template-areas: "ld l1 n1 ac" "ld l2 n2 ac"; align-content: center; align-items: center; width: 100%; min-height: 56px; padding: 0 8px; border-radius: 20px; text-align: left; }
+.films-panel .r > .ld { grid-area: ld; justify-self: start; }
+.films-panel .r > .l1 { grid-area: l1; min-width: 0; padding: 0 8px 0 12px; font: 700 15px/20px var(--f-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.films-panel .r > .l2 { grid-area: l2; min-width: 0; display: flex; align-items: center; gap: 8px; height: 16px; padding: 0 8px 0 12px; font: 400 13px/16px var(--f-ui); color: var(--tx2); white-space: nowrap; }
+.films-panel .r > .l2 > .i { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.films-panel .r > .n1 { grid-area: n1; justify-self: end; font: 700 13px/20px var(--f-ui); color: var(--tx2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.films-panel .r > .n2 { grid-area: n2; justify-self: end; display: flex; }
+.films-panel .r > .ac { grid-area: ac; justify-self: center; display: grid; place-items: center; color: var(--tx3); }
+.films-panel .r > .ac > svg { width: 16px; height: 16px; }
+.films-panel .hv { cursor: pointer; transition: background .2s, opacity .4s; }
+.films-panel .hv:hover { background: var(--fill); }
+.films-panel .po { position: relative; width: 32px; height: 48px; border-radius: 6px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 14px var(--f-head); font-style: normal; color: rgba(255,255,255,.75); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+/* инструменты создателя (вес, «не участвует») — на месте второй строки по наведению; на сенсорных всегда, справа */
+.films-panel .own { display: none; align-items: center; gap: 4px; flex: none; }
+@media (hover: hover) {
+  .films-panel .r.ow:is(:hover, :focus-within) .l2 > .i { display: none; }
+  .films-panel .r.ow:is(:hover, :focus-within) .l2 > .own { display: inline-flex; }
+}
+@media (hover: none) {
+  .films-panel .r.ow .l2 > .own { display: inline-flex; margin-left: auto; }
+  .g-off span { display: none; }
+}
+
+/* группа: шапка — строка человека 48, прилипает сверху; фон у неё появляется только в момент прилипания */
+.film-group { transition: margin-bottom .4s var(--ease); }
+.film-group:not(.closed) { margin-bottom: 8px; }
+.films-panel .gh { position: sticky; top: 0; z-index: 2; min-height: 48px; user-select: none; container-type: scroll-state; }
+.films-panel .gh.hv:hover { background: none; }
+.gh > .hb { position: absolute; inset: 0; z-index: -1; border-radius: 20px; pointer-events: none; }
+.gh:is(:hover, :focus-visible) > .hb { background-image: linear-gradient(var(--fill), var(--fill)); }
+@container scroll-state(stuck: top) { .gh > .hb { background-color: var(--sheetB); box-shadow: 0 8px 16px -8px rgba(0,0,0,.5); } }
+@supports not (container-type: scroll-state) { .film-group:not(.closed) > .gh > .hb { background-color: var(--sheetB); } }
+.gh > .ld { width: 32px; height: 32px; border-radius: 50%; }
+.gh .av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; object-fit: cover; font: 700 14px/1 var(--f-ui); color: #fff; }
+.gh .g-name:hover .nick { text-decoration: underline; text-decoration-color: var(--tx3); text-underline-offset: 3px; }
+.films-panel .gh > .n1 { color: var(--tx); }
+.films-panel .gh > .ac svg { width: 12px; height: 12px; stroke-width: 2.6; transition: transform .35s var(--ease); }
+.film-group.closed .gh > .ac svg { transform: rotate(-90deg); }
+.g-off { display: inline-flex; align-items: center; gap: 4px; font: 700 13px/16px var(--f-ui); color: var(--tx); }
+.g-off svg { width: 14px; height: 14px; }
+.g-off:hover { color: var(--acc-hi); }
+/* человек сегодня не участвует: шапка приглушена у всех, вместо доли перечёркнутый глаз */
+.film-group.off .gh > :is(.ld, .l1) { opacity: .45; }
+.films-panel .film-group.off .gh > .n1 { color: var(--tx3); }
+.g-offtag svg { display: block; width: 16px; height: 16px; }
 .g-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .4s var(--ease), opacity .3s; }
 .g-body > div { overflow: hidden; }
 .film-group.closed .g-body { grid-template-rows: 0fr; opacity: 0; }
-/* бонус или штраф человека у его процента */
-.mod-chip { flex: none; font: 800 11.5px/1 var(--f-ui); padding: 4px 6px; border-radius: 7px; cursor: help; }
-.mod-chip.up { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
-.mod-chip.down { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+/* бонус или штраф человека — под его долей */
+.mod-chip { flex: none; height: 16px; padding: 0 4px; border-radius: 4px; font: 700 11px/16px var(--f-ui); font-variant-numeric: tabular-nums; cursor: help; }
+.mod-chip.up { color: var(--acc-hi); background: color-mix(in srgb, var(--acc) 24%, transparent); }
+.mod-chip.down { color: #FF8A80; background: rgba(255,69,58,.16); }
 
-/* строка фильма: постер, название, шанс и сердечко; вес у создателя — по наведению */
-.film { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 56px; padding: 4px 4px 4px 12px; border-radius: 20px; cursor: pointer; transition: background .2s, opacity .4s; }
-.film:hover { background: var(--fill); }
-/* фильм под стрелкой — в его цвете (акцент комнаты) */
-.film.hot { background: color-mix(in srgb, var(--acc) 20%, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc-hi) 38%, transparent); }
-.film.out { opacity: .38; }
-.film.out .film-title { text-decoration: line-through; }
-.film.filtered { opacity: .38; }
-.film.filtered .film-meta { font-style: italic; }
-.film-poster { width: 32px; height: 48px; border-radius: 6px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 14px var(--f-head); color: rgba(255,255,255,.75); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
-.film-main { min-width: 0; }
-.film-title { font-size: 15px; font-weight: 600; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.film-meta { font-size: 13px; line-height: 16px; color: var(--tx3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.film-side { display: flex; align-items: center; gap: 4px; }
-.film-pct { min-width: 40px; text-align: right; font: 700 13px var(--f-ui); color: var(--tx2); font-variant-numeric: tabular-nums; }
-.film.hot .film-pct { color: var(--tx); }
-.film.out .film-pct, .film.filtered .film-pct { color: var(--tx3); }
-.film-actions { display: flex; align-items: center; gap: 2px; }
-.vote-btn { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 32px; height: 32px; padding: 0 6px; border-radius: 16px; color: var(--tx3); font-size: 12.5px; font-weight: 700; transition: background .2s, color .2s, transform .3s var(--spring); }
-.vote-btn:hover { color: var(--tx); background: var(--fill); }
-.vote-btn:active { transform: scale(.86); }
-.vote-btn b:empty { display: none; }
-.vote-btn.has { color: var(--tx2); }
-.vote-btn.on { color: var(--acc-hi); }
-.vote-btn.on .heart { fill: currentColor; filter: drop-shadow(0 0 6px var(--glow)); }
+/* фильм: постер, название, год и длительность, шанс, сердечко */
+.vt { display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 40px; height: 32px; border-radius: 16px; color: color-mix(in srgb, var(--tx) 24%, transparent); font: 700 12px/1 var(--f-ui); font-variant-numeric: tabular-nums; transition: color .2s, background .2s, transform .3s var(--spring); }
+.vt svg { width: 16px; height: 16px; }
+.vt span:empty { display: none; }
+.film:hover .vt, .vt.has { color: var(--tx2); }
+.vt.me { color: var(--acc-hi); }
+.vt.me .heart { fill: currentColor; }
+.vt:hover { background: rgba(255,255,255,.14); color: var(--tx); }
+.vt:active { transform: scale(.86); }
+@media (hover: none) { .vt { color: var(--tx2); } }
 .heart { width: 16px; height: 16px; stroke-width: 2; }
-.stepper { display: flex; align-items: center; gap: 1px; padding: 2px; border-radius: 14px; background: var(--fill); }
-.stepper button { width: 24px; height: 24px; border-radius: 12px; display: grid; place-items: center; color: var(--tx2); }
-.stepper button:hover { background: rgba(255,255,255,.12); color: var(--tx); }
-.stepper svg { width: 12px; height: 12px; }
-.stepper b { min-width: 18px; text-align: center; font-size: 12.5px; }
-@media (hover: hover) {
-  .film .stepper { display: none; }
-  .film:hover .stepper, .film:focus-within .stepper { display: flex; }
-}
-.film-del { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; display: none; place-items: center; color: #fff; background: rgba(0,0,0,.7); }
-.film:hover .film-del, .film:focus-within .film-del { display: grid; }
+/* под стрелкой — фон акцента (цвет фильма); выбывшие, выпавшие и отсеянные — внизу группы, приглушены */
+.film.hot { background: color-mix(in srgb, var(--acc) 26%, transparent); }
+.films-panel .film.hot > .n1 { color: var(--tx); }
+.film.out > :not(.ac), .film.out .vt { opacity: .42; }
+.films-panel .film.out > .n1 { color: var(--tx3); }
+.film.gone > .l1 { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--tx) 60%, transparent); }
+.stp { color: var(--tx2); }
+.stp button { width: 20px; height: 20px; margin: -2px 0; border-radius: 10px; background: rgba(255,255,255,.14); display: grid; place-items: center; color: var(--tx); }
+.stp button:hover { background: var(--btn); color: var(--btn-tx); }
+.stp button svg { width: 10px; height: 10px; stroke-width: 3; }
+.stp b { min-width: 12px; text-align: center; font: 700 13px/16px var(--f-ui); color: var(--tx); }
+.film-del { position: absolute; left: -4px; top: -4px; width: 20px; height: 20px; border-radius: 50%; display: none; place-items: center; background: rgba(0,0,0,.78); color: #fff; box-shadow: 0 0 0 1.5px rgba(255,255,255,.2); }
+.film-del svg { width: 10px; height: 10px; stroke-width: 3; }
+.film:is(:hover, :focus-within) .film-del { display: grid; }
 @media (hover: none) { .film-del { display: grid; } }
 .film-del:hover { background: var(--bad); }
-.film-del svg { width: 11px; height: 11px; }
 .empty { padding: 12px; }
 .empty p { font: 700 19px/1.25 var(--f-head); letter-spacing: -.02em; }
 .empty .m { display: block; margin-top: 4px; font: 500 14px/1.45 var(--f-ui); letter-spacing: 0; }
 
-/* уже выпадало */
-.history-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
-.lp-pane[data-lpp="history"] .history-list { flex: 1; }
+/* уже выпадало: средняя оценка в колонке чисел, «Оценить» — во второй строке */
 .lp-pane[data-lpp="history"] .note { padding: 6px 12px; }
-.hist { display: flex; gap: 12px; align-items: center; min-height: 56px; font-size: 14px; padding: 4px 8px 4px 12px; border-radius: 20px; cursor: pointer; transition: background .2s; }
-.hist:hover { background: var(--fill); }
-.hist i { width: 32px; height: 48px; border-radius: 6px; background: var(--c, var(--s3)) center/cover; flex: none; }
-.hist div { min-width: 0; flex: 1; }
-.hist b { display: block; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hist span { color: var(--tx3); font-size: 13px; }
-.hist .rate-me { flex: none; font: 700 12px var(--f-ui); font-style: normal; color: var(--btn-tx); background: var(--btn); padding: 6px 12px; border-radius: 14px; }
-.hist .score { flex: none; font: 700 13px var(--f-ui); font-style: normal; padding: 4px 10px; border-radius: 12px; background: var(--fill); color: var(--tx); }
+.films-panel .hist > .n1 { color: var(--tx); }
+.hist .rate-me { flex: none; font: 700 13px/16px var(--f-ui); font-style: normal; color: var(--acc-hi); }
+.hist:hover .rate-me { color: var(--tx); }
 
 /* ---------- оценка последнего фильма ---------- */
-.rate-box { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 18px; background: var(--s1); }
-.rate-box h3 { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; letter-spacing: -.02em; }
-.rate-box h3 > span { display: inline-flex; align-items: center; }
-.rate-box h3 .link-btn { font: 600 12.5px var(--f-ui); color: var(--tx3); text-decoration: none; }
-.rate-film { display: flex; gap: 10px; align-items: center; }
-.rate-film i { width: 30px; height: 44px; border-radius: 7px; background: var(--c, var(--s3)) center/cover; flex: none; display: grid; place-items: center; font: 800 12px var(--f-head); font-style: normal; color: rgba(255,255,255,.7); }
-.rate-film div { min-width: 0; }
-.rate-film b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rate-film span { color: var(--tx3); font-size: 12px; }
+/* в панели: служебная строка «Оцените фильм ?», под ней карточка — строка фильма, шкала, оценки */
+.rate-box { display: flex; flex-direction: column; }
+.rate-box .card { border-radius: 20px; background: var(--fill); }
+.rate-card { padding-bottom: 4px; }
+.films-panel .rate-film > .n1 { color: var(--tx); }
+.rate-fold { width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; color: var(--tx3); }
+.rate-fold svg { width: 16px; height: 16px; transform: rotate(180deg); }
+.rate-fold:hover { background: rgba(255,255,255,.14); color: var(--tx); }
+.rate-card .rate-scale { margin: 0 4px; }
+.rate-card .note { margin: 0; padding: 4px 8px; font: 400 13px/16px var(--f-ui); color: var(--tx2); }
+.rate-card .rate-list { gap: 0 8px; align-items: center; min-height: 32px; padding: 4px 8px 0; font: 400 13px/16px var(--f-ui); color: var(--tx2); }
+.rate-card .rate-list span { display: inline; padding: 0; border-radius: 0; background: none; font-size: 13px; }
+.rate-card .rate-list .person { font-weight: 400; color: var(--tx2); text-decoration: none; }
+.rate-card .rate-list .person:hover { color: var(--tx); }
+.rate-card .rate-list b { display: inline; min-width: 0; height: auto; margin-left: 4px; background: none; font-size: 13px; color: var(--tx); }
+.rate-card .rate-clear { align-self: center; margin-left: auto; font: 700 13px/16px var(--f-ui); text-decoration: none; color: var(--tx3); }
+.rate-card .rate-clear:hover { color: var(--bad); }
 /* части блока оценки перерисовываются по отдельности, в раскладке их нет */
 .rate-slot { display: contents; }
-.rate-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-.rate-scale button { height: 36px; border-radius: 10px; background: var(--s2); font: 700 15px var(--f-ui); color: var(--tx2); transition: background .2s, color .2s, box-shadow .2s, transform .3s var(--spring); }
-.rate-scale button:hover { color: var(--tx); background: var(--s3); }
-.rate-scale button.low:hover, .rate-scale button.low.on { box-shadow: inset 0 0 0 1px var(--bad); }
-.rate-scale button.high:hover, .rate-scale button.high.on { box-shadow: inset 0 0 0 1px var(--ok); }
-.rate-scale button.on { background: var(--btn); color: var(--btn-tx); }
+/* шкала 1–10 — один ряд-сегмент; выбранная оценка залита акцентом */
+.rate-scale { display: flex; gap: 2px; height: 40px; padding: 4px; border-radius: 16px; background: rgba(0,0,0,.22); }
+.rate-scale button { flex: 1; min-width: 0; border-radius: 12px; font: 700 14px/32px var(--f-ui); color: var(--tx2); font-variant-numeric: tabular-nums; transition: background .2s, color .2s; }
+.rate-scale button:hover { background: rgba(255,255,255,.14); color: var(--tx); }
+/* нажатие видно сразу, ещё до отпускания; размер не меняется, чтобы цель не уезжала из-под пальца */
+.rate-scale button:not(.on):active { background: rgba(255,255,255,.26); color: var(--tx); transition: none; }
+.rate-scale button.on { background: var(--acc); color: var(--on-acc, #fff); }
 .rate-list { display: flex; flex-wrap: wrap; gap: 4px; }
 .rate-list span { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 9px; border-radius: 8px; background: var(--s2); font-size: 12.5px; }
 .rate-list b { min-width: 22px; height: 20px; display: grid; place-items: center; border-radius: 6px; background: var(--sheetA); font-size: 12px; }
 .rate-hint { font-size: 11.5px; }
 .rate-locked b { color: var(--tx); }
-.rate-box.compact { padding: 0; background: none; }
-.rate-line { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 12px 8px 8px; border-radius: 14px; background: var(--s1); text-align: left; transition: background .2s; }
-.rate-line:hover { background: var(--s2); }
-.rate-line i { width: 28px; height: 40px; border-radius: 7px; background: var(--c, var(--s3)) center/cover; flex: none; }
-.rate-line span { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.rate-line b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rate-line small { font-size: 12px; color: var(--tx3); }
-.rate-line svg { color: var(--tx3); }
 .hist-rate { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border-radius: 14px; background: var(--s1); }
 .hist-rate .hr-head { display: flex; align-items: baseline; font: 700 14px var(--f-ui); color: var(--tx2); }
-/* «Снять оценки» — только у создателя комнаты: тихая ссылка справа от заголовка или под списком оценок */
+/* «Снять оценки» — только у создателя комнаты: тихая ссылка справа от заголовка или в строке оценок */
 .rate-clear { align-self: flex-start; margin-left: auto; font: 600 12.5px var(--f-ui); color: var(--tx3); text-decoration: none; }
-.rate-box .rate-clear { margin-left: 0; }
 .rate-clear:hover { color: var(--bad); }
 .hist-rate .hr-head b { color: var(--tx); margin-left: 4px; }
 .person { color: var(--tx); font-weight: 700; text-decoration: underline; text-decoration-color: var(--tx3); text-underline-offset: 3px; transition: text-decoration-color .2s; }
@@ -662,18 +698,6 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .nick-wrap { display: inline-flex; align-items: center; max-width: 100%; min-width: 0; white-space: nowrap; vertical-align: bottom; }
 .nick-wrap > .nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .nick-wrap > .nick-ico, .nick-wrap > .nick-badge { flex: none; }
-
-/* оценка в панели: та же подложка, что у остальных блоков панели */
-.films-panel .rate-box { padding: 12px; border-radius: 20px; background: var(--fill); }
-.films-panel .rate-box.compact { padding: 0; background: none; }
-.films-panel .rate-line { min-height: 48px; padding: 6px 12px 6px 8px; border-radius: 20px; background: var(--fill); }
-.films-panel .rate-line:hover { background: rgba(255,255,255,.12); }
-.films-panel .rate-line i { width: 24px; height: 36px; border-radius: 5px; }
-.films-panel .rate-scale button:not(.on) { background: rgba(255,255,255,.08); }
-.films-panel .rate-scale button:not(.on):hover { background: rgba(255,255,255,.16); }
-/* нажатие видно сразу, ещё до отпускания; размер не меняется, чтобы цель не уезжала из-под пальца */
-.rate-scale button:not(.on):active, .films-panel .rate-scale button:not(.on):active { background: rgba(255,255,255,.26); color: var(--tx); transition: none; }
-.films-panel .rate-list span { background: rgba(255,255,255,.08); }
 
 /* ---------- «под стрелкой»: фильм, на котором стрелка; на прокруте меняется вместе с ней ---------- */
 .now { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
@@ -1871,7 +1895,7 @@ html.fx-lite span:is(.frame-rainbow, .frame-holo)::after { content: ""; position
 }
 /* до 1023: одна колонка — колесо сверху, фильмы шторкой снизу */
 @media (max-width: 1023px) {
-  #room { --m: 16px; --g: 16px; --peek: 148px; }
+  #room { --m: 16px; --g: 16px; --peek: 140px; }
   #room .layout { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: none; row-gap: 0; height: auto; min-height: 100dvh; max-width: 720px; padding: 12px var(--m) calc(var(--peek) + 16px); }
   .stage, body.karaoke-on .stage { grid-column: 1 / -1; grid-row: 1; grid-template-rows: 44px 44px auto auto auto auto auto; row-gap: 16px; }
   .stage > .backdrop { left: calc(-1 * var(--m)); top: -12px; width: calc(100% + 2 * var(--m)); height: calc(100% + 12px + var(--peek)); }
@@ -1903,10 +1927,10 @@ html.fx-lite span:is(.frame-rainbow, .frame-holo)::after { content: ""; position
   .side-head { display: none; }
   .peek-head { display: flex; flex-direction: column; flex: none; order: -2; padding-top: 8px; text-align: left; }
   .peek-head .grab { align-self: center; width: 36px; height: 5px; margin-bottom: 8px; border-radius: 3px; background: rgba(255,255,255,.3); }
-  .peek-head .ph { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; }
-  .peek-head .ph b { font: 800 20px/24px var(--f-head); letter-spacing: -.03em; }
-  .peek-head .ph span { flex: 1; min-width: 0; font-size: 13px; color: var(--tx2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .peek-head svg { color: var(--tx3); transition: transform .4s var(--ease); }
+  .peek-head .ph { display: grid; grid-template-columns: minmax(0, 1fr) 40px; grid-template-rows: 24px 16px; align-content: center; min-height: 48px; padding: 0 8px; }
+  .peek-head .ph b { grid-area: 1 / 1; font: 400 22px/24px var(--f-head); letter-spacing: -.01em; }
+  .peek-head .ph span { grid-area: 2 / 1; min-width: 0; font: 400 13px/16px var(--f-ui); color: var(--tx2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .peek-head svg { grid-area: 1 / 2 / 3; justify-self: center; width: 16px; height: 16px; color: var(--tx3); transition: transform .4s var(--ease); }
   .films-panel.open .peek-head svg { transform: rotate(180deg); }
   .films-panel > .np { order: -1; }
   /* в шторке под заголовком «Фильмы» сразу вкладки и список; оценка фильма — внизу, под списком */

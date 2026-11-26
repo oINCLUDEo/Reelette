@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reelette: панель, концепт C</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Carlito:wght@400;700&family=Alan+Sans:wght@700&family=Press+Start+2P&family=Unbounded:wght@600&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   Концепт C «Фильмы в центре». Сетка сайта: 12 колонок, поля и интервалы 24, модуль 8.
+   Панель: 1440 → колонки 1–3 (330), 1024 → колонки 1–4 (309), телефон — шторка.
+   Внутри панели: отступ 8, блоки r20, внутри блоков r12/8, постеры r10, капсулы — высота/2.
+   Текст — четыре стиля: Lack 20/24 · 15/20 жирный · 13/16 жирный · 12/16 обычный.
+   ===================================================================== */
+@font-face { font-family: "Lack"; src: url("../public/fonts/lack.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
+:root {
+  --bg: #141414; --tx: #E2E2E2; --tx2: color-mix(in srgb, #E2E2E2 78%, transparent); --tx3: color-mix(in srgb, #E2E2E2 58%, transparent);
+  --acc: #465DFF; --acc-hi: #8C9BFF; --fill: rgba(255,255,255,.08); --fill2: rgba(255,255,255,.13);
+  --ok: #30D158; --bad: #FF6B61; --silver: #E2E2E2;
+  --f-ui: "Carlito", "Segoe UI", system-ui, sans-serif; --f-head: "Lack", "Carlito", sans-serif; --f-mark: "Alan Sans", "Carlito", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #0E0E0E; color: var(--tx); font: 400 15px/1.5 var(--f-ui); font-size-adjust: .5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+p, h1, h2, h3 { margin: 0; }
+
+/* ---------- страница концепта ---------- */
+.doc { max-width: 1488px; margin: 0 auto; padding: 40px 24px 80px; }
+.intro { max-width: 880px; margin-bottom: 32px; }
+.intro .kicker { font: 700 12px/16px var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--acc-hi); }
+.intro h1 { margin: 8px 0 16px; font: 400 40px/44px var(--f-head); letter-spacing: -.02em; }
+.intro ol { margin: 0; padding-left: 20px; color: var(--tx2); font-size: 15px; line-height: 22px; }
+.intro li { margin-bottom: 6px; }
+.intro b { color: var(--tx); }
+.sec { margin: 56px 0 16px; font: 400 24px/32px var(--f-head); }
+.sec small { display: block; font: 400 14px/20px var(--f-ui); color: var(--tx3); }
+.fit { position: relative; width: 100%; }
+.fit > .frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.cap { margin-top: 12px; color: var(--tx3); font-size: 13px; line-height: 18px; max-width: 70ch; }
+.cap b { color: var(--tx); }
+.states { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 330px)); gap: 40px 32px; align-items: start; }
+.state > .fit { max-width: 330px; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 390px)); gap: 24px; }
+
+/* ---------- кадр: фон комнаты ---------- */
+.frame { overflow: hidden; border-radius: 16px; background: var(--bg); box-shadow: 0 30px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06); isolation: isolate; }
+.room-bg { position: absolute; inset: 0; z-index: -1; overflow: hidden; }
+.room-bg::before { content: ""; position: absolute; inset: -10%; background: var(--poster) center/cover; filter: blur(60px) saturate(150%); opacity: .8; }
+.room-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(16,16,16,.66), rgba(16,16,16,.34) 40%, rgba(16,16,16,.12) 70%, rgba(16,16,16,.34)), linear-gradient(180deg, rgba(16,16,16,.15), rgba(16,16,16,.62)); }
+
+/* =====================================================================
+   ПАНЕЛЬ
+   ===================================================================== */
+.pn { position: absolute; display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: 28px;
+  background: rgba(26,26,26,.42); border: 1px solid rgba(255,255,255,.08);
+  -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08); }
+.pn.solo { position: relative; }
+.pn > * { flex: none; }
+
+/* шапка: знак и комната */
+.p-head { display: flex; align-items: center; gap: 4px; height: 56px; padding-left: 12px; }
+.p-head .mark { width: 26px; height: 26px; color: var(--tx); }
+.p-head .mark svg { width: 26px; height: 26px; stroke-width: 1.6; }
+.room { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 8px; border-radius: 20px; font: 400 20px/24px var(--f-head); white-space: nowrap; overflow: hidden; }
+.room span { overflow: hidden; text-overflow: ellipsis; }
+.room svg { width: 12px; height: 12px; stroke-width: 3; color: var(--tx3); }
+.room:hover { background: var(--fill); }
+
+/* блок оценки — той же системы, что и полка: мини-постер, строка 15, подпись 12 */
+.rate { display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 20px; background: var(--fill); }
+.rate-top { display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; }
+.mp { width: 32px; height: 48px; border-radius: 6px; background: #333 center/cover; }
+.r-txt { min-width: 0; display: flex; flex-direction: column; }
+.lbl { font: 400 12px/16px var(--f-ui); color: var(--tx3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ttl { font: 700 15px/20px var(--f-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hint { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 4px; border-radius: 50%; background: var(--fill2); font: 700 10px/1 var(--f-ui); color: var(--tx2); vertical-align: 1px; cursor: help; }
+.scale { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.scale button { height: 32px; border-radius: 8px; background: var(--fill); font: 700 13px/16px var(--f-ui); color: var(--tx2); font-variant-numeric: tabular-nums; }
+.scale button:hover { background: var(--fill2); color: var(--tx); }
+.scale button.low:hover { box-shadow: inset 0 0 0 1px var(--bad); }
+.scale button.high:hover { box-shadow: inset 0 0 0 1px var(--ok); }
+.scale button.on { background: var(--silver); color: #141414; }
+.raters { display: flex; align-items: center; gap: 12px; min-height: 20px; }
+.raters .who { display: flex; flex-wrap: wrap; gap: 4px 10px; flex: 1; min-width: 0; }
+.raters .who span { display: inline-flex; align-items: center; gap: 4px; font: 700 13px/16px var(--f-ui); font-variant-numeric: tabular-nums; }
+.raters .who .av { width: 16px; height: 16px; font-size: 8px; }
+.link { font: 400 12px/16px var(--f-ui); color: var(--tx3); white-space: nowrap; }
+.link:hover { color: var(--tx); }
+.rate.line { flex-direction: row; align-items: center; gap: 12px; padding: 8px 12px 8px 8px; width: 100%; text-align: left; }
+.rate.line .mp { width: 24px; height: 36px; border-radius: 5px; }
+.rate.line .r-txt { flex: 1; }
+.rate.line > svg { color: var(--tx3); }
+
+/* вкладки и добавление */
+.tabs { position: relative; display: grid; grid-template-columns: 1fr 1fr; height: 40px; padding: 4px; border-radius: 20px; background: var(--fill); }
+.tabs button { border-radius: 16px; font: 700 13px/16px var(--f-ui); color: var(--tx2); }
+.tabs button span { margin-left: 4px; font-weight: 400; color: var(--tx3); font-variant-numeric: tabular-nums; }
+.tabs button.on { background: var(--silver); color: #141414; }
+.tabs button.on span { color: rgba(20,20,20,.55); }
+.add { display: flex; gap: 8px; }
+.search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 20px; background: var(--fill); color: var(--tx3); font-size: 13px; }
+.search span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ibtn { width: 40px; height: 40px; border-radius: 20px; display: grid; place-items: center; background: var(--fill); color: var(--tx2); flex: none; }
+.ibtn:hover { background: var(--fill2); color: var(--tx); }
+
+/* люди — легенда и фильтр: аватары, полоса долей, строка контекста */
+.people { display: flex; flex-direction: column; gap: 8px; padding: 4px 8px 0; }
+.ava-row { display: flex; justify-content: space-between; align-items: center; height: 32px; }
+.ava-row .av { width: 24px; height: 24px; font-size: 10px; cursor: pointer; transition: opacity .2s; }
+.ava-row .av.off { opacity: .35; filter: grayscale(1); }
+.people.f .ava-row .av:not(.sel) { opacity: .3; }
+.ava-row .av.sel { outline: 2px solid var(--silver); outline-offset: 3px; }
+.share { display: flex; gap: 2px; height: 4px; }
+.share i { border-radius: 2px; background: var(--c); min-width: 2px; }
+.people.f .share i:not(.sel) { opacity: .2; }
+.ctx { display: flex; align-items: center; gap: 8px; height: 16px; font: 400 12px/16px var(--f-ui); color: var(--tx3); white-space: nowrap; }
+.ctx .l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ctx .l b { color: var(--tx); font-weight: 700; }
+.ctx .x { color: var(--tx2); margin-left: 4px; }
+.votes { display: inline-flex; align-items: center; gap: 4px; cursor: help; }
+.votes svg { width: 12px; height: 12px; }
+.votes svg.on { fill: var(--acc); stroke: var(--acc); }
+.votes svg.win { stroke: var(--ok); }
+.votes svg.win.on { fill: var(--ok); }
+
+/* список: полки по людям */
+.list { flex: 1 1 0; min-height: 0; overflow-y: auto; margin-right: -4px; padding-right: 4px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+.shelf + .shelf { margin-top: 4px; }
+.sh-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 8px; border-radius: 20px; background: #232323; cursor: pointer; }
+.sh-head:hover { background: #2B2B2B; }
+.sh-head .av { width: 32px; height: 32px; font-size: 13px; }
+.sh-t { flex: 1; min-width: 0; display: flex; flex-direction: column; margin-left: 4px; }
+.sh-t .lbl .up { color: var(--ok); } .sh-t .lbl .down { color: var(--bad); }
+.sh-pct { min-width: 36px; text-align: right; font: 700 13px/16px var(--f-ui); color: var(--tx2); font-variant-numeric: tabular-nums; }
+.eye { width: 28px; height: 28px; border-radius: 14px; display: grid; place-items: center; color: var(--tx3); margin: 0 -4px; }
+.eye:hover { background: var(--fill); color: var(--tx); }
+.eye svg { width: 15px; height: 15px; }
+.chev { color: var(--tx3); width: 12px; height: 12px; stroke-width: 3; transition: transform .25s; }
+.shelf.closed .chev { transform: rotate(-90deg); }
+/* свёрнутая полка показывает три первых постера веером — фильмы видны даже без раскрытия */
+.stack { display: none; position: relative; width: 30px; height: 30px; flex: none; }
+.stack i { position: absolute; top: 4px; width: 14px; height: 21px; border-radius: 3px; background: #333 center/cover; box-shadow: 0 0 0 1.5px #232323; }
+.stack i:nth-child(1) { left: 0; } .stack i:nth-child(2) { left: 8px; } .stack i:nth-child(3) { left: 16px; }
+.shelf.closed .stack { display: block; }
+.shelf.closed .grid { display: none; }
+.shelf.off .sh-head .av, .shelf.off .sh-t .ttl, .shelf.off .stack { opacity: .45; }
+.shelf.off .stack, .shelf.off .card .pst { filter: grayscale(1); }
+.shelf.hide { display: none; }
+
+/* карточка фильма: постер — главный материал, служебное в одной полосе снизу */
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 8px; padding: 12px 4px 16px; }
+.card { min-width: 0; position: relative; cursor: pointer; }
+.pst { position: relative; aspect-ratio: 2 / 3; border-radius: 10px; overflow: hidden; background: #2A2A2A; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.pst img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: space-between; height: 40px; padding: 0 6px 6px 8px; background: linear-gradient(transparent, rgba(0,0,0,.78)); }
+.pct { font: 700 13px/16px var(--f-ui); color: #fff; font-variant-numeric: tabular-nums; }
+.vote { display: inline-flex; align-items: center; gap: 2px; height: 20px; padding: 0 2px; font: 700 12px/16px var(--f-ui); color: #fff; font-variant-numeric: tabular-nums; }
+.vote svg { width: 14px; height: 14px; }
+.vote:not(.has):not(.mine) { opacity: 0; }
+.card:hover .vote, .card .vote:focus-visible { opacity: 1; }
+.vote.mine svg { fill: var(--acc); stroke: var(--acc); }
+.card .t { display: block; margin-top: 6px; font: 700 13px/16px var(--f-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .m { display: block; font: 400 12px/16px var(--f-ui); color: var(--tx3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* создатель: вес и удаление поверх постера, только при наведении (на сенсорных — всегда) */
+.own { position: absolute; left: 4px; right: 4px; top: 4px; display: flex; justify-content: space-between; opacity: 0; transition: opacity .15s; }
+.card:hover .own, .card.hov .own { opacity: 1; }
+.step { display: inline-flex; align-items: center; height: 24px; border-radius: 12px; background: rgba(20,20,20,.86); font: 700 12px/16px var(--f-ui); font-variant-numeric: tabular-nums; }
+.step button { width: 22px; height: 24px; display: grid; place-items: center; color: var(--tx2); }
+.step button:hover { color: #fff; }
+.step svg { width: 11px; height: 11px; stroke-width: 2.6; }
+.del { width: 24px; height: 24px; border-radius: 12px; display: grid; place-items: center; background: rgba(20,20,20,.86); color: var(--tx2); }
+.del:hover { color: var(--bad); }
+.del svg { width: 12px; height: 12px; stroke-width: 2.6; }
+/* под стрелкой: кольцо акцентом вокруг постера, без анимаций и теней */
+.card.hot .pst { outline: 2px solid var(--acc); outline-offset: 2px; }
+.card.hot .t { color: var(--acc-hi); }
+/* выбыл / уже смотрели — ниже в полке, приглушены */
+.card.out .pst { filter: grayscale(1); opacity: .4; }
+.card.out .t { color: var(--tx3); }
+.shelf.off .card .pst { opacity: .5; }
+
+/* «Выпадало» — та же карточка: вместо шанса средняя оценка, вместо сердечка — «Оценить» */
+.score { font: 700 13px/16px var(--f-ui); color: #fff; font-variant-numeric: tabular-nums; }
+.rate-me { height: 20px; padding: 0 8px; border-radius: 10px; background: var(--acc); color: #fff; font: 700 11px/20px var(--f-ui); }
+
+/* музыка */
+.np { display: flex; align-items: center; gap: 12px; height: 64px; padding: 8px 4px 8px 8px; border-radius: 20px; background: var(--fill); }
+.np .art { width: 48px; height: 48px; flex: none; border-radius: 12px; display: grid; place-items: center; background: var(--fill); color: var(--tx2); overflow: hidden; }
+.np .art.cov { background: linear-gradient(135deg, #2C2F4A, #6B5B95 55%, #D98BA6); }
+.np .nt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.np .ctl { display: flex; align-items: center; }
+.np .ctl button:not(.listen) { width: 36px; height: 36px; border-radius: 18px; display: grid; place-items: center; color: var(--tx2); position: relative; }
+.np .ctl button:hover { background: var(--fill); color: var(--tx); }
+.np .ctl i { position: absolute; top: 2px; right: 2px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: var(--acc); color: #fff; font: 700 9px/14px var(--f-ui); font-style: normal; }
+.np .ctl .listen { height: 32px; padding: 0 14px; margin-right: 4px; border-radius: 16px; background: var(--acc); color: #fff; font: 700 13px/16px var(--f-ui); }
+
+/* аватары и рамки профиля */
+.av { position: relative; flex: none; display: grid; place-items: center; border-radius: 50%; color: #fff; font-weight: 700; font-family: var(--f-ui); background: var(--a, #555); }
+.fr-accent { box-shadow: 0 0 0 2px var(--acc), 0 0 8px rgba(70,93,255,.5); }
+.fr-gold { box-shadow: 0 0 0 2px #F5C542, 0 0 10px rgba(245,197,66,.5); }
+.fr-ice { box-shadow: 0 0 0 2px #BAE6FD, 0 0 12px rgba(125,211,252,.6); }
+.fr-fire { box-shadow: 0 0 0 2px #FF7A18, 0 -2px 10px #FF4D00; animation: fFire 1.4s ease-in-out infinite; }
+.fr-toxic { box-shadow: 0 0 0 2px #A3E635, 0 0 8px #84CC16; animation: fToxic 1.8s ease-in-out infinite; }
+.fr-holo { box-shadow: 0 0 0 2px #F0ABFC, 0 0 12px #F0ABFC; animation: fHolo 3s linear infinite; }
+.fr-neon { box-shadow: 0 0 0 2px #FF5A8A, 0 0 12px #FF5A8A; animation: fNeon 2.4s ease-in-out infinite; }
+@keyframes fFire { 50% { box-shadow: 0 0 0 2px #FFC93C, 0 -4px 14px #FF7A18; } }
+@keyframes fToxic { 50% { box-shadow: 0 0 0 2px #D9F99D, 0 0 16px #84CC16; } }
+@keyframes fHolo { 33% { box-shadow: 0 0 0 2px #67E8F9, 0 0 12px #67E8F9; } 66% { box-shadow: 0 0 0 2px #C4B5FD, 0 0 12px #C4B5FD; } }
+@keyframes fNeon { 50% { box-shadow: 0 0 0 2px #FF5A8A, 0 0 3px #FF5A8A; } }
+/* ники */
+.nick { color: var(--n, var(--tx)); }
+.nick i { font-style: normal; margin-left: 4px; font-size: .9em; }
+.nick .bdg { display: inline-grid; place-items: center; min-width: 16px; height: 16px; margin-left: 4px; padding: 0 3px; border-radius: 5px; background: var(--fill2); color: var(--acc-hi); font: 700 9px/16px var(--f-ui); vertical-align: 1px; }
+.f-pixel { font-family: "Press Start 2P", monospace; font-size: 9px; letter-spacing: 0; }
+.f-wide { font-family: "Unbounded", sans-serif; font-weight: 600; font-size: 13px; }
+.fx-glow { filter: drop-shadow(0 0 5px var(--n)); }
+.fx-grad { background: linear-gradient(90deg, #E2E2E2, #8C9BFF); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.fx-rainbow { background: linear-gradient(90deg, #FF5A6E, #FFD54A, #3DDC97, #38BDF8, #C084FC, #FF5A6E) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: nRainbow 3s linear infinite; }
+.fx-rainbow i, .fx-grad i { -webkit-text-fill-color: initial; }
+@keyframes nRainbow { to { background-position: -200% 0; } }
+.fx-pulse { animation: nPulse 2.2s ease-in-out infinite; }
+@keyframes nPulse { 50% { filter: drop-shadow(0 0 8px var(--n)); } }
+/* лёгкий режим (html.fx-lite на сайте, здесь .lite на кадре): всё стоит статичным кадром, вид тот же */
+.lite .fr-fire, .lite .fr-toxic, .lite .fr-holo, .lite .fr-neon, .lite .fx-rainbow, .lite .fx-pulse { animation: none !important; }
+.lite .fr-holo { box-shadow: 0 0 0 2px #C4B5FD, 0 0 10px rgba(196,181,253,.45); }
+.lite .fx-pulse { filter: drop-shadow(0 0 5px var(--n)); }
+.lite .pn { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(30,30,30,.92); }
+
+/* сенсорные: голос и вес видны всегда */
+.touch .vote { opacity: 1 !important; }
+.touch .own { opacity: 1; }
+
+/* =====================================================================
+   СИЛУЭТ СЦЕНЫ
+   ===================================================================== */
+.stg { position: absolute; border-radius: 28px; background: rgba(26,26,26,.3); border: 1px solid rgba(255,255,255,.08); -webkit-backdrop-filter: blur(28px) saturate(160%); backdrop-filter: blur(28px) saturate(160%); }
+.stg.bare { background: none; border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.cap-g { position: absolute; display: flex; align-items: center; gap: 8px; }
+.pill { height: 40px; padding: 4px; border-radius: 20px; background: var(--fill); display: flex; align-items: center; gap: 4px; font: 700 13px/16px var(--f-ui); color: var(--tx2); }
+.pill > span { height: 32px; padding: 0 14px; border-radius: 16px; display: grid; place-items: center; white-space: nowrap; }
+.pill > span.on { background: var(--silver); color: #141414; }
+.tog { width: 36px; height: 22px; border-radius: 11px; background: var(--acc); position: relative; margin-right: 6px; }
+.tog::after { content: ""; position: absolute; right: 2px; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+.now { position: absolute; }
+.now h2 { font: 400 44px/48px var(--f-head); letter-spacing: -.01em; }
+.now p { font: 400 15px/20px var(--f-ui); color: var(--tx2); margin-top: 8px; }
+.wheel { position: absolute; border-radius: 50%; background: #1B1B1B; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 0 90px rgba(70,93,255,.45), 0 0 220px rgba(70,93,255,.25); }
+.wheel .seg { position: absolute; inset: 5%; border-radius: 50%; background: var(--segs); }
+.wheel .hub { position: absolute; inset: 37%; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff, #D8D8DE); color: #141414; display: grid; place-content: center; text-align: center; font: 400 26px/28px var(--f-ui); box-shadow: 0 0 0 6px rgba(20,20,20,.6); }
+.wheel .hub small { font-size: .42em; line-height: 1.3; color: #555; }
+.wheel .ptr { position: absolute; left: 50%; top: -6px; width: 34px; height: 44px; margin-left: -17px; background: #ECECF0; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.foot-line { position: absolute; height: 1px; background: rgba(255,255,255,.08); }
+.status { position: absolute; font: 700 13px/16px var(--f-ui); color: var(--tx2); }
+.react { position: absolute; display: flex; align-items: center; gap: 8px; height: 48px; padding: 4px 4px 4px 12px; border-radius: 24px; background: var(--fill); font-size: 18px; }
+.react .say { height: 40px; width: 180px; border-radius: 20px; background: var(--fill); color: var(--tx3); font: 400 13px/40px var(--f-ui); padding-left: 16px; }
+.ava-stack { display: flex; }
+.ava-stack .av { width: 32px; height: 32px; font-size: 12px; margin-left: -8px; box-shadow: 0 0 0 2px #1a1a1a; }
+
+/* телефон */
+.m-top { position: absolute; left: 16px; right: 16px; top: 12px; display: flex; align-items: center; gap: 8px; height: 40px; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 28px 28px 0 0; padding-bottom: 16px; }
+.grab { width: 36px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.3); margin: 0 auto; }
+.peek { display: flex; flex-direction: column; gap: 8px; height: 56px; padding-top: 4px; }
+.peek .ph { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 40px; }
+.peek .ph b { font: 400 20px/24px var(--f-head); }
+.peek .ph .lbl { flex: 1; }
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+<div class="doc">
+
+<header class="intro">
+  <div class="kicker">Reelette · левая панель · концепт C</div>
+  <h1>Фильмы в центре</h1>
+  <ol>
+    <li><b>Идея.</b> Панель — афиша вечера: главный материал — постеры, всё служебное (шанс, голос, вес) живёт в одной полосе внизу постера. Люди — не полоса из чипов у каждой группы, а легенда сверху: аватары, тонкая полоса долей колеса и строка контекста; тап по аватару оставляет только его фильмы.</li>
+    <li><b>Сетка.</b> Панель на колонках сайта (1–3, на 1024 — 1–4), внутри отступ 8, всё по модулю 8: блоки 40/48/64, полка — 3 постера 2:3 с интервалом 8 по горизонтали и 16 по вертикали. Скругления концентричные: 28 → 20 → 12/8 → постер 10.</li>
+    <li><b>Иерархия — четыре стиля текста.</b> Lack 20 — только комната. 15 жирный — ники и название оцениваемого фильма. 13 жирный — названия на карточках, проценты, вкладки. 12 обычный 58% белого — всё вторичное (год, «9 из 10», «уже смотрели»). Других размеров и плашек нет.</li>
+    <li><b>Анатомия карточки:</b> постер → полоса снизу «шанс слева · сердечко справа» → название → год·длительность. Создателю при наведении сверху на постере «− вес +» и «×». Под стрелкой — кольцо акцентом. Выбывшие и смотренные — серые в конце полки.</li>
+    <li><b>Анатомия полки:</b> аватар 32 с рамкой · ник (строка 15) и под ним «9 из 10 · ×1,5» — сколько на колесе и множитель (строка 12) · доля % · глаз создателя · шеврон. Свёрнутая полка показывает веер из трёх постеров.</li>
+    <li><b>Что убрано.</b> Красные плашки «×0,5», серые чипы «7/12», «не участвует» отдельным тегом, точки голосов — всё это стало текстом второй строки или знаком, который уже есть (сердечко). Один акцент — Laser Blue: свой голос, строка под стрелкой, «Оценить», «Слушать».</li>
+    <li><b>Почему лечит «разрозненно и перегруз».</b> Вместо десятков разнородных мелочей — две повторяющиеся детали (полка и карточка), у которых у каждой одно место для числа и одно место для действия. Глаз читает постеры, а не интерфейс.</li>
+  </ol>
+</header>
+
+<h2 class="sec">Комната 1440 × 900<small>Живая комната: 77 фильмов, 10 человек, идёт выбывание, четверо сегодня не участвуют, музыка играет. Ваша полка раскрыта, «Психо» под стрелкой.</small></h2>
+<div class="fit" id="hero"></div>
+
+<h2 class="sec">Состояния панели<small>Кадры 330 px — ширина панели на 1440. Наведите на постеры: голос, вес и удаление появляются по наведению.</small></h2>
+<div class="states" id="states"></div>
+
+<h2 class="sec">1024 × 768 — панель на 4 колонки<small>Та же панель, ширина 309: в полке по-прежнему три постера.</small></h2>
+<div class="fit" id="tab1024" style="max-width:1024px"></div>
+
+<h2 class="sec">Телефон 390 — шторка<small>Свёрнута: видны заголовок и музыка. Раскрыта: весь состав панели, полка в три постера, голос и вес всегда видны (сенсорный экран).</small></h2>
+<div class="pair" id="phones"></div>
+
+</div>
+
+<script>
+// ---------- данные: как в живой комнате владельца ----------
+const KP = n => `https://kinopoiskapiunofficial.tech/images/posters/kp_small/${n}.jpg`;
+const people = [
+  { id: 'me', name: 'МС Дымка', you: 1, a: '#5B4BB5', n: '#C9B8FF', fx: 'fx-grad', font: 'f-wide', fr: 'fr-accent' },
+  { id: 'glenn', name: 'GLENN', a: '#3A3A3A', n: '#FFFFFF', mult: 0.5 },
+  { id: 'sc', name: 'soundcloud hero', a: '#8A3B12', n: '#FF8A65', font: 'f-pixel', fx: 'fx-pulse', fr: 'fr-fire', ico: '👑', off: 1 },
+  { id: 'toha', name: 'тоха', a: '#2F6B3F', n: '#3DDC97', fx: 'fx-glow', fr: 'fr-toxic', ico: '¥', bdg: 'X_X', mult: 1.5 },
+  { id: 'nis', name: 'nisshokuryu', a: '#7A3B7E', n: '#F0ABFC', font: 'f-pixel', fx: 'fx-rainbow', fr: 'fr-holo', ico: '👑', bdg: '♫' },
+  { id: 'tip', name: 'tipoya', a: '#4C3D8F', n: '#A78BFA', ico: '💀', off: 1 },
+  { id: 'syra', name: 'Сыра Гойда', a: '#8F2A4C', n: '#FF5A8A', font: 'f-pixel', fr: 'fr-neon' },
+  { id: 'ser', name: 'Serhio', a: '#6B5520', n: '#FFFFFF', fr: 'fr-gold' },
+  { id: 'mar', name: 'Marcellus', a: '#4A4F57', n: '#9CA3AF', off: 1 },
+  { id: 'igra', name: 'Игра', a: '#1F5F6B', n: '#67E8F9', fx: 'fx-pulse', fr: 'fr-ice', off: 1 },
+];
+// [кинопоиск id, название, год, минуты, состояние: o — выбыл, w — уже смотрели]
+const lists = {
+  me: [[344,'Психо',1960,109],[301,'Матрица',1999,136],[309,'Эквилибриум',2002,107],[324,'Поймай меня, если сможешь',2002,141],[352,'Головокружение',1958,128],[367,'Реквием по мечте',2000,102],[333,'Звёздные войны: Новая надежда',1977,121],[345,'Молчание ягнят',1991,118,'w'],[337,'Окно во двор',1954,112,'w'],[316,'Матрица: Революция',2003,129,'o'],[338,'Империя наносит ответный удар',1980,124,'o'],[321,'Звёздный путь: Возмездие',2002,116,'o']],
+  glenn: [[326,'Побег из Шоушенка',1994,142],[329,'Список Шиндлера',1993,195],[355,'Пианист',2002,150],[371,'Спасти рядового Райана',1998,169],[325,'Крёстный отец',1972,175],[327,'Крёстный отец 2',1974,202],[350,'Славные парни',1990,146],[340,'Подозрительные лица',1995,106],[358,'Таксист',1976,114],[374,'Бешеный бык',1980,129],[319,'Терминатор 3: Восстание машин',2003,109,'o']],
+  sc: [[361,'Бойцовский клуб',1999,139],[335,'Мементо',2000,113],[320,'25-й час',2002,135],[305,'Телефонная будка',2002,81],[363,'Секреты Лос-Анджелеса',1997,138]],
+  toha: [[303,'Управление гневом',2003,106],[304,'Афера',2003,97],[308,'Тупой и ещё тупее тупого',2003,85],[311,'Пуленепробиваемый',2003,104],[318,'Ограбление по-итальянски',2003,111],[323,'Двойной форсаж',2003,107],[307,'Разыскивается в Малибу',2003,86],[310,'Дежурный папа',2003,92],[313,'Играй как Бекхэм',2002,112],[342,'Криминальное чтиво',1994,154,'w']],
+  nis: [[370,'Унесённые призраками',2001,125],[332,'Семь самураев',1954,207],[373,'М убийца',1931,117],[330,'Касабланка',1942,102],[331,'Гражданин Кейн',1941,119],[334,'Доктор Стрейнджлав',1964,95],[359,'Третий человек',1949,104],[366,'Мальтийский сокол',1941,100],[364,'Двойная страховка',1944,107],[375,'Монти Пайтон и Священный Грааль',1975,91,'o']],
+  tip: [[341,'Амели',2001,122],[317,'Любовь с уведомлением',2002,101],[314,'Цыпочка',2002,104],[300,'Лиззи Магуайр',2003,94]],
+  syra: [[336,'Пролетая над гнездом кукушки',1975,133],[351,'Красота по-американски',1999,122],[354,'Апокалипсис сегодня',1979,147],[362,'Подводная лодка',1981,149],[365,'Китайский квартал',1974,130],[349,'Хороший, плохой, злой',1966,178],[343,'На север через северо-запад',1959,136,'o']],
+  ser: [[328,'Властелин колец: Братство кольца',2001,178],[312,'Властелин колец: Две крепости',2002,179],[322,'Гарри Поттер и узник Азкабана',2004,142],[339,'Индиана Джонс: В поисках утраченного ковчега',1981,115],[347,'Лоуренс Аравийский',1962,228],[369,'Мост через реку Квай',1957,161],[376,'Однажды на Диком Западе',1968,165],[360,'Тропы славы',1957,88,'w']],
+  mar: [[346,'12 разгневанных мужчин',1957,96],[348,'Эта замечательная жизнь',1946,130],[353,'Сансет бульвар',1950,110],[356,'В джазе только девушки',1959,121],[357,'Убить пересмешника',1962,129]],
+  igra: [[302,'Клад',2003,117],[306,'Рекрут',2003,115],[315,'Догвилль',2003,178],[368,'Поющие под дождём',1952,103],[372,'Всё о Еве',1950,138]],
+};
+const votes = { 'Психо': [2], 'Головокружение': [1], 'Матрица': [1], 'Список Шиндлера': [1], 'Властелин колец: Братство кольца': [3], 'Унесённые призраками': [1, 1], 'Хороший, плохой, злой': [0, 1], 'Управление гневом': [1], 'Пролетая над гнездом кукушки': [2], 'Семь самураев': [1] }; // [чужие, свой]
+const HOT = 'Психо', RATED = 'Криминальное чтиво', HEAVY = 'Управление гневом';
+const films = [];
+for (const p of people) for (const [k, t, y, r, s] of lists[p.id]) {
+  const v = votes[t] || [0, 0];
+  films.push({ id: 'f' + k, t, y, r, s, pid: p.id, poster: KP(k), others: v[0], mine: !!v[1], w: t === HEAVY ? 2 : 1 });
+}
+console.assert(films.length === 77 && new Set(films.map(f => f.id)).size === 77, 'нужно 77 разных постеров 300–376');
+// равные шансы: колесо делится поровну между участниками, ×множитель, внутри — между фильмами; голос ≈ +4 пункта
+const onWheel = f => !f.s && !people.find(p => p.id === f.pid).off;
+const pw = {};
+for (const p of people) if (!p.off) pw[p.id] = p.mult || 1;
+const raw = new Map();
+for (const p of people) {
+  const act = films.filter(f => f.pid === p.id && onWheel(f));
+  const wsum = act.reduce((a, f) => a + f.w, 0);
+  for (const f of act) raw.set(f.id, (pw[p.id] / Object.keys(pw).length) * (f.w / wsum) * 100 + (f.others + f.mine) * 0.6);
+}
+const tot = [...raw.values()].reduce((a, b) => a + b, 0);
+const share = f => (raw.get(f.id) || 0) / tot;
+const pShare = pid => films.filter(f => f.pid === pid).reduce((a, f) => a + share(f), 0);
+const fmtPct = s => s ? (s * 100).toFixed(s < .1 ? 1 : 0).replace('.', ',') + '%' : '—';
+const fmtRt = m => `${Math.floor(m / 60)} ч ${m % 60} мин`;
+const fmtX = x => '×' + String(x).replace('.', ',');
+const ON = films.filter(onWheel).length;
+
+// ---------- значки ----------
+const I = {
+  heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-9.4-9C1.3 7.7 3.4 4.5 6.8 4.5c2.1 0 3.6 1.2 5.2 3.1 1.6-1.9 3.1-3.1 5.2-3.1 3.4 0 5.5 3.2 4.2 6.5-1.9 4.4-9.4 9-9.4 9z"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
+  eye: '<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24"><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-2.6 3.4M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7c1.9 0 3.6-.6 5-1.5M3 3l18 18"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>',
+  list: '<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  pause: '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke-width="3"/></svg>',
+  next: '<svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z" fill="currentColor"/><path d="M18 5v14"/></svg>',
+  queue: '<svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h8M19 15v6M16 18h6"/></svg>',
+  music: '<svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+  replay: '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>',
+  mark: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2.5v7.3M12 14.2v7.3M2.5 12h7.3M14.2 12h7.3M5.3 5.3l5.1 5.1M13.6 13.6l5.1 5.1M18.7 5.3l-5.1 5.1M10.4 13.6l-5.1 5.1"/></svg>',
+  chevD: '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
+  chevU: '<svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg>',
+};
+const P = id => people.find(p => p.id === id);
+const av = (p, cls = '') => `<span class="av ${p.fr || ''} ${cls}" style="--a:${p.a}" title="${p.name}">${p.name.replace(/[^A-Za-zА-Яа-яЁё]/, '').charAt(0).toUpperCase()}</span>`;
+const nick = p => `<span class="nick ${p.font || ''} ${p.fx || ''}" style="--n:${p.n}">${p.name}${p.ico ? `<i>${p.ico}</i>` : ''}${p.bdg ? `<span class="bdg">${p.bdg}</span>` : ''}</span>`;
+
+// ---------- карточка: устойчивая разметка, числа — отдельные текстовые узлы ----------
+function card(f, o = {}) {
+  const off = P(f.pid).off;
+  const meta = f.s === 'w' ? 'уже смотрели' : f.s === 'o' ? 'выбыл' : `${f.y} · ${fmtRt(f.r)}`;
+  const n = f.others + f.mine;
+  const own = o.owner ? `<div class="own"><span class="step"><button title="Меньше">${I.minus}</button><b>${f.w}</b><button title="Больше">${I.plus}</button></span><button class="del" title="Удалить">${I.x}</button></div>` : '';
+  return `<article class="card${f.s ? ' out' : ''}${f.t === HOT && !o.noHot ? ' hot' : ''}${o.hov === f.t ? ' hov' : ''}" data-id="${f.id}">
+    <div class="pst"><img src="${f.poster}" alt="" loading="lazy" decoding="async">
+      <div class="bar"><span class="pct">${f.s || off ? '—' : fmtPct(share(f))}</span><button class="vote${f.mine ? ' mine' : ''}${f.others ? ' has' : ''}" title="${f.mine ? 'Снять свой голос' : 'Хочу посмотреть: около +4% колеса'}">${I.heart}<b>${n || ''}</b></button></div>${own}
+    </div>
+    <b class="t">${f.t}</b><small class="m">${meta}</small>
+  </article>`;
+}
+function shelf(p, o = {}) {
+  const fs = films.filter(f => f.pid === p.id);
+  const left = fs.filter(onWheel).length;
+  const closed = !(o.open || []).includes(p.id);
+  const sub = p.off ? 'не участвует' : `<span title="на колесе ${left} из ${fs.length}">${left} из ${fs.length}</span>${p.mult ? ` · <span class="${p.mult > 1 ? 'up' : 'down'}" title="Бонус к шансам до следующего его фильма">${fmtX(p.mult)}</span>` : ''}`;
+  const hidden = o.filter && o.filter !== p.id;
+  return `<section class="shelf${closed && o.filter !== p.id ? ' closed' : ''}${p.off ? ' off' : ''}${hidden ? ' hide' : ''}" data-pid="${p.id}">
+    <div class="sh-head" role="button" tabindex="0">
+      ${av(p)}
+      <span class="sh-t"><span class="ttl">${nick(p)}${p.you ? ' <span class="lbl" style="display:inline">(вы)</span>' : ''}</span><span class="lbl">${sub}</span></span>
+      <span class="stack">${fs.slice(0, 3).map(f => `<i style="background-image:url(${f.poster})"></i>`).join('')}</span>
+      <span class="sh-pct">${p.off ? '—' : fmtPct(pShare(p.id))}</span>
+      ${o.owner ? `<button class="eye" title="${p.off ? 'Вернуть в колесо' : 'Отключить из колеса'}">${p.off ? I.eyeOff : I.eye}</button>` : ''}
+      ${I.chev}
+    </div>
+    <div class="grid">${fs.map(f => card(f, o)).join('')}</div>
+  </section>`;
+}
+function rateBlock(kind) {
+  const f = films.find(x => x.t === RATED), toha = P('toha');
+  const raters = [['GLENN', 8, 'glenn'], ['nisshokuryu', 7, 'nis'], ['Serhio', 9, 'ser'], ['Сыра Гойда', 6, 'syra']];
+  const who = list => `<span class="who">${list.map(([n, s, id]) => `<span>${av(P(id))}${s}</span>`).join('')}</span>`;
+  const top = `<div class="rate-top"><i class="mp" style="background-image:url(${f.poster})"></i><span class="r-txt"><span class="lbl">Оцените фильм<span class="hint" title="Средняя оценка даст фильмам тохи бонус или штраф до следующего его фильма: ниже 6 — ×0,5, 8–9,9 — ×1,5, 10 — ×2">?</span></span><span class="ttl">${f.t}</span><span class="lbl">добавил(а) ${nick(toha)}</span></span>${kind === 'after' ? '<button class="link">Свернуть</button>' : ''}</div>`;
+  const scale = mine => `<div class="scale">${Array.from({ length: 10 }, (_, i) => `<button class="${i + 1 < 6 ? 'low' : i + 1 >= 8 ? 'high' : ''}${i + 1 === mine ? ' on' : ''}">${i + 1}</button>`).join('')}</div>`;
+  if (kind === 'open') return `<section class="rate">${top}${scale(0)}</section>`;
+  if (kind === 'after') return `<section class="rate">${top}${scale(8)}<div class="raters">${who([['Вы', 8, 'me'], ...raters])}<button class="link">Снять оценки</button></div><span class="lbl" style="margin-top:-6px">Поменять можно в течение минуты · средняя 7,6</span></section>`;
+  const sub = { done: 'ваша 8 · средняя 7,6', author: 'ваш фильм · средняя 7,6', banned: 'оценки для вас закрыты' }[kind];
+  return `<button class="rate line"><i class="mp" style="background-image:url(${f.poster})"></i><span class="r-txt"><span class="ttl">${f.t}</span><span class="lbl">${sub}</span></span>${I.chevD}</button>`;
+}
+const ctxAll = () => `${ON} на колесе · ${people.filter(p => !p.off).length} из ${people.length} в игре`;
+const ctxOne = p => `Только ${nick(p)}<button class="x" title="Показать всех">✕</button>`;
+function people_(o = {}) {
+  const fp = o.filter && P(o.filter);
+  const order = [...people];
+  const left = fp
+    ? ctxOne(fp)
+    : ctxAll();
+  return `<div class="people${fp ? ' f' : ''}">
+    <div class="ava-row">${order.map(p => av(p, `${p.off ? 'off' : ''}${fp && fp.id === p.id ? ' sel' : ''}`).replace('title="', `data-p="${p.id}" title="${p.off ? 'не участвует · ' : fmtPct(pShare(p.id)) + ' колеса · '}`)).join('')}</div>
+    <div class="share">${people.filter(p => !p.off).map(p => `<i data-p="${p.id}" class="${fp && fp.id === p.id ? 'sel' : ''}" style="--c:${p.n === '#FFFFFF' ? '#BDBDBD' : p.n};flex:${pShare(p.id).toFixed(3)}" title="${p.name} · ${fmtPct(pShare(p.id))}"></i>`).join('')}</div>
+    <div class="ctx"><span class="l">${left}</span><span class="votes" title="Сердечко у фильма — ваш голос. Отдано 2 из 3">голоса ${[1, 1, 0].map(v => I.heart.replace('<svg', `<svg class="${v ? 'on' : ''}"`)).join('')}</span></div>
+  </div>`;
+}
+function music(kind) {
+  if (kind === 'empty') return `<div class="np"><span class="art">${I.music}</span><span class="nt"><span class="ttl" style="font-size:14px">Музыка</span><span class="lbl">Поиск трека или наши треки</span></span></div>`;
+  return `<div class="np"><span class="art cov"></span><span class="nt"><span class="ttl" style="font-size:14px">andy warhol</span><span class="lbl">Kai Angel</span></span><span class="ctl">${kind === 'unmute' ? '<button class="listen">Слушать</button>' : `<button title="Пауза">${I.pause}</button>`}<button title="Следующий">${I.next}</button><button title="Очередь">${I.queue}<i>3</i></button></span></div>`;
+}
+function history() {
+  // первые — выпавшие из списка, дальше — фильмы, которых уже нет в списке (постеры 377–384)
+  const h = [[RATED, 1, null], ['Тропы славы', 0, '8,1'], ['Молчание ягнят', 0, '7,4'], ['Окно во двор', 0, '9,2'], ['Семь', 1, null, 377], ['Крадущийся тигр, затаившийся дракон', 0, '6,8', 378], ['Волшебник страны Оз', 0, '5,9', 379], ['2001 год: Космическая одиссея', 0, '7,7', 380], ['Жизнь прекрасна', 0, '8,6', 381]];
+  const ago = ['сегодня', 'вчера', '3 дня назад', 'неделю назад', 'неделю назад', '2 недели назад', '2 недели назад', 'месяц назад', 'месяц назад'];
+  return `<div class="grid" style="padding-top:4px">${h.map(([t, rate, avg, k], i) => {
+    const f = films.find(x => x.t === t);
+    const src = f ? f.poster : KP(k);
+    return `<article class="card"><div class="pst"><img src="${src}" alt="" loading="lazy"><div class="bar"><span class="score">${avg ? '★ ' + avg : ''}</span>${rate ? '<button class="rate-me">Оценить</button>' : ''}</div></div><b class="t">${t}</b><small class="m">${ago[i]}</small></article>`;
+  }).join('')}</div>`;
+}
+// панель целиком
+function panel(o) {
+  const tab = o.tab || 'films';
+  return `<aside class="pn${o.solo ? ' solo' : ''}" style="${o.style || ''}">${o.top || ''}
+    ${o.noHead ? '' : `<div class="p-head"><span class="mark">${I.mark}</span><button class="room"><span>Лудка колесо</span>${I.chevD}</button></div>`}
+    ${o.rate ? rateBlock(o.rate) : ''}
+    <div class="tabs"><button class="${tab === 'films' ? 'on' : ''}">Фильмы<span>77</span></button><button class="${tab === 'hist' ? 'on' : ''}">Выпадало<span>30</span></button></div>
+    ${tab === 'films' ? `<div class="add"><div class="search">${I.search}<span>Фильм или ссылка на YouTube</span></div><button class="ibtn" title="Добавить списком">${I.list}</button></div>
+    ${people_(o)}
+    <div class="list" ${o.scroll ? `data-scroll="${o.scroll}"` : ''}>${people.map(p => shelf(p, o)).join('')}</div>` : `<div class="list">${history()}</div>`}
+    ${o.music === false ? '' : music(o.music || 'play')}
+  </aside>`;
+}
+
+// ---------- сцена-силуэт ----------
+const segs = (() => {
+  const act = films.filter(onWheel), stops = [];
+  act.forEach((f, i) => { const h = (parseInt(f.id.slice(1)) * 47) % 360; const a = i / act.length * 360, b = (i + 1) / act.length * 360; stops.push(`hsl(${h} 30% ${f.t === HOT ? 46 : 18 + (i % 3) * 5}%) ${a}deg ${b - .6}deg, #111 ${b - .6}deg ${b}deg`); });
+  return `conic-gradient(from -${180 / act.length}deg, ${stops.join(',')})`;
+})();
+const hotF = films.find(f => f.t === HOT);
+function wheel(x, y, d) {
+  return `<div class="wheel" style="left:${x}px;top:${y}px;width:${d}px;height:${d}px"><div class="seg" style="--segs:${segs}"></div><div class="hub" style="font-size:${Math.round(d * .045)}px;line-height:1.1"><span>Крутить</span><small>${ON} на колесе</small></div><div class="ptr"></div></div>`;
+}
+const ppl = people.filter(p => !p.off).slice(0, 3).map(p => av(p)).join('');
+
+// 1440 × 900: панель колонки 1–3, сцена-лист колонки 4–12
+document.getElementById('hero').innerHTML = `<div class="frame" data-w="1440" data-h="900" style="width:1440px;height:900px;--poster:url(${hotF.poster})">
+  <div class="room-bg"></div>
+  ${panel({ style: 'left:24px;top:16px;width:330px;height:860px', rate: 'open', owner: true, open: ['me'] })}
+  <div class="stg" style="left:378px;top:16px;width:1038px;height:860px">
+    <div class="cap-g" style="left:20px;top:16px"><div class="pill"><span>Обычный</span><span class="on">Выбывание</span></div><div class="pill" style="padding-left:14px">До победителя <span class="tog"></span></div></div>
+    <div class="cap-g" style="right:20px;top:16px"><div class="ava-stack" style="margin-right:8px">${ppl}</div><div class="pill" style="padding:4px 8px;gap:8px"><span style="padding:0 6px">✦</span><span style="padding:0 6px">⌁</span><span style="padding:0 6px">⚙</span></div></div>
+    <div class="foot-line" style="left:0;right:0;top:72px"></div>
+    <div class="now" style="left:44px;top:330px;width:300px"><h2>${HOT}</h2><p>1960, 1 ч 49 мин, ужасы, триллер<br>Добавил(а) МС Дымка<br>Осталось ${ON} из 77</p></div>
+    ${wheel(410, 120, 580)}
+    <div class="foot-line" style="left:0;right:0;bottom:80px"></div>
+    <div class="status" style="left:44px;bottom:32px">Колесо выбивает по фильму, последний побеждает</div>
+    <div class="react" style="right:16px;bottom:16px">👏 🔥 😂 😍 😮 💀 🎉 <span class="say">Написать всем…</span></div>
+  </div>
+</div>`;
+
+// состояния
+const S = (title, text, html) => `<figure class="state" style="margin:0">${html}<figcaption class="cap"><b>${title}.</b> ${text}</figcaption></figure>`;
+const solo = (h, o) => `<div class="fit" style="max-width:330px"><div class="frame" data-w="330" data-h="${h}" style="width:330px;height:${h}px;--poster:url(${hotF.poster})"><div class="room-bg"></div>${panel({ ...o, style: `left:0;top:0;width:330px;height:${h}px;border-radius:16px` })}</div></div>`;
+document.getElementById('states').innerHTML = [
+  S('Полка раскрыта, наведение создателя', 'Шанс и голос в полосе внизу постера: белое сердечко с числом — чужие голоса, синее — ваш. При наведении у создателя сверху вес «− 1 +» и «×». Шапка полки липнет к верху списка. Ниже — смотренные и выбывшие: серые, в конце полки, вместо года «уже смотрели» / «выбыл». У следующей полки «Управление гневом» с весом 2 — 5,1%.',
+    solo(760, { noHead: 1, owner: true, open: ['me', 'toha'], hov: 'Головокружение', scroll: 1, music: false })),
+  S('Все полки свёрнуты', 'Как у владельца на скриншоте. Свёрнутая полка — веер из трёх постеров, вторая строка «10 из 11 · ×0,5» текстом без плашек. Четверо «не участвуют» — приглушены целиком, глаз зачёркнут.',
+    solo(760, { noHead: 1, owner: true, open: [], music: 'empty' })),
+  S('Фильтр по человеку', 'Тап по аватару в легенде: остальные гаснут, в полосе долей подсвечена его часть, в списке — только его полка, раскрытая. ✕ в строке контекста — снова все.',
+    solo(760, { noHead: 1, filter: 'toha', open: ['toha'], music: false })),
+  S('Оценка: до и сразу после', 'Шкала — одна строка из 10 кнопок по 32: читается как шкала, а не как сетка 2×5, и экономит 40 px. После оценки: ваша подсвечена, под шкалой оценки людей аватарами, «Снять оценки» у создателя.',
+    `<div style="display:grid;gap:12px">${['open', 'after'].map(k => `<div class="pn solo" style="max-width:330px">${rateBlock(k)}</div>`).join('')}</div>`),
+  S('Оценка свёрнута', 'Строка 48 в том же ритме: мини-постер, название, подпись. Три причины — уже оценили, ваш фильм, оценки закрыты создателем.',
+    `<div style="display:grid;gap:12px">${['done', 'author', 'banned'].map(k => `<div class="pn solo" style="max-width:330px">${rateBlock(k)}</div>`).join('')}</div>`),
+  S('«Выпадало»', 'Та же карточка: вместо шанса — средняя оценка, вместо сердечка — «Оценить» акцентом, вместо года — когда выпал.',
+    solo(640, { noHead: 1, tab: 'hist', music: false })),
+  S('Лёгкий режим', 'Рамки и ники стоят статичным кадром, стекло панели без размытия. Дизайн не держится на движении: система — сетка постеров и две строки текста.',
+    `<div class="lite">${solo(560, { noHead: 1, owner: true, open: ['nis'], music: 'unmute' })}</div>`),
+].join('');
+
+// 1024 × 768: панель колонки 1–4 (309), «под стрелкой» строкой над колесом
+document.getElementById('tab1024').innerHTML = `<div class="frame" data-w="1024" data-h="768" style="width:1024px;height:768px;--poster:url(${hotF.poster})">
+  <div class="room-bg"></div>
+  ${panel({ style: 'left:24px;top:16px;width:309px;height:728px', rate: 'done', owner: true, open: ['me'] })}
+  <div class="stg bare" style="left:357px;top:16px;width:643px;height:728px">
+    <div class="cap-g" style="left:0;top:16px"><div class="pill"><span>Обычный</span><span class="on">Выбывание</span></div></div>
+    <div class="cap-g" style="right:0;top:16px"><div class="ava-stack" style="margin-right:4px">${ppl}</div></div>
+    <div class="now" style="left:0;top:92px"><h2 style="font-size:32px;line-height:36px">${HOT}</h2><p style="margin-top:4px">1960 · 1 ч 49 мин · ужасы · добавил(а) МС Дымка</p></div>
+    ${wheel(96, 190, 450)}
+    <div class="react" style="left:50%;transform:translateX(-50%);bottom:0">👏 🔥 😂 😍 💀 <span class="say" style="width:140px">Написать всем…</span></div>
+  </div>
+</div>`;
+
+// телефон: шторка свёрнута / раскрыта
+const phoneStage = `<div class="room-bg"></div>
+  <div class="m-top"><span style="width:26px;height:26px">${I.mark.replace('<svg', '<svg style="width:26px;height:26px;stroke-width:1.6"')}</span><span style="font:400 20px/24px var(--f-head)">Лудка колесо</span></div>
+  <div class="cap-g" style="left:16px;top:64px"><div class="pill"><span>Обычный</span><span class="on">Выбывание</span></div></div>
+  <div class="now" style="left:16px;top:124px"><h2 style="font-size:32px;line-height:36px">${HOT}</h2><p style="margin-top:4px">1960 · 1 ч 49 мин · МС Дымка</p></div>
+  ${wheel(31, 230, 328)}`;
+const peek = `<div class="peek"><div class="grab" style="margin-top:8px"></div><div class="ph"><b>Фильмы</b><span class="lbl">${ON} на колесе из 77</span><span style="color:var(--tx3)">${I.chevU}</span></div></div>`;
+document.getElementById('phones').innerHTML = [
+  `<figure style="margin:0"><div class="fit" style="max-width:390px"><div class="frame touch" data-w="390" data-h="844" style="width:390px;height:844px;--poster:url(${hotF.poster})">${phoneStage}
+    <aside class="pn sheet" style="height:148px;padding-top:0">${peek}${music('play')}</aside></div></div><figcaption class="cap"><b>Свёрнута.</b> Заголовок «Фильмы · 48 на колесе из 77» и музыка; тяни вверх.</figcaption></figure>`,
+  `<figure style="margin:0"><div class="fit" style="max-width:390px"><div class="frame touch" data-w="390" data-h="844" style="width:390px;height:844px;--poster:url(${hotF.poster})">${phoneStage}<div class="scrim"></div>
+    ${panel({ style: 'left:0;right:0;bottom:0;top:56px;border-radius:28px 28px 0 0;padding-top:0', rate: 'done', owner: true, open: ['me'], noHead: 1, top: peek })}</div></div><figcaption class="cap"><b>Раскрыта.</b> Тот же порядок блоков, что на компьютере; полка в три постера по 108. На сенсорном голос и вес создателя видны всегда.</figcaption></figure>`,
+].join('');
+
+// ---------- масштаб кадров под ширину страницы ----------
+function fit() {
+  document.querySelectorAll('.fit').forEach(w => {
+    const f = w.firstElementChild, W = +f.dataset.w, H = +f.dataset.h;
+    const s = Math.min(1, w.clientWidth / W);
+    f.style.transform = `scale(${s})`; w.style.height = H * s + 'px';
+  });
+}
+fit(); addEventListener('resize', fit);
+// стартовая прокрутка кадров: раскрытая полка видна сразу
+document.querySelectorAll('[data-scroll]').forEach(l => { const c = l.querySelector('.card.hov'); if (c) l.scrollTop = c.offsetTop - l.offsetTop - 64; });
+
+// ---------- живой макет: точечное обновление без пересборки ----------
+// голос: меняются класс сердечка и текстовые узлы чисел, строки не пересоздаются
+document.addEventListener('click', e => {
+  const v = e.target.closest('.vote');
+  if (v) { e.stopPropagation(); const b = v.querySelector('b'); const n = (+b.textContent || 0) + (v.classList.toggle('mine') ? 1 : -1); b.textContent = n || ''; return; }
+  const head = e.target.closest('.sh-head');
+  if (head && !e.target.closest('.eye')) { head.parentElement.classList.toggle('closed'); return; }
+  // фильтр по человеку: только классы и одна строка контекста, полки не пересоздаются
+  const a = e.target.closest('.ava-row .av'), x = e.target.closest('.ctx .x');
+  if (a || x) {
+    const pn = (a || x).closest('.pn'), pid = a && !a.classList.contains('sel') ? a.dataset.p : null;
+    pn.querySelector('.people').classList.toggle('f', !!pid);
+    pn.querySelectorAll('.ava-row .av, .share i').forEach(el => el.classList.toggle('sel', el.dataset.p === pid));
+    pn.querySelectorAll('.shelf').forEach(s => { s.classList.toggle('hide', !!pid && s.dataset.pid !== pid); if (s.dataset.pid === pid) s.classList.remove('closed'); });
+    pn.querySelector('.ctx .l').innerHTML = pid ? ctxOne(P(pid)) : ctxAll();
+  }
+});
+</script>
+</body>
+</html>

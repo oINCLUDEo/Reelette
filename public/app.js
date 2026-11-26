@@ -16,6 +16,8 @@ const ICON = {
   check: '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>',
   eye: '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24"><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.6 3.3M6.6 6.9C4 8.6 2.5 12 2.5 12s3.5 6.5 9.5 6.5a9 9 0 0 0 4.4-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
+  chev: '<svg viewBox="0 0 24 24" class="chev"><path d="m6 9 6 6 6-6"/></svg>',
+  right: '<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>',
   heart: '<svg viewBox="0 0 24 24" class="heart"><path d="M12 20.5s-7.5-4.6-7.5-10.3A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3Z"/></svg>',
 };
 
@@ -1741,6 +1743,11 @@ function initRoom(roomId) {
   }
   // новые фильмы в списке появляются с подскоком; при первой отрисовке — без анимации
   let seenFilms = null;
+  // список фильмов: шапки групп и строки по ключу, создаются один раз и дальше правятся точечно
+  const groupEls = new Map(), rowEls = new Map();
+  const mkEl = html => { const t = document.createElement('template'); t.innerHTML = html; return t.content.firstElementChild; };
+  const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
+  const setAttr = (el, k, v) => { if (el.getAttribute(k) !== v) el.setAttribute(k, v); };
   function renderNow() {
     if (!state) return;
     $('#roomTitle').textContent = $('#roomTitleM').textContent = state.name;
@@ -1762,13 +1769,13 @@ function initRoom(roomId) {
     const watched = watchedIds();
 
     const used = myVotesUsed(), R = rules(), vMax = votesMax(myPid()), vWin = bonusVotesOf(myPid());
-    // голоса — одной строкой, объяснение в подсказке
+    // голоса — служебной строкой: точки (бонусные — контуром), «осталось/всего», объяснение в подсказке
     const vLeft = Math.max(0, vMax - used);
-    setHTML($('#myVotes'), `<span>Ваши голоса</span><span class="dots">${Array.from({ length: vMax }, (_, i) => `<i class="${i < vLeft ? 'on' : ''}${i >= R.votes ? ' win' : ''}"></i>`).join('')}</span><span class="m">${vLeft ? `осталось ${vLeft}` : 'все отданы'}</span>`);
+    setHTML($('#myVotes'), `<span class="lb">Ваши голоса<span class="dots">${Array.from({ length: vMax }, (_, i) => `<i class="${i < vLeft ? 'on' : ''}${i >= R.votes ? ' bn' : ''}"></i>`).join('')}</span></span><span class="n">${vLeft}/${vMax}</span><span class="ac"><i class="q">?</i></span>`);
     $('#myVotes').dataset.tt = `Сердечко у фильма — ваш голос: около +${R.points ?? 4}% колеса этому фильму, на фильм не больше одного своего.${vLeft ? '' : ' Голос можно снять и отдать другому.'}`
       + (vWin > 0 ? ` +${vWin} ${plural(vWin, 'голос', 'голоса', 'голосов')} за ${vWin >= 4 ? 'оценку 10' : 'хорошую оценку'} вашего фильма.` : vWin < 0 ? ` На ${-vWin} ${plural(-vWin, 'голос', 'голоса', 'голосов')} меньше за низкую оценку вашего фильма.` : '');
 
-    // бонус или штраф человека — значком у его процента, подробности в подсказке
+    // бонус или штраф человека — значком под его долей, подробности в подсказке
     const modChip = pid => {
       const m = state.modifiers?.[pid];
       if (!m || m.factor === 1) return '';
@@ -1794,64 +1801,100 @@ function initRoom(roomId) {
     for (const g of groups.values()) {
       g.left = g.films.filter(f => onWheel.has(f.id)).length;
       g.films = [...g.films.filter(f => onWheel.has(f.id)), ...g.films.filter(f => !onWheel.has(f.id))];
+      g.share = total ? g.films.reduce((a, f) => a + (W.get(f.id) || 0), 0) / total : 0;
     }
     const ordered = [...groups.values()].sort((a, b) => (b.pid === myPid()) - (a.pid === myPid()) || b.films.length - a.films.length);
-    const avatarOf = avatarFor;
-    const filmRow = f => {
-      const seen = watched.has(f.id);
-      const off = !seen && isOff(personOf(f));
-      const filtered = !seen && !out.has(f.id) && (off || !matchesFilters(f));
-      const share = (W.get(f.id) || 0) / total;
-      const pct = seen || out.has(f.id) || filtered || !total ? '—' : `${(share * 100).toFixed(share < 0.1 ? 1 : 0)}%`;
-      const nv = (f.votes || []).length, mine = iVoted(f);
-      const meta = seen ? ['уже смотрели'] : off ? ['автор сегодня не участвует'] : filtered ? ['не подходит под фильтры'] : [f.year, f.runtime && fmtRuntime(f.runtime)].filter(Boolean);
-      const fresh = seenFilms && !seenFilms.has(f.id);
-      return `<div class="film${fresh ? ' fresh' : ''}${out.has(f.id) || seen ? ' out' : ''}${seen ? ' watched' : ''}${filtered ? ' filtered' : ''}${wheel.curId === f.id ? ' hot' : ''}" data-id="${esc(f.id)}">
-        <div class="film-poster" style="${posterStyle(f)}">${f.poster ? '' : initial(f.title)}</div>
-        <div class="film-main">
-          <div class="film-title">${esc(f.title)}</div>
-          <div class="film-meta">${meta.map(esc).join(', ')}</div>
-        </div>
-        <div class="film-side">
-          <span class="film-pct" title="${seen ? 'Уже выпадал, на колесе его нет' : 'Шанс выиграть'}">${pct}</span>
-          <div class="film-actions">
-            <button class="vote-btn${mine ? ' on' : ''}${nv ? ' has' : ''}" data-vote-film title="${mine ? 'Снять свой голос' : `Хочу посмотреть: около +${rules().points ?? 4}% колеса этому фильму`}">${ICON.heart}<b>${nv || ''}</b></button>
-            ${amOwner ? `<div class="stepper"><button data-w="-1" title="Меньше">${ICON.minus}</button><b>${f.weight}</b><button data-w="1" title="Больше">${ICON.plus}</button></div>` : ''}
-          </div>
-        </div>
-        ${canDelete(f) ? `<button class="film-del" data-del title="Удалить">${ICON.x}</button>` : ''}
-      </div>`;
-    };
-    queueMicrotask(() => { seenFilms = new Set(state.films.map(f => f.id)); });
-    setHTML($('#filmList'), ordered.map(g => {
-      const gShare = total ? g.films.reduce((a, f) => a + (W.get(f.id) || 0), 0) / total : 0;
-      const ava = avatarOf(g.pid);
+    const fmtShare = s => `${(s * 100).toFixed(s < 0.1 ? 1 : 0).replace('.', ',')}%`;
+    // полоса долей: кусок на человека в цвете его ника, ширина — доля колеса
+    setHTML($('#shareBar'), ordered.filter(g => g.share > 0).map(g => `<i style="--c:${esc(authorColor(g.pid) || `hsl(${hue(g.name)} 55% 42%)`)};flex:${g.share.toFixed(4)}" title="${esc(g.name)} · ${fmtShare(g.share)}"></i>`).join(''));
+    // строки списка живут между обновлениями: на голос меняются текст процента, сердечко и классы, а не весь список
+    const list = $('#filmList');
+    const seenGroups = new Set(), seenRows = new Set();
+    let prevG = null;
+    for (const g of ordered) {
+      seenGroups.add(g.pid);
+      let ge = groupEls.get(g.pid);
+      if (!ge) {
+        ge = mkEl(`<div class="film-group"><div class="r gh hv group-head" role="button" tabindex="0"><i class="hb"></i><span class="ld g-person" title="Профиль"></span><b class="l1"></b><span class="l2"><span class="i"></span><span class="own"></span></span><span class="n1"></span><span class="n2"></span><span class="ac">${ICON.chev}</span></div><div class="g-body"><div></div></div></div>`);
+        groupEls.set(g.pid, ge);
+      }
+      // порядок групп поправляется, только если он изменился: лишние перестановки сбрасывают наведение и анимации
+      const want = prevG ? prevG.nextElementSibling : list.firstElementChild;
+      if (want !== ge) list.insertBefore(ge, want);
+      prevG = ge;
+      const head = ge.firstElementChild, [, ld, l1, l2, n1, n2] = head.children;
       const closed = collapsed.has(g.pid), off = isOff(g.pid);
-      // создатель отключает человека прямо из шапки группы; отключённая группа приглушена у всех
-      const offBtn = amOwner ? `<button type="button" class="g-off${off ? ' on' : ''}" data-off="${esc(g.pid)}" title="${off ? 'Вернуть в колесо' : 'Отключить из колеса: сегодня его нет'}" aria-label="${off ? 'Вернуть в колесо' : 'Отключить из колеса'}">${off ? ICON.eyeOff : ICON.eye}</button>` : '';
-      return `<div class="film-group${closed ? ' closed' : ''}${off ? ' off' : ''}">
-        <div class="group-head" data-group="${esc(g.pid)}" role="button" tabindex="0" aria-expanded="${!closed}" title="${closed ? 'Развернуть' : 'Свернуть'}">
-          <svg class="g-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
-          <span class="g-person" data-person="${esc(g.pid)}" data-name="${esc(g.name)}" title="Профиль">
-            ${ava ? `<img class="${frameCls(g.pid)}" style="${frameVars(g.pid)}" src="${esc(pimg(ava))}" alt="">` : `<span class="g-ava${frameCls(g.pid)}" style="background:hsl(${hue(g.name)} 55% 42%);${frameVars(g.pid)}">${initial(g.name)}</span>`}
-            <b>${nick(g.pid, g.name)}${g.pid === myPid() ? ' <span class="m">(вы)</span>' : ''}</b>
-          </span>
-          ${off ? '<span class="g-offtag">не участвует</span>' : `<span class="g-count${g.left < g.films.length ? ' part' : ''}" title="${g.left < g.films.length ? `На колесе ${g.left} из ${g.films.length}` : `${g.films.length} ${plural(g.films.length, 'фильм', 'фильма', 'фильмов')} на колесе`}">${g.left < g.films.length ? `${g.left}<i>/${g.films.length}</i>` : g.films.length}</span>
-          ${modChip(g.pid)}`}
-          ${offBtn}
-          <em>${gShare ? `${(gShare * 100).toFixed(gShare < 0.1 ? 1 : 0)}%` : '—'}</em>
-        </div>
-        <div class="g-body"><div>${g.films.map(filmRow).join('')}</div></div>
-      </div>`;
-    }).join(''));
-    // разметка не изменилась (тик отсчёта, музыка) — список не пересобирается: setHTML
+      ge.classList.toggle('closed', closed);
+      ge.classList.toggle('off', off);
+      setAttr(head, 'data-group', g.pid);
+      setAttr(head, 'aria-expanded', String(!closed));
+      setAttr(head, 'title', closed ? 'Развернуть' : 'Свернуть');
+      setAttr(ld, 'data-person', g.pid); setAttr(ld, 'data-name', g.name);
+      const ava = avatarFor(g.pid);
+      setHTML(ld, ava ? `<img class="av${frameCls(g.pid)}" style="${frameVars(g.pid)}" src="${esc(pimg(ava))}" alt="">` : `<span class="av g-ava${frameCls(g.pid)}" style="background:hsl(${hue(g.name)} 55% 42%);${frameVars(g.pid)}">${initial(g.name)}</span>`);
+      setHTML(l1, `<span class="g-name" data-person="${esc(g.pid)}" data-name="${esc(g.name)}">${nick(g.pid, g.name)}</span>`);
+      const n = g.films.length, nf = `${n} ${plural(n, 'фильм', 'фильма', 'фильмов')}`;
+      setText(l2.firstElementChild, (g.pid === myPid() ? 'Вы · ' : '') + (off ? `не участвует · ${nf}` : g.left < n ? `${g.left} из ${n} на колесе` : nf));
+      // создатель отключает человека прямо из шапки группы: кнопка на месте второй строки по наведению
+      setHTML(l2.lastElementChild, amOwner ? `<button type="button" class="g-off" data-off="${esc(g.pid)}" title="${off ? 'Вернуть в колесо' : 'Отключить из колеса: сегодня его нет'}">${off ? `${ICON.eye}<span>Вернуть в колесо</span>` : `${ICON.eyeOff}<span>Не участвует сегодня</span>`}</button>` : '');
+      head.classList.toggle('ow', amOwner);
+      setHTML(n1, off ? `<span class="g-offtag" title="Не участвует сегодня">${ICON.eyeOff}</span>` : g.share ? fmtShare(g.share) : '—');
+      setHTML(n2, off ? '' : modChip(g.pid));
+      // строки фильмов группы
+      const body = ge.lastElementChild.firstElementChild;
+      let prevR = null;
+      for (const f of g.films) {
+        seenRows.add(f.id);
+        let row = rowEls.get(f.id);
+        if (!row) {
+          row = mkEl(`<div class="r hv film" data-id="${esc(f.id)}"><i class="ld po"></i><b class="l1"></b><span class="l2"><span class="i"></span><span class="own stp"></span></span><span class="n1"></span><span class="n2"></span><span class="ac"><button class="vt" data-vote-film>${ICON.heart}<span></span></button></span></div>`);
+          // новый фильм проявляется один раз: строка живёт весь вечер, и без снятия класса анимация повторялась бы при каждой перестановке
+          if (seenFilms && !seenFilms.has(f.id)) { row.classList.add('fresh'); row.addEventListener('animationend', e => { if (e.target === row) row.classList.remove('fresh'); }); }
+          if (wheel.curId === f.id) row.classList.add('hot');
+          rowEls.set(f.id, row);
+        }
+        const wantR = prevR ? prevR.nextElementSibling : body.firstElementChild;
+        if (wantR !== row) body.insertBefore(row, wantR);
+        prevR = row;
+        const seen = watched.has(f.id), gone = out.has(f.id);
+        const fOff = !seen && isOff(g.pid);
+        const filtered = !seen && !gone && (fOff || !matchesFilters(f));
+        const dim = seen || gone || filtered;
+        const share = (W.get(f.id) || 0) / total;
+        const nv = (f.votes || []).length, mine = iVoted(f);
+        const own = amOwner && !dim;
+        row.classList.toggle('out', dim);
+        row.classList.toggle('gone', gone);
+        row.classList.toggle('ow', own);
+        const [po, t1, t2, p1, , acc] = row.children;
+        setAttr(po, 'style', posterStyle(f));
+        setHTML(po, (f.poster ? '' : initial(f.title)) + (canDelete(f) ? `<button class="film-del" data-del title="Удалить">${ICON.x}</button>` : ''));
+        setText(t1, f.title);
+        setText(t2.firstElementChild, seen ? 'уже смотрели' : gone ? 'выбыл' : fOff ? 'автор сегодня не участвует' : filtered ? 'не подходит под фильтры' : [f.year, f.runtime && fmtRuntime(f.runtime)].filter(Boolean).join(' · '));
+        // кнопки веса не пересоздаются на смену числа: иначе быстрый второй клик и фокус клавиатуры терялись
+        setHTML(t2.lastElementChild, own ? `вес <button data-w="-1" title="Меньше">${ICON.minus}</button><b></b><button data-w="1" title="Больше">${ICON.plus}</button>` : '');
+        if (own) setText(t2.lastElementChild.querySelector('b'), String(f.weight));
+        setText(p1, dim || !total ? '—' : fmtShare(share));
+        setAttr(p1, 'title', seen ? 'Уже выпадал, на колесе его нет' : 'Шанс выиграть');
+        const vt = acc.firstElementChild;
+        vt.classList.toggle('me', mine);
+        vt.classList.toggle('has', nv > 0);
+        setText(vt.lastElementChild, nv ? String(nv) : '');
+        setAttr(vt, 'title', mine ? 'Снять свой голос' : `Хочу посмотреть: около +${R.points ?? 4}% колеса этому фильму`);
+      }
+      // фильмы, которых в группе больше нет (удалили)
+      while (prevR ? prevR.nextElementSibling : body.firstElementChild) (prevR ? prevR.nextElementSibling : body.firstElementChild).remove();
+    }
+    for (const [pid, ge] of groupEls) if (!seenGroups.has(pid)) { ge.remove(); groupEls.delete(pid); }
+    for (const [id, row] of rowEls) if (!seenRows.has(id)) { row.remove(); rowEls.delete(id); }
+    queueMicrotask(() => { seenFilms = new Set(state.films.map(f => f.id)); });
 
     $('#histCount').textContent = state.history.length ? String(state.history.length) : '';
     setHTML($('#historyList'), state.history.length
       ? state.history.slice(0, 50).map((h, i) => {
         const a = avgRating(h);
         const canRate = personOf(h.film) !== myPid() && !h.ratings?.[myPid()] && !noRateMe();
-        return `<div class="hist" data-h="${i}"><i style="${posterStyle(h.film)}"></i><div><b>${esc(h.film.title)}</b><span>${timeAgo(h.at)}</span></div>${canRate ? '<em class="rate-me">Оценить</em>' : ''}${a !== null ? `<em class="score">${a.toFixed(1).replace('.', ',')}</em>` : ''}</div>`;
+        return `<div class="r hv hist" data-h="${i}"><i class="ld po" style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><b class="l1">${esc(h.film.title)}</b><span class="l2"><span class="i">${timeAgo(h.at)}</span>${canRate ? '<em class="rate-me">Оценить</em>' : ''}</span><span class="n1" title="Средняя оценка">${a !== null ? a.toFixed(1).replace('.', ',') : '—'}</span><span class="n2"></span><span class="ac">${ICON.right}</span></div>`;
       }).join('')
       : '<p class="note">Пока ничего. Победители будут появляться здесь.</p>');
 
@@ -1992,7 +2035,7 @@ function initRoom(roomId) {
     const q = state?.queue || [];
     const m = state?.music;
     $('#ytQCount').hidden = !q.length;
-    $('#ytQCount').textContent = q.length;
+    $('#ytQCount').textContent = `в очереди ${q.length}`;
     $('#ytQueueBtn').hidden = !m;
     $('#ytRestart').hidden = $('#ytStop').hidden = !m;
     $('#ytNowBtn').textContent = m ? 'Включить сейчас' : 'Включить';
@@ -2785,30 +2828,32 @@ function initRoom(roomId) {
     const banned = !isAuthor && noRateMe();
     const done = isAuthor || banned || (mine && rateLeft(h) <= 0);
     box.classList.toggle('compact', done && rateOpen !== h.hid);
+    const a = avgRating(h);
+    const avgT = a === null ? '' : a.toFixed(1).replace('.', ',');
+    // свёрнуто — обычная строка списка в карточке: постер, название, ваша и средняя оценка, раскрыть
     if (done && rateOpen !== h.hid) {
-      const a0 = avgRating(h);
-      setHTML(box, `<button class="rate-line" data-rate-open title="Подробнее"><i style="${posterStyle(h.film)}"></i><span><b>${esc(h.film.title)}</b><small>${isAuthor ? 'ваш фильм' : banned ? 'оценки для вас закрыты' : `ваша ${mine}`}${a0 !== null ? ` · средняя ${a0.toFixed(1).replace('.', ',')}` : ''}</small></span><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>`);
+      setHTML(box, `<div class="card"><button class="r hv rate-line" data-rate-open title="Подробнее"><i class="ld po" style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><b class="l1">${esc(h.film.title)}</b><span class="l2"><span class="i">${isAuthor ? 'ваш фильм' : banned ? 'оценки для вас закрыты' : `ваша ${mine}`}${avgT ? ` · средняя ${avgT}` : ''}</span></span><span class="n1"></span><span class="n2"></span><span class="ac">${ICON.chev}</span></button></div>`);
       return;
     }
     const list = Object.entries(h.ratings || {}).filter(([pid]) => pid !== author);
     const who = `<button class="person" data-person="${esc(author)}" data-name="${esc(h.film.addedBy || '')}">${esc(h.film.addedBy || 'автора')}</button>`;
-    const a = avgRating(h);
     const fct = a === null ? null : ratingFactor(a);
     const whoT = h.film.addedBy || 'автора';
     const effect = !h.src ? `Бонус ${whoT} уже задаёт его более новый фильм.`
       : a === null ? `Средняя оценка даст фильмам ${whoT} бонус или штраф до следующего выпадения его фильма: ниже 6 — ×0,5 и 1 голос вместо 3; 8–9,9 — ×1,5 и +2 голоса; 10 — ×2 и +4 голоса.`
       : fct === 1 ? `Средняя ${a.toFixed(1).replace('.', ',')}: шанс фильмов ${whoT} не меняется.`
       : `Средняя ${a.toFixed(1).replace('.', ',')}: фильмы ${whoT} получают ${fmtFactor(fct)}, пока снова не выпадет его фильм.`;
-    // три части обновляются отдельно и только при изменении: чужая оценка не пересоздаёт кнопки шкалы
+    // части обновляются отдельно и только при изменении: чужая оценка не пересоздаёт кнопки шкалы
     // посреди нажатия (иначе клик между нажатием и отпусканием терялся)
-    if (!box.firstElementChild?.classList.contains('rate-slot')) {
-      box.innerHTML = '<div class="rate-slot"></div><div class="rate-slot"></div><div class="rate-slot"></div>';
+    if (!box.querySelector(':scope > .rate-card')) {
+      box.innerHTML = '<div class="sh rate-sh"></div><div class="card rate-card"><div class="rate-slot"></div><div class="rate-slot"></div><div class="rate-slot"></div></div>';
       box.__html = null;
     }
-    const [top, scale, rated] = box.children;
-    setHTML(top, `
-      <h3><span>Оцените фильм <button type="button" class="hint" data-hint="${esc(effect)}" aria-label="Подсказка: что даёт оценка">?</button></span>${done ? ' <button class="link-btn" data-rate-close>Свернуть</button>' : ''}</h3>
-      <div class="rate-film" data-h="0"><i style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><div><b>${esc(h.film.title)}</b><span>добавил(а) ${who}</span></div></div>`);
+    const [top, scale, rated] = box.lastElementChild.children;
+    // служебная строка: заголовок слева, «?» в колонке действия
+    setHTML(box.firstElementChild, `<span class="lb">Оцените фильм</span><span class="n"></span><span class="ac"><button type="button" class="hint" data-hint="${esc(effect)}" aria-label="Подсказка: что даёт оценка">?</button></span>`);
+    // фильм — строка с постером, средняя в колонке чисел; уже оцененный можно свернуть стрелкой в колонке действия
+    setHTML(top, `<div class="r rate-film"><i class="ld po" style="${posterStyle(h.film)}">${h.film.poster ? '' : initial(h.film.title)}</i><b class="l1">${esc(h.film.title)}</b><span class="l2"><span class="i">добавил(а) ${who}</span></span><span class="n1" title="Средняя оценка">${avgT}</span><span class="n2"></span><span class="ac">${done ? `<button type="button" class="rate-fold" data-rate-close title="Свернуть" aria-label="Свернуть">${ICON.chev}</button>` : ''}</span></div>`);
     const scaleHtml = isAuthor ? '<p class="note">Это ваш фильм, его оценивают остальные.</p>' : rateScale(h);
     // своя оценка дошла: шкала та же, меняется только подсветка — правим на месте, не пересоздавая кнопки,
     // иначе следующее нажатие посреди перерисовки теряется. Пока своя оценка в пути, подсветку не трогаем
@@ -2816,7 +2861,7 @@ function initRoom(roomId) {
     if (cur && cur.dataset.hid === h.hid && scaleHtml.startsWith('<div class="rate-scale"')) {
       if (scale.__html !== scaleHtml && !ratePend) { scale.__html = scaleHtml; patchScale(cur, mine); }
     } else setHTML(scale, scaleHtml);
-    setHTML(rated, list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}</div>${rateClearBtn(h)}` : '');
+    setHTML(rated, list.length ? `<div class="rate-list">${list.map(([pid, v]) => `<span><button class="person" data-person="${esc(pid)}" data-name="${esc(v.name)}">${esc(v.name)}</button><b>${v.score}</b></span>`).join('')}${rateClearBtn(h)}</div>` : '');
   }
   // создатель комнаты может снять все оценки фильма, чтобы его оценили заново
   const rateClearBtn = h => (isRoomOwner() ? `<button class="link-btn rate-clear" data-rate-clear="${esc(h.hid)}">Снять оценки</button>` : '');
@@ -2894,7 +2939,7 @@ function initRoom(roomId) {
         rateSent = null;
         setTimeout(() => {
           if (ratePend) return;
-          const slot = $('#rateBox .rate-slot:nth-child(2)');
+          const slot = $('#rateBox .rate-card > .rate-slot:nth-child(2)');
           if (slot) slot.__html = null;
           renderRate();
           if (detailHid === hid) showHist(hid);
@@ -3268,7 +3313,15 @@ function initRoom(roomId) {
     $$('#lpTabs button').forEach(b => { b.classList.toggle('on', b.dataset.lp === tab); b.setAttribute('aria-selected', String(b.dataset.lp === tab)); });
     $$('.lp-pane').forEach(x => (x.hidden = x.dataset.lpp !== tab));
     placeSeg($('#lpTabs'));
+    measureSb();
   }
+  // ширина полосы прокрутки списков: строки сдвигаются на неё, чтобы колонки списка совпадали с карточками над ним
+  function measureSb() {
+    const l = $$('.film-list, .history-list').find(x => x.offsetWidth);
+    if (l) $('#filmsPanel').style.setProperty('--sb', `${l.offsetWidth - l.clientWidth}px`);
+  }
+  addEventListener('resize', measureSb);
+  requestAnimationFrame(measureSb);
   $('#lpTabs').addEventListener('click', e => { const b = e.target.closest('[data-lp]'); if (b) setLp(b.dataset.lp); });
 
   $('#historyList').addEventListener('click', e => {

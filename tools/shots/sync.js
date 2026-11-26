@@ -1,6 +1,8 @@
 // Колесо у всех одинаковое: три браузера в одной комнате проходят через голоса, добавление и удаление фильма,
 // отключение человека и серию выбывания. После каждого шага их колесо сверяется попиксельно
-// с только что открытым браузером (он рисует всё с нуля). Запуск: сервер на 3000, node tools/shots/sync.js
+// с только что открытым браузером (он рисует всё с нуля), а список фильмов — со свежим браузером того же человека
+// (строки списка не пересоздаются, а правятся точечно — они не должны разойтись с отрисовкой с нуля).
+// Запуск: сервер на 3000, node tools/shots/sync.js
 const { chromium } = require('playwright');
 const base = process.env.BASE || 'http://localhost:3000';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -21,7 +23,15 @@ let fails = 0;
     const pg = await ctx.newPage(); pg.on('pageerror', e => { console.log('pageerror', e.message); fails++; });
     await pg.goto(`${base}/r/${id}`); return pg;
   };
-  const users = [await open('Аня', 's0'), await open('Борис', 's1'), await open('Вика', 's2')];
+  const who = [['Аня', 's0'], ['Борис', 's1'], ['Вика', 's2']];
+  const users = [];
+  for (const [n, c] of who) users.push(await open(n, c));
+  // список: шапки групп и строки по порядку — тексты, классы (кроме «под стрелкой» и «новый»), сердечко
+  const listSig = pg => pg.evaluate(() => [...document.querySelectorAll('#filmList .film-group')].map(g => {
+    const h = g.querySelector('.gh'), t = s => h.querySelector(s).textContent;
+    return [g.className, h.dataset.group, t('.l1'), t('.l2 .i'), t('.n1'), t('.n2'), h.querySelector('.own').innerHTML,
+      ...[...g.querySelectorAll('.film')].map(r => [r.dataset.id, r.className.replace(/ ?\b(hot|fresh)\b/g, ''), r.querySelector('.l1').textContent, r.querySelector('.l2').innerHTML, r.querySelector('.n1').textContent, r.querySelector('.vt').className, r.querySelector('.vt').textContent, r.querySelector('.po').innerHTML].join('|'))].join('\n');
+  }).join('\n\n') + '\n' + document.querySelector('#shareBar').innerHTML);
   await sleep(4000);
   // снимок колеса: пиксели холста, уменьшенные до 160×160 (сглаживание прячет разницу в долю пикселя)
   const snap = pg => pg.evaluate(() => {
@@ -46,6 +56,12 @@ let fails = 0;
     const ok = ds.every(d => d <= 40); // ≤40 из 25 600 пикселей — сглаживание краёв
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}: отличия от свежего браузера (пикселей из 25600) — ${tries.join(' → ')}`);
     if (!ok) fails++;
+    for (let i = 0; i < users.length; i++) {
+      const same = await open(...who[i]); await sleep(3000);
+      const [a, b2] = [await listSig(same), await listSig(users[i])];
+      await same.context().close();
+      if (a !== b2) { fails++; const la = a.split('\n'), lb = b2.split('\n'), k = la.findIndex((x, j) => x !== lb[j]); console.log(`FAIL ${step}: список у ${who[i][0]} не совпал со свежим: «${lb[k]}» вместо «${la[k]}»`); }
+    }
   };
   await check('открыли комнату');
   let st = await room(id);
