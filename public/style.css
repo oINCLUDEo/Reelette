@@ -54,6 +54,11 @@
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   --ease: cubic-bezier(.2, .8, .2, 1);
   --spring: cubic-bezier(.34, 1.56, .64, 1);
+  /* движение интерфейса — набор «Плавно» (docs/motion-research.md, brand/motion-concepts.html):
+     hover — тон за 160 мс; появление — проявление и сдвиг 6 px за 200 мс, исчезновение короче — 140 мс;
+     панели, вкладки, раскрытие — 300 мс кривой шторки iOS; задержка намерения у строк — 90 мс */
+  --m-hover: 160ms; --m-in: 200ms; --m-out: 140ms; --m-shift: 6px; --m-panel: 300ms; --m-intent: 90ms;
+  --e-out: cubic-bezier(.23, 1, .32, 1); --e-sheet: cubic-bezier(.32, .72, 0, 1);
   --warn: #FFB020;
   /* слои страницы снизу вверх: осколки, шапка, шторка фильмов, музыка, летящий постер, окна, парад, верхние окна, финал, поиск, тосты, подсказка */
   --z-fx: 30; --z-nav: 40; --z-sheet: 45; --z-panel: 46; --z-pop: 47; --z-toss: 48; --z-modal: 50; --z-show: 55; --z-modal-top: 60; --z-finale: 70; --z-results: 75; --z-toast: 80; --z-tip: 90;
@@ -159,10 +164,10 @@ input:disabled { opacity: .55; }
 
 /* переключатель режимов и вкладки: белый индикатор ездит под выбранной кнопкой */
 .seg, .tabs { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 4px; border-radius: 14px; background: var(--s1); }
-.seg button, .tabs button { position: relative; z-index: 1; height: 34px; padding: 0 10px; white-space: nowrap; border-radius: 10px; font-weight: 600; font-size: 14px; color: var(--tx2); transition: color .3s; }
+.seg button, .tabs button { position: relative; z-index: 1; height: 34px; padding: 0 10px; white-space: nowrap; border-radius: 10px; font-weight: 600; font-size: 14px; color: var(--tx2); transition: color var(--m-panel) ease; }
 .seg button:hover:not(.on), .tabs button:hover:not(.on) { color: var(--tx); }
 .seg button.on, .tabs button.on { color: var(--btn-tx); }
-.seg-ind, .tabs-ind { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); background: var(--btn); border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.25); transition: transform .45s var(--ease), width .45s var(--ease); will-change: transform, width; }
+.seg-ind, .tabs-ind { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); background: var(--btn); border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.25); transition: transform var(--m-panel) var(--e-sheet), width var(--m-panel) var(--e-sheet); will-change: transform, width; }
 .tabs { align-self: flex-start; }
 #delaySeg button { padding: 0 6px; }
 
@@ -187,7 +192,7 @@ input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px var(--
 /* подсказка «?» и плавающий слой для неё */
 .hint { position: relative; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 7px; border-radius: 50%; background: var(--s2); color: var(--tx3); font: 800 11px/1 var(--f-ui); cursor: help; flex: none; transition: color .2s, background .2s; }
 .hint:hover, .hint:focus-visible { color: var(--tx); background: var(--s3); }
-.tip { position: fixed; z-index: var(--z-tip); max-width: 280px; padding: 10px 12px; border-radius: 12px; background: var(--s2); border: 1px solid var(--bd); box-shadow: 0 14px 40px rgba(0,0,0,.5); color: var(--tx2); font: 500 13px/1.45 var(--f-ui); pointer-events: none; }
+.tip { --m-in: 130ms; --m-out: 100ms; --m-shift: 4px; position: fixed; z-index: var(--z-tip); max-width: 280px; padding: 10px 12px; border-radius: 12px; background: var(--s2); border: 1px solid var(--bd); box-shadow: 0 14px 40px rgba(0,0,0,.5); color: var(--tx2); font: 500 13px/1.45 var(--f-ui); pointer-events: none; }
 .tip[hidden] { display: none; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -341,7 +346,7 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .tools > * { transition: opacity .8s var(--ease), filter .8s var(--ease); }
 .nav-group { display: flex; align-items: center; gap: 2px; height: 44px; padding: 3px; border-radius: 22px; }
 .nav-btn { width: 36px; height: 36px; border-radius: 18px; display: grid; place-items: center; color: var(--tx); transition: background .2s; }
-.nav-btn:hover, .nav-btn[aria-expanded="true"] { background: var(--fill); }
+.nav-btn:hover, .nav-btn[aria-expanded="true"] { background: rgba(255,255,255,.14); }
 
 /* кто в комнате: аватарки внахлёст, лишние — «+N» со списком; на узком экране — счётчик */
 .people { display: flex; align-items: center; }
@@ -363,8 +368,15 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 
 /* выпадающие меню шапки */
 .menu-wrap { position: relative; }
-.pop-menu { position: absolute; top: calc(100% + 10px); right: 0; z-index: 60; display: flex; flex-direction: column; gap: 2px; padding: 6px; min-width: 248px; border-radius: 18px; background: var(--sheetB); border: 1px solid var(--bd); box-shadow: 0 24px 60px rgba(0,0,0,.55); animation: rise .3s var(--ease); }
+.pop-menu { position: absolute; top: calc(100% + 10px); right: 0; z-index: 60; display: flex; flex-direction: column; gap: 2px; padding: 6px; min-width: 248px; border-radius: 18px; background: var(--sheetB); border: 1px solid var(--bd); box-shadow: 0 24px 60px rgba(0,0,0,.55); transform-origin: top right; animation: menuIn var(--m-in) var(--e-out); }
 .pop-menu[hidden] { display: none; }
+.pop-menu.leaving { animation: menuOut var(--m-out) var(--e-out) forwards; pointer-events: none; }
+.pop-menu:not(.leaving) > * { animation: menuItem var(--m-in) var(--e-out) backwards; }
+.pop-menu > :nth-child(2) { animation-delay: 30ms; } .pop-menu > :nth-child(3) { animation-delay: 60ms; } .pop-menu > :nth-child(4) { animation-delay: 90ms; }
+.pop-menu > :nth-child(5) { animation-delay: 120ms; } .pop-menu > :nth-child(n+6) { animation-delay: 150ms; }
+@keyframes menuIn { from { opacity: 0; translate: 0 calc(var(--m-shift) * -1); scale: .97; } }
+@keyframes menuItem { from { opacity: 0; translate: 0 calc(var(--m-shift) * -.5); } }
+@keyframes menuOut { to { opacity: 0; translate: 0 calc(var(--m-shift) * -1); scale: .97; } }
 .menu-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 10px; border-radius: 12px; text-align: left; font-weight: 600; font-size: 14px; color: var(--tx); transition: background .2s; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--s2); }
 .menu-item svg { width: 20px; height: 20px; color: var(--tx2); }
@@ -426,7 +438,7 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 /* панель музыки: место задаёт placeYtPanel в app.js — над строкой «сейчас играет» */
 .yt-panel { position: fixed; z-index: var(--z-pop); display: flex; flex-direction: column; gap: 12px; }
 .yt-panel[hidden] { display: none; }
-.yt-panel.open { padding: 16px; border-radius: 24px; max-height: min(560px, calc(100dvh - 32px)); overflow-y: auto; background: color-mix(in srgb, var(--sheetB) 92%, transparent); border: 1px solid var(--bd); -webkit-backdrop-filter: blur(28px) saturate(160%); backdrop-filter: blur(28px) saturate(160%); box-shadow: 0 30px 70px rgba(0,0,0,.5); animation: rise .3s var(--ease); scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
+.yt-panel.open { padding: 16px; border-radius: 24px; max-height: min(560px, calc(100dvh - 32px)); overflow-y: auto; background: color-mix(in srgb, var(--sheetB) 92%, transparent); border: 1px solid var(--bd); -webkit-backdrop-filter: blur(28px) saturate(160%); backdrop-filter: blur(28px) saturate(160%); box-shadow: 0 30px 70px rgba(0,0,0,.5); animation: fxIn var(--m-in) var(--e-out); scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
 /* музыка без видео: плеер YouTube нужен только ради звука — он отрисован, но невидим и не мешает */
 .yt-panel.docked { opacity: 0; pointer-events: none; left: 0; right: auto; bottom: 0; top: auto; width: 320px; z-index: -1; border: 0; box-shadow: none; background: none; }
 .yt-player { position: absolute; left: 0; top: 0; width: 320px; height: 180px; overflow: hidden; background: #000; opacity: 0; pointer-events: none; z-index: -1; }
@@ -573,14 +585,21 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .films-panel .r > .n2 { grid-area: n2; justify-self: end; display: flex; }
 .films-panel .r > .ac { grid-area: ac; justify-self: center; display: grid; place-items: center; color: var(--tx3); }
 .films-panel .r > .ac > svg { width: 16px; height: 16px; }
-.films-panel .hv { cursor: pointer; transition: background .2s, opacity .4s; }
-.films-panel .hv:hover { background: var(--fill); }
+.films-panel .hv { cursor: pointer; transition: background-color 240ms ease, opacity .4s; }
+.films-panel .hv:hover { background: var(--fill); transition-duration: 120ms, .4s; }
 .films-panel .po { position: relative; width: 32px; height: 48px; border-radius: 6px; background: var(--c, var(--s3)) center/cover; display: grid; place-items: center; font: 800 14px var(--f-head); font-style: normal; color: rgba(255,255,255,.75); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
 /* инструменты создателя (вес, «не участвует») — на месте второй строки по наведению; на сенсорных всегда, справа */
 .films-panel .own { display: none; align-items: center; gap: 4px; flex: none; }
+/* наведение «по очереди» (выбор владельца): подпись гаснет, и только потом на её месте проявляются инструменты.
+   Курсор, пролетающий по списку, их не будит — задержка намерения 90 мс; уходят без задержки */
 @media (hover: hover) {
-  .films-panel .r.ow:is(:hover, :focus-within) .l2 > .i { display: none; }
-  .films-panel .r.ow:is(:hover, :focus-within) .l2 > .own { display: inline-flex; }
+  .films-panel .r.ow > .l2 { display: grid; }
+  .films-panel .r.ow > .l2 > * { grid-area: 1 / 1; min-width: 0; transition: opacity 160ms ease; }
+  .films-panel .r.ow > .l2 > .i { transition-delay: 140ms; }
+  .films-panel .r.ow > .l2 > .own { display: inline-flex; justify-self: start; opacity: 0; visibility: hidden; transition: opacity 160ms ease, visibility 0s linear 160ms; }
+  .films-panel .r.ow:is(:hover, :focus-within) > .l2 > .i { opacity: 0; transition-delay: var(--m-intent); }
+  /* видимы и нажимаемы — только с началом проявления: промах по ещё пустому месту не меняет вес и не отключает человека */
+  .films-panel .r.ow:is(:hover, :focus-within) > .l2 > .own { opacity: 1; visibility: visible; transition: opacity 300ms ease calc(var(--m-intent) + 160ms), visibility 0s linear calc(var(--m-intent) + 160ms); }
 }
 @media (hover: none) {
   .films-panel .r.ow .l2 > .own { display: inline-flex; margin-left: auto; }
@@ -588,19 +607,20 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 }
 
 /* группа: шапка — строка человека 48, прилипает сверху; фон у неё появляется только в момент прилипания */
-.film-group { transition: margin-bottom .4s var(--ease); }
+.film-group { transition: margin-bottom var(--m-panel) var(--e-sheet); }
 .film-group:not(.closed) { margin-bottom: 8px; }
 .films-panel .gh { position: sticky; top: 0; z-index: 2; min-height: 48px; user-select: none; container-type: scroll-state; }
 .films-panel .gh.hv:hover { background: none; }
 .gh > .hb { position: absolute; inset: 0; z-index: -1; border-radius: 20px; pointer-events: none; }
-.gh:is(:hover, :focus-visible) > .hb { background-image: linear-gradient(var(--fill), var(--fill)); }
+.gh > .hb::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--fill); opacity: 0; transition: opacity 240ms ease; }
+.gh:is(:hover, :focus-visible) > .hb::after { opacity: 1; transition-duration: 120ms; }
 @container scroll-state(stuck: top) { .gh > .hb { background-color: var(--sheetB); box-shadow: 0 8px 16px -8px rgba(0,0,0,.5); } }
 @supports not (container-type: scroll-state) { .film-group:not(.closed) > .gh > .hb { background-color: var(--sheetB); } }
 .gh > .ld { width: 32px; height: 32px; border-radius: 50%; }
 .gh .av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; object-fit: cover; font: 700 14px/1 var(--f-ui); color: #fff; }
 .gh .g-name:hover .nick { text-decoration: underline; text-decoration-color: var(--tx3); text-underline-offset: 3px; }
 .films-panel .gh > .n1 { color: var(--tx); }
-.films-panel .gh > .ac svg { width: 12px; height: 12px; stroke-width: 2.6; transition: transform .35s var(--ease); }
+.films-panel .gh > .ac svg { width: 12px; height: 12px; stroke-width: 2.6; transition: transform var(--m-panel) var(--e-sheet); }
 .film-group.closed .gh > .ac svg { transform: rotate(-90deg); }
 .g-off { display: inline-flex; align-items: center; gap: 4px; font: 700 13px/16px var(--f-ui); color: var(--tx); }
 .g-off svg { width: 14px; height: 14px; }
@@ -609,7 +629,7 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .film-group.off .gh > :is(.ld, .l1) { opacity: .45; }
 .films-panel .film-group.off .gh > .n1 { color: var(--tx3); }
 .g-offtag svg { display: block; width: 16px; height: 16px; }
-.g-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .4s var(--ease), opacity .3s; }
+.g-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--m-panel) var(--e-sheet), opacity var(--m-panel) ease; }
 .g-body > div { overflow: hidden; }
 .film-group.closed .g-body { grid-template-rows: 0fr; opacity: 0; }
 /* бонус или штраф человека — под его долей */
@@ -639,10 +659,10 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .stp button:hover { background: var(--btn); color: var(--btn-tx); }
 .stp button svg { width: 10px; height: 10px; stroke-width: 3; }
 .stp b { min-width: 12px; text-align: center; font: 700 13px/16px var(--f-ui); color: var(--tx); }
-.film-del { position: absolute; left: -4px; top: -4px; width: 20px; height: 20px; border-radius: 50%; display: none; place-items: center; background: rgba(0,0,0,.78); color: #fff; box-shadow: 0 0 0 1.5px rgba(255,255,255,.2); }
+.film-del { position: absolute; left: -4px; top: -4px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: rgba(0,0,0,.78); color: #fff; box-shadow: 0 0 0 1.5px rgba(255,255,255,.2); opacity: 0; scale: .6; visibility: hidden; transition: opacity 140ms ease, scale 140ms var(--e-out), background-color var(--m-hover) ease, visibility 0s linear 140ms; }
 .film-del svg { width: 10px; height: 10px; stroke-width: 3; }
-.film:is(:hover, :focus-within) .film-del { display: grid; }
-@media (hover: none) { .film-del { display: grid; } }
+.film:is(:hover, :focus-within) .film-del { opacity: 1; scale: 1; visibility: visible; transition-duration: 200ms, 200ms, var(--m-hover), 0s; transition-delay: var(--m-intent), var(--m-intent), 0s, var(--m-intent); }
+@media (hover: none) { .film-del { opacity: 1; scale: 1; visibility: visible; } }
 .film-del:hover { background: var(--bad); }
 .empty { padding: 12px; }
 .empty p { font: 700 19px/1.25 var(--f-head); letter-spacing: -.02em; }
@@ -733,8 +753,6 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .now-left b { position: relative; display: inline-block; color: var(--tx); font-weight: 700; font-variant-numeric: tabular-nums; }
 .now-left b span { display: inline-block; } /* строчный элемент не сдвигается transform-ом */
 #nowLeft::after { width: min(100%, 240px); margin-top: 12px; } /* сама полоска — общее правило со строкой под колесом (ниже по файлу) */
-@media (prefers-reduced-motion: no-preference) { .now-left:not([hidden]) { animation: riseIn .6s var(--ease); } }
-@keyframes riseIn { from { opacity: 0; transform: translateY(20px) scale(.98); filter: blur(8px); } }
 /* полка (app.js renderShelf, по мотивам ряда банок CIRO): с топ-5 до финала оставшиеся фильмы стоят карточками в ряд
    под «Осталось» вместо полоски пути, каждая под своим наклоном. Карточка фильма под стрелкой приподнята, выпрямлена
    и в цвете, остальные приглушены; выбывшая выпадает, кувыркаясь, остальные смыкаются */
@@ -815,8 +833,8 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 
 /* реакции и «Написать всем»: стеклянная капсула на оси колеса (стекло — общее правило с панелью фильмов) */
 .react-bar { position: relative; z-index: 9; display: flex; align-items: center; gap: 2px; height: 52px; padding: 4px; border-radius: 26px; }
-.react-bar button { position: relative; width: 44px; height: 44px; border-radius: 22px; font-size: 22px; display: grid; place-items: center; transition: background .2s, transform .3s var(--spring); }
-.react-bar button:hover { background: var(--fill); transform: translateY(-2px) scale(1.08); }
+.react-bar button { position: relative; width: 44px; height: 44px; border-radius: 22px; font-size: 22px; display: grid; place-items: center; transition: background .2s, transform .3s var(--spring), scale 160ms var(--e-out); }
+.react-bar button:hover { background: var(--fill); }
 .react-bar button.pop { animation: rxPop .35s var(--spring); }
 @keyframes rxPop { 50% { transform: scale(.8); } }
 /* взведённый бросок: плашка в полосе реакций, по клику бросок убирается */
@@ -830,20 +848,27 @@ body[data-stage="final"] .room-bg .tug { opacity: .95; }
 .chat-form input { width: 220px; height: 44px; padding: 0 18px; font-size: 14px; border-radius: 22px; background: var(--fill); border-color: transparent; transition: width .3s var(--ease), border-color .2s, box-shadow .2s; }
 .chat-form input:focus { width: 280px; }
 
-/* ---------- HUD комнаты: стекло со скруглениями, поведение кнопок по мотивам навигации ALCHE и Notturno ----------
-   Наведение — белая плашка въезжает слева по форме кнопки, а уходит вправо; подпись прокатывается вверх (.tr),
-   кнопка чуть тянется за курсором (app.js, магнит). На прокруте управление уезжает за края (body.cine) */
-#room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .nav-btn, .people-count, .menu-item, .stage-actions .ghost, .react-bar > button:not(.armed-chip), #addBtn, .np-replay, .room-title, .recap-chip) { position: relative; isolation: isolate; }
-#room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .nav-btn, .people-count, .menu-item, .stage-actions .ghost, .react-bar > button:not(.armed-chip), #addBtn, .np-replay, .room-title, .recap-chip)::before {
-  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--btn); transform: scaleX(0); transform-origin: right; transition: transform .45s cubic-bezier(.7, 0, .2, 1); pointer-events: none; }
-#room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .nav-btn, .people-count, .menu-item, .stage-actions .ghost, .react-bar > button:not(.armed-chip), #addBtn, .np-replay, .room-title, .recap-chip):is(:hover, :focus-visible, [aria-expanded="true"])::before { transform: scaleX(1); transform-origin: left; }
-#room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .nav-btn, .people-count, .menu-item, .stage-actions .ghost, .react-bar > button:not(.armed-chip), #addBtn, .np-replay, .room-title, .recap-chip):is(:hover, :focus-visible, [aria-expanded="true"]) { color: var(--btn-tx); }
-#room :is(.menu-item, .room-title):is(:hover, :focus-visible) :is(svg, small) { color: inherit; }
-#room .room-title:is(:hover, :focus-visible)::after { background: var(--btn-tx); }
-/* подпись прокатывается: уходит вверх, снизу въезжает её копия — тень текста на 1,6 строки ниже (обёртку ставит app.js) */
-.tr { display: inline-block; overflow: hidden; vertical-align: top; }
-.tr > span { display: inline-block; text-shadow: 0 1.6em currentColor; transition: transform .5s cubic-bezier(.7, 0, .2, 1); }
-:is(button, label):is(:hover, :focus-visible) .tr > span { transform: translateY(-1.6em); }
+/* ---------- HUD комнаты: hover — тон, а не движение (docs/motion-research.md) ----------
+   Кнопки без своей подложки при наведении получают светлую подложку: она проявляется за 160 мс, ничего не едет.
+   Кнопки со своей подложкой (nav-btn, ghost, пункты меню, реакции) просто светлеют по своим правилам.
+   На прокруте управление уезжает за края (body.cine) */
+#room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .people-count) { position: relative; isolation: isolate; }
+#room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .people-count)::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: rgba(255,255,255,.1); opacity: 0; transition: opacity var(--m-hover) ease; pointer-events: none; }
+@media (hover: hover) { #room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .people-count):hover::before { opacity: 1; } }
+/* нажатие: кнопка чуть поджимается (свойство scale не мешает их transform) и мягко возвращается */
+#room :is(.nav-btn, .stage-actions .ghost, .recap-chip) { transition: background-color .2s, color .2s, border-color .2s, scale 160ms var(--e-out); }
+#room :is(.seg button, .tabs button) { transition: color var(--m-panel) ease, scale 160ms var(--e-out); }
+#room :is(.nav-btn, .stage-actions .ghost, .recap-chip, .seg button, .tabs button, .react-bar > button, .people-count, .auto-check):active { scale: .97; }
+#room :is(#modeSeg button:not(.on), .lp-tabs button:not(.on), .auto-check, .people-count):is(:focus-visible, [aria-expanded="true"])::before { opacity: 1; }
+
+/* появление и исчезновение (app.js vis): элемент проявляется со сдвигом снизу, а прячется короче и не мгновенно —
+   app.js ставит .leaving, ждёт конец и только потом hidden. Анимируются только opacity и translate (дёшево на слабых) */
+.fx:not([hidden]) { animation: fxIn var(--m-in) var(--e-out); }
+.fx.leaving { animation: fxOut var(--m-out) var(--e-out) forwards; pointer-events: none; }
+.fx.fade { --m-shift: 0px; }
+@keyframes fxIn { from { opacity: 0; translate: 0 var(--m-shift); } }
+@keyframes fxOut { to { opacity: 0; translate: 0 var(--m-shift); } }
+@media (prefers-reduced-motion: reduce) { :root, .tip { --m-shift: 0px; } }
 
 /* киношный режим (body.cine, app.js setCine): на прокруте управление уезжает за края, остаётся колесо, как продукт у CIRO.
    Движение мышью или касание возвращает его на пару секунд (body.peek), фокус клавиатуры тоже держит.
@@ -1014,9 +1039,9 @@ body[data-stage="final"] .current span { background: linear-gradient(180deg, var
 
 /* ---------- окна ---------- */
 /* Окно: фон проявляется, карточка всплывает. Без backdrop-filter: размытие поверх анимированного фона дёргало кадры. */
-.modal { position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.62); opacity: 0; transition: opacity .26s ease; }
+.modal { position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.62); opacity: 0; transition: opacity 240ms ease; }
 .modal.open { opacity: 1; }
-.modal > .modal-card { transform: translateY(18px) scale(.975); opacity: 0; transition: transform .5s var(--ease), opacity .3s ease; will-change: transform, opacity; }
+.modal > .modal-card { transform: translateY(calc(var(--m-shift) * 2)) scale(.97); opacity: 0; transition: transform 300ms var(--e-out), opacity 200ms ease; will-change: transform, opacity; }
 .modal.open > .modal-card { transform: none; opacity: 1; }
 .modal-card { position: relative; width: min(560px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 28px; border-radius: 30px; background: var(--sheetB); border: 1px solid var(--bd); box-shadow: 0 40px 100px rgba(0,0,0,.6); display: flex; flex-direction: column; gap: 18px; scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
 .modal-card:focus { outline: none; }
@@ -1102,9 +1127,11 @@ body[data-stage="final"] .current span { background: linear-gradient(180deg, var
 /* ---------- уведомления ---------- */
 .toasts { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: var(--z-toast); display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
 /* уведомление — стеклянная капсула, как уведомления Liquid Glass: поднимается из размытия; ошибка — стекло с красным отливом */
-.toast { max-width: min(92vw, 520px); padding: 12px 20px; border-radius: 22px; background: color-mix(in srgb, var(--s2) 70%, transparent); border: 1px solid rgba(255,255,255,.14); font-weight: 600; font-size: 14px; text-align: center; animation: toastIn .6s cubic-bezier(.16, 1, .3, 1); box-shadow: 0 16px 44px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.14); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
+.toast { max-width: min(92vw, 520px); padding: 12px 20px; border-radius: 22px; background: color-mix(in srgb, var(--s2) 70%, transparent); border: 1px solid rgba(255,255,255,.14); font-weight: 600; font-size: 14px; text-align: center; animation: toastIn 350ms var(--e-out); box-shadow: 0 16px 44px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.14); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
 .toast.bad { background: color-mix(in srgb, var(--bad) 30%, color-mix(in srgb, var(--s2) 70%, transparent)); border-color: color-mix(in srgb, var(--bad) 55%, transparent); }
-@keyframes toastIn { from { opacity: 0; transform: translateY(14px) scale(.96); filter: blur(10px); } }
+@keyframes toastIn { from { opacity: 0; translate: 0 calc(var(--m-shift) * 2); scale: .97; } }
+.toast.leaving { animation: toastOut 200ms ease forwards; }
+@keyframes toastOut { to { opacity: 0; translate: 0 var(--m-shift); scale: .98; } }
 
 /* что нового */
 .news-card { width: min(520px, 100%); gap: 16px; }
@@ -1721,8 +1748,8 @@ html.fx-lite span:is(.frame-rainbow, .frame-holo)::after { content: ""; position
   .stage:not(.karaoke-on) .wheel-box { animation: riseLite .5s .1s var(--ease) both; }
 
   /* новый фильм в списке */
-  .film.fresh { animation: filmIn .7s var(--spring) both; }
-  @keyframes filmIn { from { opacity: 0; transform: translateX(-14px) scale(.96); background: color-mix(in srgb, var(--acc) 22%, transparent); } }
+  .film.fresh { animation: filmIn 400ms var(--e-out) both; }
+  @keyframes filmIn { from { opacity: 0; translate: -8px 0; background: color-mix(in srgb, var(--acc) 22%, transparent); } }
 
   /* «Угадай мелодию»: подсказка и ответ появляются, заглушка уходит плавно */
   .qz-hint { animation: riseLite .5s var(--spring) both; }
@@ -1969,14 +1996,12 @@ html.fx-lite span:is(.frame-rainbow, .frame-holo)::after { content: ""; position
   .sweep.busy .ar svg, .hub-btn:not(:disabled)::before, .pd-face, .winner.full.open .win-inner > img, .winner.full.open .win-inner > .noposter,
   .eq i, .nick[class*="fx-"], .nick[class*="fx-"] > span, [class*="frame-"], .bn-live, .bn-stars, .profile-card::before,
   .crow-bird svg, .cw-wing, .pointer.flare { animation: none !important; }
-  /* реакции и тосты не летят, а проявляются на месте; длительность та же — по animationend их убирает app.js */
+  /* реакции не летят, а проявляются на месте; длительность та же — по animationend их убирает app.js */
   .rx { animation-name: rmFade !important; }
-  .toast { animation-name: rmIn !important; }
   .hub-btn.busy::after { animation-duration: 2.4s; } /* «крутится» остаётся, но медленно: это состояние, не украшение */
 }
 @keyframes tkFade { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
 @keyframes rmFade { 0%, 100% { opacity: 0; } 12%, 75% { opacity: 1; } }
-@keyframes rmIn { from { opacity: 0; } }
 
 /* 2K и больше: колесо растёт с экраном, а панель, подписи и управление оставались размером с ноутбук.
    Всё, кроме колеса, укрупняется на 20% */

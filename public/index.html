@@ -96,7 +96,7 @@
         <a class="brand" href="/" aria-label="Reelette, на главную"><svg aria-hidden="true"><use href="#logo"/></svg></a>
         <button id="roomTitle" class="room-title" title="Настройки комнаты"></button>
       </div>
-      <div class="rate-box" id="rateBox" hidden></div>
+      <div class="rate-box fx" id="rateBox" hidden></div>
       <div class="panel-head">
         <div class="tabs lp-tabs" id="lpTabs" role="tablist">
           <span class="tabs-ind"></span>
@@ -104,7 +104,7 @@
           <button data-lp="history" role="tab" aria-selected="false">Выпадало <span class="m" id="histCount"></span></button>
         </div>
       </div>
-      <div class="lp-pane" data-lpp="films">
+      <div class="lp-pane fx" data-lpp="films">
         <div class="quick-add search-box">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
           <input id="quickSearch" placeholder="Фильм или ссылка на YouTube" autocomplete="off" aria-label="Найти фильм или вставить ссылку на ролик YouTube" aria-controls="quickResults" aria-expanded="false">
@@ -113,17 +113,17 @@
         <div class="sh my-votes" id="myVotes" tabindex="0"></div>
         <div class="share-bar" id="shareBar" aria-hidden="true"></div>
         <div id="filmList" class="film-list"></div>
-        <div id="filmEmpty" class="empty" hidden>
+        <div id="filmEmpty" class="empty fx" hidden>
           <p>Колесо пустое. <span class="m">Найдите фильм в поле выше или добавьте списком.</span></p>
         </div>
       </div>
-      <div class="lp-pane" data-lpp="history" hidden>
+      <div class="lp-pane fx" data-lpp="history" hidden>
         <div id="historyList" class="history-list"></div>
       </div>
       <div class="np" id="navMusic">
-        <button class="np-empty" id="musicBtn" type="button" title="Общая музыка из YouTube, её слышат все в комнате"><span class="art"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span><span class="nt"><b>Музыка</b><small>Поиск трека или наши треки</small></span></button>
-        <button class="nav-icon np-replay" id="ytReplay" type="button" hidden aria-label="Сыграть ещё раз"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
-        <div class="yt-card" id="ytCard" hidden>
+        <button class="np-empty fx" id="musicBtn" type="button" title="Общая музыка из YouTube, её слышат все в комнате"><span class="art"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span><span class="nt"><b>Музыка</b><small>Поиск трека или наши треки</small></span></button>
+        <button class="nav-icon np-replay fx" id="ytReplay" type="button" hidden aria-label="Сыграть ещё раз"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
+        <div class="yt-card fx" id="ytCard" hidden>
           <button class="yt-thumb" id="ytThumb" type="button" title="Очередь, громкость и добавить трек" aria-label="Открыть музыку: очередь и громкость"></button>
           <button class="yt-info" id="ytChange" type="button" title="Очередь, громкость и добавить трек"><b id="ytTitle"></b><span><span id="ytBy"></span><span id="ytQCount" hidden></span></span></button>
           <button class="yt-unmute nav-unmute" id="ytUnmute" type="button" hidden title="Браузер ждёт клика, чтобы включить звук">Слушать</button>
@@ -163,7 +163,7 @@
       <span class="eq right" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
     </div>
       <div class="tools">
-        <button class="ghost sm glass recap-chip" id="recapChip" type="button" hidden></button>
+        <button class="ghost sm glass recap-chip fx" id="recapChip" type="button" hidden></button>
         <div id="people" class="people"></div>
         <div class="menu-wrap people-wrap">
           <button class="ghost sm people-count glass" id="peopleBtn" aria-haspopup="true" aria-expanded="false" aria-controls="peopleMenu" title="Кто в комнате"><span class="pc-num"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg><b id="peopleNum">0</b></span></button>
@@ -281,7 +281,7 @@
           <h2 class="current" id="current"><span id="currentTitle">&nbsp;</span></h2>
           <p class="now-meta" id="nowMeta"></p>
           <div class="now-by" id="nowBy"></div>
-          <div class="now-left" id="nowLeft" hidden><span>Осталось <b><span id="nowLeftN"></span></b> из <b id="nowLeftOf"></b></span><div class="shelf" id="shelf" aria-hidden="true"></div></div>
+          <div class="now-left fx" id="nowLeft" hidden><span>Осталось <b><span id="nowLeftN"></span></b> из <b id="nowLeftOf"></b></span><div class="shelf" id="shelf" aria-hidden="true"></div></div>
         </section>
         <div class="wheel-area">
         <div class="wheel-box" id="wheelBox">
@@ -294,8 +294,8 @@
         <div class="stage-foot">
           <div class="stage-status" id="stageStatus"></div>
           <div class="stage-actions">
-            <button id="stopBtn" class="ghost sm glass" hidden></button>
-            <button id="resetBtn" class="ghost sm glass" hidden>Вернуть выбывших</button>
+            <button id="stopBtn" class="ghost sm glass fx" hidden></button>
+            <button id="resetBtn" class="ghost sm glass fx" hidden>Вернуть выбывших</button>
           </div>
         </div>
       </div>
@@ -308,7 +308,7 @@
     </section>
   </div>
 
-  <button class="sheet-scrim" id="sheetScrim" type="button" hidden aria-label="Свернуть список фильмов"></button>
+  <button class="sheet-scrim fx fade" id="sheetScrim" type="button" hidden aria-label="Свернуть список фильмов"></button>
   <!-- заставка этапа выбывания на весь экран: «Топ-10», «Топ-5», «Полуфинал» (app.js showChapter) -->
   <!-- «Парад пятёрки» после короткой заставки «Топ-5»: постеры вылетают из колеса в ряд и по одному встают под лампу (app.js showParade) -->
   <div class="parade" id="parade" hidden aria-hidden="true">
@@ -569,7 +569,7 @@
 </div>
 
 <div id="toasts" class="toasts"></div>
-<div id="tip" class="tip" role="tooltip" hidden></div>
+<div id="tip" class="tip fx" role="tooltip" hidden></div>
 
 <script src="/audio.js"></script>
 <script src="/fx.js"></script>

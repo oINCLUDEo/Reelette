@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reelette: движение</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Carlito:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   Живой стенд движения: одни и те же элементы комнаты, четыре набора движения.
+   Значения — из docs/motion-research.md (Linear, Apple, Emil Kowalski, Material, Atlassian).
+   ===================================================================== */
+@font-face { font-family: "Lack"; src: url("../public/fonts/lack.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
+:root {
+  --bg: #141414; --tx: #E2E2E2; --t2: rgba(226,226,226,.72); --t3: rgba(226,226,226,.5);
+  --acc: #465DFF; --acc-hi: #8C9BFF; --bad: #FF453A;
+  --fill: rgba(255,255,255,.08); --fill2: rgba(255,255,255,.14); --btn: #E2E2E2; --btn-tx: #141414;
+  --f-ui: "Carlito", "Segoe UI", system-ui, sans-serif; --f-head: "Lack", "Carlito", sans-serif;
+  --o: cubic-bezier(.23, 1, .32, 1);          /* ease-out для входа и ответа на действие */
+  --io: cubic-bezier(.2, 0, 0, 1);            /* движение того, что остаётся на экране */
+  --sheet: cubic-bezier(.32, .72, 0, 1);      /* шторки и панели (Vaul, iOS) */
+  --snappy: linear(0, 0.026 3%, 0.098 6.3%, 0.185 9.3%, 0.515 19.7%, 0.69 26.3%, 0.812 32.7%, 0.902 39.7%, 0.965 48.3%, 0.997 58.7%, 1.006 72.3%, 1);
+  --bouncy: linear(0, 0.028 2.7%, 0.109 5.7%, 0.222 8.7%, 0.583 17.3%, 0.776 23%, 0.911 28.7%, 0.996 34.7%, 1.034 40.3%, 1.046 47%, 1.004 75.7%, 1);
+  color-scheme: dark;
+}
+/* наборы движения */
+[data-m="now"] { --hov: 450ms; --press: 1; --pd: 0ms; --pe: ease; --in: 0ms; --out: 0ms; --shift: 0px; --sc: 1; --e-in: ease; --e-out: ease;
+  --menu-in: 300ms; --menu-shift: 12px; --menu-sc: .98; --tip: 0ms; --swap-in: 0ms; --swap-out: 0ms; --panel: 400ms; --panel-e: cubic-bezier(.2,.8,.2,1);
+  --modal-in: 500ms; --modal-out: 260ms; --modal-e: cubic-bezier(.2,.8,.2,1); --toast-in: 600ms; --toast-out: 0ms; --toast-e: cubic-bezier(.16,1,.3,1);
+  --list: 0ms; --list-e: ease; --stagger: 0ms; --seg: 450ms; --seg-e: cubic-bezier(.2,.8,.2,1); --heart: 0; }
+[data-m="a"] { --hov: 120ms; --press: .98; --pd: 100ms; --pe: var(--o); --in: 120ms; --out: 80ms; --shift: 0px; --sc: .98; --e-in: var(--o); --e-out: var(--o);
+  --menu-in: 120ms; --menu-shift: 0px; --menu-sc: .98; --tip: 100ms; --swap-in: 120ms; --swap-out: 80ms; --panel: 200ms; --panel-e: var(--io);
+  --modal-in: 180ms; --modal-out: 120ms; --modal-e: var(--o); --toast-in: 200ms; --toast-out: 150ms; --toast-e: var(--o);
+  --list: 180ms; --list-e: var(--io); --stagger: 0ms; --seg: 200ms; --seg-e: var(--io); --heart: 0; }
+[data-m="b"] { --hov: 160ms; --press: .97; --pd: 160ms; --pe: var(--o); --in: 200ms; --out: 140ms; --shift: 6px; --sc: .97; --e-in: var(--o); --e-out: var(--o);
+  --menu-in: 200ms; --menu-shift: -6px; --menu-sc: .97; --tip: 130ms; --swap-in: 220ms; --swap-out: 140ms; --panel: 300ms; --panel-e: var(--sheet);
+  --modal-in: 280ms; --modal-out: 200ms; --modal-e: var(--o); --toast-in: 350ms; --toast-out: 200ms; --toast-e: var(--o);
+  --list: 260ms; --list-e: var(--io); --stagger: 30ms; --seg: 300ms; --seg-e: var(--sheet); --heart: 1; }
+[data-m="c"] { --hov: 200ms; --press: .96; --pd: 320ms; --pe: var(--snappy); --in: 380ms; --out: 160ms; --shift: 10px; --sc: .94; --e-in: var(--snappy); --e-out: var(--o);
+  --menu-in: 380ms; --menu-shift: -10px; --menu-sc: .94; --tip: 160ms; --swap-in: 300ms; --swap-out: 160ms; --panel: 480ms; --panel-e: var(--snappy);
+  --modal-in: 520ms; --modal-out: 220ms; --modal-e: var(--snappy); --toast-in: 600ms; --toast-out: 220ms; --toast-e: var(--bouncy);
+  --list: 480ms; --list-e: var(--snappy); --stagger: 45ms; --seg: 480ms; --seg-e: var(--snappy); --heart: 1; }
+[data-m="now"] { --intent: 0ms; } [data-m="a"] { --intent: 60ms; } [data-m="b"], [data-m="c"] { --intent: 90ms; }
+/* «уменьшить движение»: сдвиги и масштаб убираются, остаётся короткий fade */
+.rm .del { transform: none !important; }
+.rm { --shift: 0px !important; --menu-shift: 0px !important; --sc: 1 !important; --menu-sc: 1 !important; --press: 1 !important; --list: 0ms !important; --heart: 0 !important; --stagger: 0ms !important; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #0C0C0C; color: var(--tx); font: 400 15px/1.45 var(--f-ui); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+h1, h2, p { margin: 0; }
+[hidden] { display: none !important; }
+
+/* ---------- шапка стенда ---------- */
+.intro { max-width: 1240px; margin: 0 auto; padding: 40px 24px 16px; display: grid; gap: 16px; }
+.intro h1 { font: 400 36px/44px var(--f-head); }
+.intro h1 small { display: block; font: 700 13px/16px var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--acc-hi); margin-bottom: 8px; }
+.intro p { color: var(--t2); max-width: 900px; }
+.pick { position: sticky; top: 0; z-index: 40; background: rgba(12,12,12,.9); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,.06); }
+.pick-in { max-width: 1240px; margin: 0 auto; padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+.presets { display: flex; gap: 4px; padding: 4px; border-radius: 20px; background: var(--fill); }
+.presets button { height: 32px; padding: 0 16px; border-radius: 16px; font: 700 14px/32px var(--f-ui); color: var(--t2); }
+.presets button.on { background: var(--btn); color: var(--btn-tx); }
+.pick label { display: inline-flex; align-items: center; gap: 8px; font: 700 13px var(--f-ui); color: var(--t2); cursor: pointer; }
+.desc { flex: 1 1 360px; font: 400 13px/18px var(--f-ui); color: var(--t2); }
+.desc b { color: var(--tx); }
+.tokens { max-width: 1240px; margin: 0 auto; padding: 8px 24px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.tokens span { padding: 3px 8px; border-radius: 8px; background: var(--fill); font: 400 12px/16px ui-monospace, Consolas, monospace; color: var(--t2); }
+.tokens b { color: var(--tx); font-weight: 700; }
+
+/* ---------- кадр комнаты ---------- */
+.room { position: relative; max-width: 1240px; margin: 16px auto 0; padding: 0 24px; display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 24px; }
+.room::before { content: ""; position: absolute; inset: -20px 0; z-index: -1; background: radial-gradient(60% 70% at 70% 40%, rgba(70,93,255,.28), transparent 70%), radial-gradient(40% 50% at 20% 70%, rgba(255,90,110,.14), transparent 70%); filter: blur(10px); }
+.glass { position: relative; border-radius: 28px; background: rgba(28,28,30,.55); border: 1px solid rgba(255,255,255,.08); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08); }
+.pn { display: flex; flex-direction: column; gap: 8px; padding: 8px; min-height: 640px; }
+.stage { display: flex; flex-direction: column; min-height: 640px; padding: 0 24px; }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 72px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.bar.b { border-bottom: 0; border-top: 1px solid rgba(255,255,255,.08); margin-top: auto; }
+.mid { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: center; gap: 24px; padding: 24px 0; }
+.mid h2 { font: 400 44px/48px var(--f-head); }
+.mid .sub { margin-top: 8px; color: var(--t2); }
+.wheel { width: 300px; aspect-ratio: 1; border-radius: 50%; background: repeating-conic-gradient(#2C2C30 0 10deg, #1A1A1D 10deg 20deg, #3A3A40 20deg 30deg); box-shadow: 0 0 0 10px #161618, 0 0 90px rgba(70,93,255,.35); display: grid; place-items: center; }
+.hub { width: 92px; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff, #D6D8E2); color: #141414; display: grid; place-content: center; text-align: center; font: 400 18px/20px var(--f-ui); }
+
+/* ---------- кнопки: hover и нажатие ---------- */
+.b { position: relative; isolation: isolate; height: 40px; padding: 0 20px; border-radius: 20px; background: var(--fill); font: 700 14px/40px var(--f-ui); color: var(--tx); white-space: nowrap;
+  transition: background-color var(--hov) ease, color var(--hov) ease, box-shadow var(--hov) ease, filter var(--hov) ease, transform var(--pd) var(--pe); }
+.b.ic { width: 40px; padding: 0; display: inline-grid; place-items: center; }
+.b.pri { background: var(--acc); color: #fff; }
+.cap { display: inline-flex; gap: 4px; padding: 4px; border-radius: 24px; background: var(--fill); }
+.cap .b { height: 36px; background: none; }
+.cap .b.ic { width: 36px; }
+.b:active { transform: scale(var(--press)); }
+@media (hover: hover) and (pointer: fine) {
+  [data-m="a"] .b:hover, [data-m="b"] .b:hover { background: rgba(255,255,255,.14); }
+  [data-m="a"] .b.pri:hover, [data-m="b"] .b.pri:hover { background: var(--acc); filter: brightness(1.15); }
+  [data-m="c"] .b:hover { background: rgba(255,255,255,.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); }
+  [data-m="c"] .b.pri:hover { background: var(--acc); filter: brightness(1.12); box-shadow: 0 0 0 4px rgba(70,93,255,.25); }
+  /* «сейчас»: фон заливается полосой слева направо */
+  [data-m="now"] .b:not(.pri)::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--btn); transform: scaleX(0); transform-origin: right; transition: transform .45s cubic-bezier(.7, 0, .2, 1); }
+  [data-m="now"] .b:not(.pri):hover::before { transform: scaleX(1); transform-origin: left; }
+  [data-m="now"] .b:not(.pri):hover { color: var(--btn-tx); }
+}
+[data-m="now"] .b { transition: none; }
+
+/* переключатель режима с ползунком */
+.seg { position: relative; display: inline-flex; padding: 4px; border-radius: 24px; background: var(--fill); }
+.seg button { position: relative; z-index: 1; height: 36px; padding: 0 18px; border-radius: 18px; font: 700 14px/36px var(--f-ui); color: var(--t2); transition: color var(--seg) ease; }
+.seg button.on { color: var(--btn-tx); }
+.seg i { position: absolute; top: 4px; left: 4px; height: 36px; border-radius: 18px; background: var(--btn); transition: transform var(--seg) var(--seg-e), width var(--seg) var(--seg-e); }
+
+/* ---------- появление и исчезновение: общий механизм ---------- */
+.an { transition: opacity var(--in) var(--e-in), transform var(--in) var(--e-in); }
+.b.an { transition: opacity var(--in) var(--e-in), transform var(--in) var(--e-in), background-color var(--hov) ease, color var(--hov) ease; }
+.an.from { opacity: 0; transform: translateY(var(--shift)) scale(var(--sc)); transition: none; }
+.an.leaving { opacity: 0; transform: translateY(var(--shift)) scale(var(--sc)); transition-duration: var(--out); transition-timing-function: var(--e-out); pointer-events: none; }
+
+/* меню от кнопки, пункты каскадом */
+.anchor { position: relative; }
+.menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: 240px; padding: 6px; border-radius: 18px; background: #1E1E20; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 24px 60px rgba(0,0,0,.55); transform-origin: top right;
+  transition: opacity var(--menu-in) var(--e-in), transform var(--menu-in) var(--e-in); }
+.menu.from, .menu.leaving { opacity: 0; transform: translateY(var(--menu-shift)) scale(var(--menu-sc)); }
+.menu.from { transition: none; }
+.menu.leaving { transition-duration: var(--out); transition-timing-function: var(--e-out); }
+.menu button { display: flex; align-items: center; gap: 12px; width: 100%; height: 40px; padding: 0 12px; border-radius: 12px; text-align: left; font-weight: 700;
+  transition: opacity var(--menu-in) var(--e-in) calc(var(--i) * var(--stagger)), transform var(--menu-in) var(--e-in) calc(var(--i) * var(--stagger)); }
+.menu.from button { opacity: 0; transform: translateY(var(--menu-shift)); }
+.menu.leaving button { transition: none; }
+.menu button:hover { background: var(--fill); }
+[data-m="now"] .menu button:hover { background: var(--btn); color: var(--btn-tx); }
+
+/* подсказка */
+.tipw { position: relative; display: inline-grid; }
+.q { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--t3); display: grid; place-items: center; font: 700 11px/1 var(--f-ui); color: var(--t2); cursor: help; }
+.tip { position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 30; width: 240px; margin-left: -120px; padding: 10px 12px; border-radius: 12px; background: #262628; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 14px 40px rgba(0,0,0,.5); font: 400 13px/18px var(--f-ui); color: var(--t2); transform-origin: bottom center;
+  transition: opacity var(--tip) var(--o), transform var(--tip) var(--o); pointer-events: none; }
+.tip.from, .tip.leaving { opacity: 0; transform: translateY(4px) scale(var(--menu-sc)); }
+.tip.from { transition: none; }
+.tip.leaving { transition-duration: calc(var(--tip) * .7); }
+
+/* ---------- панель: строки, оценка, вкладки, группа ---------- */
+.r { display: grid; grid-template-columns: 32px minmax(0, 1fr) 40px 40px; grid-template-rows: 20px 16px; grid-template-areas: "ld l1 n1 ac" "ld l2 n2 ac"; align-content: center; align-items: center; min-height: 56px; padding: 0 8px; border-radius: 20px; transition: background-color 240ms ease; }
+.r.h48 { min-height: 48px; }
+.r > .ld { grid-area: ld; }
+.r > .l1 { grid-area: l1; padding: 0 8px 0 12px; font: 700 15px/20px var(--f-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.r > .l2 { grid-area: l2; padding: 0 8px 0 12px; display: grid; font: 400 13px/16px var(--f-ui); color: var(--t2); white-space: nowrap; }
+.r > .l2 > * { grid-area: 1 / 1; transition: opacity var(--swap-out) var(--o), transform var(--swap-out) var(--o); }
+.r.ow:hover .l2 > * { transition-duration: var(--swap-in); transition-delay: var(--intent); }
+.r > .n1 { grid-area: n1; justify-self: end; font: 700 13px/20px var(--f-ui); color: var(--t2); font-variant-numeric: tabular-nums; }
+.r > .ac { grid-area: ac; justify-self: center; display: grid; place-items: center; color: var(--t3); }
+.r.hv { cursor: pointer; }
+.r.hv:hover { background: var(--fill); transition-duration: 120ms; }
+[data-m="now"] .r { transition: none; }
+.po { position: relative; width: 32px; height: 48px; border-radius: 6px; background: var(--c) center/cover; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 700 14px/1 var(--f-ui); color: #fff; }
+/* инструменты создателя на месте второй строки */
+.own { display: inline-flex; align-items: center; gap: 4px; color: var(--tx); font-weight: 700; opacity: 0; transform: translateY(calc(var(--shift) * .7)); pointer-events: none; }
+.r.ow:hover .l2 > .meta { opacity: 0; transform: translateY(calc(var(--shift) * -.7)); }
+.r.ow:hover .l2 > .own { opacity: 1; transform: none; pointer-events: auto; }
+[data-m="now"] .r > .l2 > *, [data-m="now"] .fold, [data-m="now"] .fold > div > *, [data-m="now"] .swap > *, [data-m="now"] .chev { transition: none; }
+[data-m="now"] .r .l2 > .own { opacity: 1; display: none; }
+[data-m="now"] .r:hover .l2 > .own { display: inline-flex; }
+.del { position: absolute; left: -4px; top: -4px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: rgba(0,0,0,.78); color: #fff; font: 700 13px/1 var(--f-ui); box-shadow: 0 0 0 1.5px rgba(255,255,255,.2); opacity: 0; transform: scale(.6); transition: opacity var(--swap-out) var(--o), transform var(--swap-out) var(--o); }
+.r:hover .del { opacity: 1; transform: none; transition-duration: var(--swap-in); transition-delay: var(--intent); }
+[data-m="now"] .del { transition: none; }
+/* способы смены второй строки при наведении (переключатель «Наведение на строку») */
+/* размытие: без движения, старый текст тает в дымку, новый проступает из неё */
+body:not([data-m="now"])[data-h="blur"] .r > .l2 > * { transform: none; transition: opacity 220ms ease, filter 220ms ease; }
+body:not([data-m="now"])[data-h="blur"] .r.ow:hover .l2 > * { transition-duration: 340ms; transition-delay: var(--intent); }
+body:not([data-m="now"])[data-h="blur"] .own { filter: blur(4px); }
+body:not([data-m="now"])[data-h="blur"] .r.ow:hover .l2 > .meta { transform: none; filter: blur(4px); }
+body:not([data-m="now"])[data-h="blur"] .r.ow:hover .l2 > .own { filter: none; }
+/* по очереди: старый текст гаснет, и только потом проявляется новый — слои не наслаиваются */
+body:not([data-m="now"])[data-h="seq"] .r > .l2 > * { transform: none; transition: opacity 160ms ease; }
+body:not([data-m="now"])[data-h="seq"] .r > .l2 > .meta { transition-delay: 140ms; }
+body:not([data-m="now"])[data-h="seq"] .r.ow:hover .l2 > .meta { transform: none; transition: opacity 160ms ease var(--intent); }
+body:not([data-m="now"])[data-h="seq"] .r.ow:hover .l2 > .own { transition: opacity 300ms ease calc(var(--intent) + 160ms); }
+.rm .own, .rm .r.ow:hover .l2 > .meta { filter: none !important; }
+.own i { width: 20px; height: 20px; border-radius: 10px; background: var(--fill2); display: grid; place-items: center; font-style: normal; }
+/* сердечко */
+.vt { width: 40px; height: 32px; border-radius: 16px; display: inline-grid; place-items: center; color: rgba(226,226,226,.24); transition: color var(--hov) ease, background-color var(--hov) ease, transform var(--pd) var(--pe); }
+.r:hover .vt { color: var(--t2); }
+.vt:hover { background: var(--fill2); color: var(--tx); }
+.vt:active { transform: scale(var(--press)); }
+.vt.me { color: var(--acc-hi); }
+.vt.me svg { fill: currentColor; }
+.vt.pop svg { animation: heart .42s var(--o); }
+@keyframes heart { 30% { transform: scale(1.3); } }
+.sh { display: grid; grid-template-columns: minmax(0, 1fr) 40px 40px; align-items: center; height: 32px; padding: 0 8px; font: 700 13px/16px var(--f-ui); color: var(--t2); }
+.sh .n { justify-self: end; color: var(--tx); }
+.sh .ac { justify-self: center; }
+.card { border-radius: 20px; background: var(--fill); }
+/* блок оценки: шкала сворачивается по высоте, подпись меняется плавной сменой */
+.fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--panel) var(--panel-e); }
+.fold > div { overflow: hidden; min-height: 0; }
+.fold.shut { grid-template-rows: 0fr; }
+.fold > div > * { transition: opacity var(--panel) ease; }
+.fold.shut > div > * { opacity: 0; }
+.scale { display: flex; gap: 2px; height: 40px; margin: 0 4px 4px; padding: 4px; border-radius: 16px; background: rgba(0,0,0,.22); }
+.scale button { flex: 1; border-radius: 12px; font: 700 14px/32px var(--f-ui); color: var(--t2); transition: background-color var(--hov) ease, color var(--hov) ease, transform var(--pd) var(--pe); }
+.scale button:hover { background: var(--fill2); color: var(--tx); }
+.scale button:active { transform: scale(var(--press)); }
+.scale button.on { background: var(--acc); color: #fff; }
+.swap { display: grid; }
+.swap > * { grid-area: 1 / 1; transition: opacity var(--swap-in) var(--o), transform var(--swap-in) var(--o); }
+.swap > .gone { opacity: 0; transform: translateY(calc(var(--shift) * -.5)); transition-duration: var(--swap-out); pointer-events: none; }
+.chev { transition: transform var(--panel) var(--panel-e); }
+.shut-chev { transform: rotate(-180deg); }
+/* вкладки */
+.tabs { position: relative; display: flex; height: 40px; padding: 4px; border-radius: 20px; background: var(--fill); }
+.tabs button { position: relative; z-index: 1; flex: 1; border-radius: 16px; font: 700 14px/32px var(--f-ui); color: var(--t2); transition: color var(--seg) ease; }
+.tabs button.on { color: var(--btn-tx); }
+.tabs i { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 16px; background: var(--btn); transition: transform var(--seg) var(--seg-e); }
+.tabs.h i { transform: translateX(100%); }
+.panes { display: grid; flex: 1; align-items: start; }
+.panes > section { grid-area: 1 / 1; }
+.pane-anim { transition: opacity var(--swap-in) var(--o), transform var(--swap-in) var(--o); }
+.pane-anim.from { opacity: 0; transform: translateY(var(--shift)); transition: none; }
+.pane-anim.leaving { opacity: 0; transition-duration: var(--swap-out); pointer-events: none; }
+/* группа */
+.gh .ac svg { width: 12px; height: 12px; stroke-width: 2.6; transition: transform var(--panel) var(--panel-e); }
+.g.closed .gh .ac svg { transform: rotate(-90deg); }
+.gb { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--panel) var(--panel-e), opacity var(--panel) ease; }
+.gb > div { overflow: hidden; min-height: 0; }
+.g.closed .gb { grid-template-rows: 0fr; opacity: 0; }
+[data-m="now"] .gb { transition: grid-template-rows .4s cubic-bezier(.2,.8,.2,1), opacity .3s; }
+.mini { display: flex; gap: 8px; padding: 0 8px; }
+.mini .b { height: 32px; padding: 0 14px; font-size: 13px; line-height: 32px; }
+
+/* ---------- сцена: кнопка серии, строка «Осталось», тосты, окно ---------- */
+.foot { display: flex; align-items: center; gap: 12px; min-height: 40px; }
+.left { display: inline-flex; align-items: center; gap: 8px; font: 700 14px var(--f-ui); color: var(--t2); }
+.left b { color: var(--tx); }
+.toasts { position: fixed; left: 50%; bottom: 24px; z-index: 50; display: flex; flex-direction: column-reverse; align-items: center; gap: 8px; transform: translateX(-50%); pointer-events: none; }
+.toast { padding: 12px 20px; border-radius: 22px; background: rgba(44,44,46,.85); border: 1px solid rgba(255,255,255,.14); font-weight: 700; font-size: 14px; box-shadow: 0 16px 44px rgba(0,0,0,.4);
+  transition: opacity var(--toast-in) ease, transform var(--toast-in) var(--toast-e); }
+.toast.from { opacity: 0; transform: translateY(16px) scale(.96); transition: none; }
+.toast.leaving { opacity: 0; transform: translateY(8px) scale(.98); transition-duration: var(--toast-out); transition-timing-function: ease; }
+[data-m="now"] .toast { animation: toastIn .6s cubic-bezier(.16, 1, .3, 1); transition: none; }
+[data-m="now"] .toast.from { opacity: 1; transform: none; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(14px) scale(.96); filter: blur(10px); } }
+.modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(0,0,0,.6); transition: opacity var(--modal-in) ease; }
+.modal.from, .modal.leaving { opacity: 0; }
+.modal.from { transition: none; }
+.modal.leaving { transition-duration: var(--modal-out); }
+.modal-card { width: min(440px, calc(100% - 32px)); padding: 24px; border-radius: 28px; background: #1E1E20; border: 1px solid rgba(255,255,255,.1); display: grid; gap: 16px; transition: transform var(--modal-in) var(--modal-e); }
+.modal.from .modal-card { transform: translateY(calc(var(--shift) * 2)) scale(var(--sc)); transition: none; }
+.modal.leaving .modal-card { transform: scale(var(--sc)); transition-duration: var(--modal-out); transition-timing-function: var(--o); }
+.modal-card h2 { font: 400 26px/30px var(--f-head); }
+.modal-card p { color: var(--t2); }
+.notes { max-width: 1240px; margin: 32px auto 80px; padding: 0 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; color: var(--t2); font-size: 14px; line-height: 21px; }
+.notes b { display: block; margin-bottom: 4px; color: var(--tx); font-size: 15px; }
+@media (max-width: 900px) { .room { grid-template-columns: 1fr; } .mid { grid-template-columns: 1fr; } .wheel { width: 240px; } }
+</style>
+</head>
+<body data-m="b" data-h="blur">
+<header class="intro">
+  <h1><small>Reelette · движение</small>Как ведут себя кнопки, меню, панели и всё, что появляется</h1>
+  <p>Одни и те же элементы комнаты в четырёх наборах движения. Наведите на кнопки, откройте меню ✦, подсказку «?», переключите вкладки и режим, сверните оценку и группу, проголосуйте, перемешайте список, вызовите тост и окно. «Сейчас» — как на сайте сегодня.</p>
+</header>
+<div class="pick"><div class="pick-in">
+  <div class="presets" id="presets">
+    <button data-p="now">Сейчас</button><button data-p="a">A · Тихо</button><button data-p="b" class="on">B · Плавно</button><button data-p="c">C · Живо</button>
+  </div>
+  <div class="presets" id="hovers" title="Как меняется вторая строка при наведении на фильм или человека"><button data-h="shift">Сдвиг</button><button data-h="blur" class="on">Размытие</button><button data-h="seq">По очереди</button></div>
+  <label><input type="checkbox" id="rm"> Уменьшить движение</label>
+  <p class="desc" id="desc"></p>
+</div><div class="tokens" id="tokens"></div></div>
+
+<div class="room">
+  <aside class="glass pn">
+    <div class="r h48"><span class="ld" style="font:400 22px var(--f-head)">◎</span><b class="l1" style="font:400 22px/24px var(--f-head);grid-row:1/3">Лудка колесо</b></div>
+    <div>
+      <div class="sh"><span>Оцените фильм</span><span class="n"></span><span class="ac"><span class="tipw"><i class="q" data-tip>?</i><span class="tip" hidden>Средняя оценка даст фильмам автора бонус или штраф до следующего выпадения его фильма.</span></span></span></div>
+      <div class="card">
+        <div class="r hv" id="rateRow"><i class="ld po" style="--c:linear-gradient(160deg,#3a4a7a,#141428)"></i><b class="l1">Сияние</b>
+          <span class="l2"><span class="swap" id="rateSub"><span>добавил(а) nisshokuryu</span><span class="gone">ваша 8 · средняя 8,0</span></span></span>
+          <span class="n1">7,6</span><span class="ac"><svg class="chev" id="rateChev" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></span></div>
+        <div class="fold" id="rateFold"><div><div class="scale" id="scale"></div></div></div>
+      </div>
+    </div>
+    <div class="tabs" id="tabs"><i></i><button class="on" data-t="f">Фильмы <span style="opacity:.6;font-weight:400">61</span></button><button data-t="h">Выпадало <span style="opacity:.6;font-weight:400">4</span></button></div>
+    <div class="panes">
+      <section class="pane-anim" data-p="f">
+        <div class="sh"><span>Ваши голоса ●●○</span><span class="n">1/3</span><span class="ac"></span></div>
+        <div class="g" id="grp">
+          <div class="r hv h48 gh ow" id="gh"><i class="ld av" style="background:#7a3fd1">N</i><b class="l1">nisshokuryu</b><span class="l2"><span class="meta">7 из 8 на колесе</span><span class="own">◌ Не участвует сегодня</span></span><span class="n1" style="color:var(--tx)">12%</span><span class="ac"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></div>
+          <div class="gb"><div id="rows"></div></div>
+        </div>
+        <div class="mini"><button class="b" id="shuffle">Перемешать по шансам</button></div>
+      </section>
+      <section class="pane-anim" data-p="h" hidden>
+        <div id="hist"></div>
+      </section>
+    </div>
+  </aside>
+
+  <section class="glass stage">
+    <div class="bar">
+      <div class="seg" id="seg"><i></i><button class="on">Обычный</button><button>Выбывание</button></div>
+      <div class="cap anchor">
+        <button class="b ic" id="funBtn" title="Развлечения"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/></svg></button>
+        <button class="b ic" id="linkBtn" title="Пригласить"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button>
+        <button class="b ic" id="gearBtn" title="Настройки"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></button>
+        <div class="menu" id="menu" hidden>
+          <button style="--i:0">🎤 Караоке</button><button style="--i:1">🎵 Угадай мелодию</button><button style="--i:2">🍅 Броски</button><button style="--i:3">📊 Итоги месяца</button><button style="--i:4">🎬 Смотреть вместе</button>
+        </div>
+      </div>
+    </div>
+    <div class="mid">
+      <div>
+        <h2>Психо</h2>
+        <p class="sub">1960, 1 ч 49 мин, ужасы · Добавил(а) nisshokuryu</p>
+        <p class="left an" id="left" hidden>Осталось <b>12</b> из <b>40</b></p>
+      </div>
+      <div class="wheel"><div class="hub">Крутить</div></div>
+    </div>
+    <div class="bar b">
+      <div class="foot">
+        <button class="b" id="seriesBtn">Начать серию</button>
+        <button class="b an" id="stopBtn" hidden>Остановить серию</button>
+      </div>
+      <div class="foot"><button class="b pri" id="toastBtn">Показать тост</button><button class="b" id="modalBtn">Открыть окно</button></div>
+    </div>
+  </section>
+</div>
+
+<div class="notes">
+  <div><b>A · Тихо</b>Как Linear: hover — только тон фона за 120 мс, нажатие 0,98, меню и подсказки проявляются за 80–120 мс почти без движения. Максимально быстро и сдержанно; часть людей не заметит, что что-то анимируется.</div>
+  <div><b>B · Плавно</b>Как Apple и Emil Kowalski: hover — тон за 160 мс, нажатие 0,97, появление — проявление и сдвиг 6 px за 200 мс, исчезновение быстрее (140 мс), панели и вкладки — кривая шторки iOS, пункты меню каскадом по 30 мс. Всё короче 300 мс, кроме окна.</div>
+  <div><b>C · Живо</b>Пружины без большого отскока (Apple «snappy»): элементы приезжают чуть дальше и с лёгким пружинящим доводом, у тоста — заметный отскок, hover с тонким кольцом. Выразительно, но заметно дольше; на частых действиях может утомлять.</div>
+  <div><b>Во всех A–C</b>Исчезновение не мгновенное, а короче появления; движение только transform и opacity (дёшево для слабых ноутбуков); hover только для мыши; при «уменьшить движение» остаётся короткое проявление без сдвигов.</div>
+</div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const DESC = {
+  now: '<b>Сейчас.</b> Hover заливает кнопку полосой за 0,45 с. Меню, подсказки, вкладки, кнопка серии, «Осталось» появляются и исчезают мгновенно; окно и тост въезжают долго (0,5–0,6 с), а уходят разом.',
+  a: '<b>A · Тихо.</b> Только тон и прозрачность, без сдвигов. Вход 120 мс, выход 80 мс.',
+  b: '<b>B · Плавно</b> (выбран). Наведите на строку фильма или шапку nisshokuryu и переключайте способ рядом: «Сдвиг» — строка уезжает вверх, новая приезжает снизу; «Размытие» — старый текст тает в дымку, новый проступает из неё; «По очереди» — сначала гаснет одно, потом проявляется другое.  Проявление со сдвигом 6 px, вход 200 мс, выход 140 мс, панели 300 мс кривой шторки iOS, каскад 30 мс.',
+  c: '<b>C · Живо.</b> Пружины Apple «snappy», вход 380 мс, сдвиг 10 px, тост с отскоком, каскад 45 мс.',
+};
+const ms = name => { const v = getComputedStyle(document.body).getPropertyValue(name).trim(); return v.endsWith('ms') ? parseFloat(v) : parseFloat(v) * 1000 || 0; };
+// появление: снять hidden, поставить начальное состояние, на следующем кадре убрать его — сработает переход
+function show(el) {
+  clearTimeout(el._t); el.classList.remove('leaving');
+  if (!el.hidden) return;
+  el.hidden = false; el.classList.add('from'); el.offsetWidth; el.classList.remove('from');
+}
+// исчезновение: доиграть переход и только потом hidden
+function hide(el, durVar = '--out') {
+  if (el.hidden || el.classList.contains('leaving')) return;
+  el.classList.add('leaving');
+  el._t = setTimeout(() => { el.hidden = true; el.classList.remove('leaving'); }, ms(durVar) + 30);
+}
+const toggle = (el, v) => (v ? show(el) : hide(el));
+
+// наборы
+function setPreset(p) {
+  document.body.dataset.m = p;
+  document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  $('#desc').innerHTML = DESC[p];
+  const keys = [['hover', '--hov'], ['нажатие', '--press'], ['вход', '--in'], ['выход', '--out'], ['сдвиг', '--shift'], ['меню', '--menu-in'], ['панели', '--panel'], ['окно', '--modal-in'], ['тост', '--toast-in'], ['список', '--list'], ['каскад', '--stagger']];
+  const cs = getComputedStyle(document.body);
+  $('#tokens').innerHTML = keys.map(([n, k]) => `<span>${n} <b>${cs.getPropertyValue(k).trim()}</b></span>`).join('');
+  placeSeg();
+}
+$('#hovers').addEventListener('click', e => { const b = e.target.closest('[data-h]'); if (!b) return; document.body.dataset.h = b.dataset.h; document.querySelectorAll('#hovers button').forEach(x => x.classList.toggle('on', x === b)); });
+$('#presets').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) setPreset(b.dataset.p); });
+$('#rm').addEventListener('change', e => { document.body.classList.toggle('rm', e.target.checked); setPreset(document.body.dataset.m); });
+
+// режим
+const segBtns = [...document.querySelectorAll('#seg button')];
+function placeSeg() { const on = segBtns.find(b => b.classList.contains('on')); const i = $('#seg i'); i.style.width = on.offsetWidth + 'px'; i.style.transform = `translateX(${on.offsetLeft - 4}px)`; }
+$('#seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; segBtns.forEach(x => x.classList.toggle('on', x === b)); placeSeg(); toggle($('#left'), b === segBtns[1]); });
+
+// меню
+$('#funBtn').addEventListener('click', e => { e.stopPropagation(); toggle($('#menu'), $('#menu').hidden || $('#menu').classList.contains('leaving')); });
+document.addEventListener('click', e => { if (!e.target.closest('#menu')) hide($('#menu')); });
+
+// подсказка
+const tw = $('.tipw'), tip = $('.tip');
+tw.addEventListener('mouseenter', () => show(tip));
+tw.addEventListener('mouseleave', () => hide(tip, '--tip'));
+
+// оценка: выбрал цифру — блок сворачивается в строку
+$('#scale').innerHTML = Array.from({ length: 10 }, (_, i) => `<button>${i + 1}</button>`).join('');
+let rated = false;
+function setRate(open) {
+  $('#rateFold').classList.toggle('shut', !open);
+  $('#rateChev').classList.toggle('shut-chev', !open);
+  const [a, b] = $('#rateSub').children; a.classList.toggle('gone', !open); b.classList.toggle('gone', open);
+}
+$('#scale').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; $('#scale').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); rated = true; setTimeout(() => setRate(false), 450); });
+$('#rateRow').addEventListener('click', () => setRate($('#rateFold').classList.contains('shut')));
+
+// вкладки: старая гаснет, новая проявляется на её месте
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-t]'); if (!b || b.classList.contains('on')) return;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  $('#tabs').classList.toggle('h', b.dataset.t === 'h');
+  document.querySelectorAll('.panes > section').forEach(s => (s.dataset.p === b.dataset.t ? show(s) : hide(s, '--swap-out')));
+});
+
+// список
+const FILMS = [['Психо', '1960 · 1 ч 49 мин', 6.2, 2, '#4a3a2a'], ['Сияние', '1980 · 2 ч 26 мин', 4.1, 1, '#2a3a5a'], ['Нечто', '1982 · 1 ч 49 мин', 3.8, 0, '#2a4a3a'], ['Маяк', '2019 · 1 ч 49 мин', 7.4, 1, '#3a3a3a'], ['Ведьма', '2015 · 1 ч 32 мин', 2.9, 0, '#4a2a3a'], ['Прочь', '2017 · 1 ч 44 мин', 5.1, 3, '#2a2a4a']];
+const row = (f, i) => `<div class="r hv ow film" data-id="${i}"><i class="ld po" style="--c:linear-gradient(160deg,${f[4]},#111)"><b class="del">×</b></i><b class="l1">${f[0]}</b><span class="l2"><span class="meta">${f[1]}</span><span class="own">вес <i>−</i> 1 <i>+</i></span></span><span class="n1">${String(f[2]).replace('.', ',')}%</span><span class="ac"><button class="vt" title="Голос"><svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10.3A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3Z"/></svg></button></span></div>`;
+$('#rows').innerHTML = FILMS.map(row).join('');
+$('#hist').innerHTML = [['Большой куш', 'вчера, 23:40', '8,0'], ['Побег из Шоушенка', '3 дня назад', '9,1'], ['Оно', '5 дней назад', '6,4'], ['Брат', '30 октября', '9,4']].map((h, i) => `<div class="r hv"><i class="ld po" style="--c:linear-gradient(160deg,${FILMS[i][4]},#111)"></i><b class="l1">${h[0]}</b><span class="l2"><span class="meta">${h[1]}</span></span><span class="n1" style="color:var(--tx)">${h[2]}</span><span class="ac">›</span></div>`).join('');
+$('#gh').addEventListener('click', () => $('#grp').classList.toggle('closed'));
+$('#rows').addEventListener('click', e => {
+  const v = e.target.closest('.vt'); if (!v) return;
+  v.classList.toggle('me');
+  if (getComputedStyle(document.body).getPropertyValue('--heart').trim() === '1') { v.classList.remove('pop'); v.offsetWidth; v.classList.add('pop'); }
+});
+// перестановка: FLIP — запомнить места, переставить, анимировать от старого места к новому
+$('#shuffle').addEventListener('click', () => {
+  const box = $('#rows'), rows = [...box.children];
+  const first = new Map(rows.map(r => [r, r.getBoundingClientRect().top]));
+  rows.sort(() => Math.random() - .5).forEach(r => box.append(r));
+  const d = ms('--list'); if (!d) return;
+  const dy = rows.map(r => first.get(r) - r.getBoundingClientRect().top);
+  const ease = getComputedStyle(document.body).getPropertyValue('--list-e').trim();
+  rows.forEach((r, i) => { if (dy[i]) r.animate([{ transform: `translateY(${dy[i]}px)` }, { transform: 'none' }], { duration: d, easing: ease.startsWith('var') ? 'ease-out' : ease }); });
+});
+
+// серия, тост, окно
+$('#seriesBtn').addEventListener('click', () => { const on = $('#stopBtn').hidden || $('#stopBtn').classList.contains('leaving'); toggle($('#stopBtn'), on); $('#seriesBtn').textContent = on ? 'Скрыть «Остановить»' : 'Начать серию'; });
+$('#stopBtn').addEventListener('click', () => { hide($('#stopBtn')); $('#seriesBtn').textContent = 'Начать серию'; });
+const TOASTS = ['Ссылка скопирована', 'Голос отдан: «Психо»', 'GLENN добавил(а) 3 фильма', 'Тоха поставил(а) оценку 9'];
+let tn = 0;
+function toast(text) {
+  const t = document.createElement('div'); t.className = 'toast from'; t.textContent = text; t.hidden = true;
+  $('#toasts').append(t); t.classList.remove('from'); show(t);
+  setTimeout(() => { hide(t, '--toast-out'); setTimeout(() => t.remove(), ms('--toast-out') + 80); }, 2600);
+}
+$('#toastBtn').addEventListener('click', () => toast(TOASTS[tn++ % TOASTS.length]));
+$('#linkBtn').addEventListener('click', () => toast('Ссылка скопирована'));
+function modal() {
+  const m = document.createElement('div'); m.className = 'modal'; m.hidden = true;
+  m.innerHTML = '<div class="modal-card"><h2>Настройки комнаты</h2><p>Окно появляется из центра, фон затемняется. Закрыть — кликом мимо или Esc.</p><div><button class="b pri" data-x>Готово</button></div></div>';
+  document.body.append(m); show(m);
+  const close = () => { hide(m, '--modal-out'); setTimeout(() => m.remove(), ms('--modal-out') + 60); document.removeEventListener('keydown', esc); };
+  const esc = e => e.key === 'Escape' && close();
+  m.addEventListener('click', e => { if (e.target === m || e.target.closest('[data-x]')) close(); });
+  document.addEventListener('keydown', esc);
+}
+$('#modalBtn').addEventListener('click', modal);
+$('#gearBtn').addEventListener('click', modal);
+setPreset('b');
+addEventListener('resize', placeSeg);
+document.fonts?.ready.then(placeSeg);
+</script>
+</body>
+</html>

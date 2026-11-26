@@ -68,8 +68,22 @@ function toast(text, bad = false) {
   el.className = 'toast' + (bad ? ' bad' : '');
   el.textContent = text;
   $('#toasts').append(el);
-  setTimeout(() => { el.style.transition = 'opacity .4s'; el.style.opacity = 0; }, 2600);
-  setTimeout(() => el.remove(), 3100);
+  setTimeout(() => el.classList.add('leaving'), 2600);
+  setTimeout(() => el.remove(), 2850);
+}
+// плавно показать или спрятать (style.css .fx): появление — CSS-анимация при снятии hidden; исчезновение доигрывает
+// .leaving и только потом ставит hidden. Тот же вызов с тем же состоянием ничего не делает — можно звать на каждой отрисовке
+const FX_OUT = 140;
+function vis(el, on) {
+  if (!el) return;
+  if (on) {
+    if (el._fx) { clearTimeout(el._fx); el._fx = 0; el.classList.remove('leaving'); }
+    el.hidden = false;
+    return;
+  }
+  if (el.hidden || el._fx) return;
+  el.classList.add('leaving');
+  el._fx = setTimeout(() => { el._fx = 0; el.classList.remove('leaving'); el.hidden = true; }, FX_OUT);
 }
 // Окна: показываем элемент, на следующем кадре включаем переход; при закрытии ждём конец перехода.
 const modalEl = m => (typeof m === 'string' ? $(m) : m);
@@ -1758,7 +1772,7 @@ function initRoom(roomId) {
     // первая неделя месяца и в прошлом что-то выпадало: в шапке сцены плашка «Итоги октября», после просмотра тоже остаётся
     const pm = prevMonthKey();
     const chip = new Date(Date.now() + 3 * 3600e3).getUTCDate() <= 7 && state.history.some(h => monthKey(h.at) === pm);
-    $('#recapChip').hidden = !chip;
+    vis($('#recapChip'), chip);
     if (chip) $('#recapChip').textContent = `Итоги ${MONTHS[Number(pm.slice(5)) - 1]}`;
     const active = activeFilms();
     const W = chanceWeights(active);
@@ -1788,7 +1802,7 @@ function initRoom(roomId) {
     renderRate();
 
     $('#filmCount').textContent = state.films.length ? String(state.films.length) : '';
-    $('#filmEmpty').hidden = state.films.length > 0;
+    vis($('#filmEmpty'), !state.films.length);
     // группы по тем, кто добавил: сначала ваши, потом остальные по числу фильмов
     const groups = new Map();
     for (const f of state.films) {
@@ -1921,8 +1935,8 @@ function initRoom(roomId) {
       // часть фильмов выбыла или уже выпадала: в списке их больше, чем на колесе
       : active.length < state.films.length ? `${active.length} на колесе` : `${active.length} ${plural(active.length, 'фильм', 'фильма', 'фильмов')}`;
 
-    $('#stopBtn').hidden = !counting && !state.series;
-    $('#stopBtn').textContent = counting ? 'Отменить прокрут' : 'Остановить серию';
+    vis($('#stopBtn'), counting || Boolean(state.series));
+    if (counting || state.series) $('#stopBtn').textContent = counting ? 'Отменить прокрут' : 'Остановить серию';
     // выбывание: «осталось N из M». На широком экране — строкой слева под фильмом, на узком — строкой с полоской под колесом
     const elimTotal = active.length + state.eliminated.length;
     const elimOn = state.eliminated.length > 0 || (spinning && (state.spin || curSpin)?.mode === 'elimination');
@@ -1930,7 +1944,7 @@ function initRoom(roomId) {
     // строка появляется, когда выбывание пошло: «осталось 50 из 50» до старта ничего не говорит.
     // Название над ней не прыгает — блок держится на оси центра колеса (style.css, «под стрелкой»)
     const showLeft = elimOn && elimTotal > 1;
-    $('#nowLeft').hidden = !showLeft;
+    vis($('#nowLeft'), showLeft);
     $('#nowLeft').style.setProperty('--p', progP);
     if (showLeft) {
       const n = $('#nowLeftN');
@@ -1953,7 +1967,7 @@ function initRoom(roomId) {
         : sp?.mode === 'elimination' ? `Осталось ${active.length} из ${elimTotal}`
         : by ? `Крутит ${by}` : 'Колесо крутится';
     }
-    $('#resetBtn').hidden = !state.eliminated.length || spinning;
+    vis($('#resetBtn'), state.eliminated.length > 0 && !spinning);
     const banned = Boolean(state.noAdd?.includes(myPid())) && !isRoomOwner(); // создатель запретил этому человеку добавлять
     const addClosed = (state.addLock && !isRoomOwner()) || banned || state.elimActive;
     $('#addBtn').disabled = spinning || addClosed;
@@ -2061,7 +2075,7 @@ function initRoom(roomId) {
     const m = state?.music;
     const hostSel = state?.quiz ? '#qHost' : state?.karaoke ? '#kHost' : '#ytHost';
     if (yt && ytHostCur !== hostSel) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $(ytHostCur).innerHTML = ''; }
-    $('#ytCard').hidden = !m;
+    vis($('#ytCard'), Boolean(m));
     $('#ytAdd').hidden = !ytChanging;
     // плеер живёт в одной панели и не переносится по странице, иначе YouTube перезагрузит видео
     const playerHere = Boolean(m) && hostSel === '#ytHost';
@@ -2072,9 +2086,9 @@ function initRoom(roomId) {
     $('#ytPlayer').hidden = !playerHere;
     renderQueue();
     $$('.our-track').forEach(b => b.classList.toggle('on', b.dataset.our === m?.vid));
-    $('#musicBtn').hidden = Boolean(m);
+    vis($('#musicBtn'), !m);
     const last = state?.lastTrack;
-    $('#ytReplay').hidden = Boolean(m) || !last;
+    vis($('#ytReplay'), !m && Boolean(last));
     if (last) $('#ytReplay').title = `Сыграть ещё раз: ${last.title}`;
     if (!m) {
       if (yt) { yt.destroy(); yt = null; ytReady = false; ytVid = null; $(ytHostCur).innerHTML = ''; }
@@ -2819,15 +2833,17 @@ function initRoom(roomId) {
   function renderRate() {
     const h = state.history[0];
     const box = $('#rateBox');
-    if (!h) { box.hidden = true; return; }
-    box.hidden = false;
+    if (!h) { vis(box, false); return; }
+    vis(box, true);
     const author = personOf(h.film);
     const isAuthor = author === myPid();
     const mine = h.ratings?.[myPid()]?.score || 0;
     // свёрнуто: свой фильм, оценки закрыты создателем или оценка уже стоит и минута на исправление прошла
     const banned = !isAuthor && noRateMe();
     const done = isAuthor || banned || (mine && rateLeft(h) <= 0);
+    const wasCompact = box.classList.contains('compact');
     box.classList.toggle('compact', done && rateOpen !== h.hid);
+    if (wasCompact !== box.classList.contains('compact') && box.firstElementChild) box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
     const a = avgRating(h);
     const avgT = a === null ? '' : a.toFixed(1).replace('.', ',');
     // свёрнуто — обычная строка списка в карточке: постер, название, ваша и средняя оценка, раскрыть
@@ -3249,6 +3265,8 @@ function initRoom(roomId) {
     $('#peopleNum').textContent = String(list.length);
     $('#peopleBtn').setAttribute('aria-label', `В комнате ${list.length} ${plural(list.length, 'человек', 'человека', 'человек')}`);
     $('#peopleMenu').innerHTML = `<div class="menu-label">В комнате</div>` + list.map(row).join('');
+    // меню уже открыто: пункты просто появляются, каскад только при открытии (finish — только у каскада: у ников бесконечные анимации)
+    if (!$('#peopleMenu').hidden) for (const a of $('#peopleMenu').getAnimations({ subtree: true })) if (a.animationName === 'menuItem') a.finish();
   }
 
   // ---- действия с фильмами ----
@@ -3309,12 +3327,16 @@ function initRoom(roomId) {
   });
 
   // вкладки левой колонки: фильмы и уже выпавшие
-  function setLp(tab) {
+  function setLp(tab, now = false) {
     $$('#lpTabs button').forEach(b => { b.classList.toggle('on', b.dataset.lp === tab); b.setAttribute('aria-selected', String(b.dataset.lp === tab)); });
-    $$('.lp-pane').forEach(x => (x.hidden = x.dataset.lpp !== tab));
+    // «по очереди»: старая вкладка гаснет, потом на её месте проявляется новая (вместе им тесно — список прыгнул бы)
+    clearTimeout(lpT);
+    const panes = $$('.lp-pane'), next = panes.find(x => x.dataset.lpp === tab), cur = panes.find(x => x !== next && !x.hidden);
+    const go = () => { vis(next, true); measureSb(); };
+    if (cur && !now) { vis(cur, false); lpT = setTimeout(go, FX_OUT); } else { if (cur) { vis(cur, true); cur.hidden = true; } go(); }
     placeSeg($('#lpTabs'));
-    measureSb();
   }
+  let lpT = 0;
   // ширина полосы прокрутки списков: строки сдвигаются на неё, чтобы колонки списка совпадали с карточками над ним
   function measureSb() {
     const l = $$('.film-list, .history-list').find(x => x.offsetWidth);
@@ -3383,14 +3405,14 @@ function initRoom(roomId) {
     if (!text) return hideTip();
     tipFor = el;
     tipEl.textContent = text;
-    tipEl.hidden = false;
+    vis(tipEl, true);
     const r = el.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
     const left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2));
     const below = r.bottom + 8 + h < innerHeight;
     tipEl.style.left = `${left}px`;
     tipEl.style.top = `${below ? r.bottom + 8 : r.top - h - 8}px`;
   }
-  function hideTip() { tipFor = null; tipEl.hidden = true; }
+  function hideTip() { tipFor = null; vis(tipEl, false); }
   const tipTarget = e => e.target.closest?.('.hint[data-hint], [data-tt]');
   document.addEventListener('pointerover', e => { const t = tipTarget(e); if (t && e.pointerType === 'mouse') showTip(t); });
   document.addEventListener('pointerout', e => { const t = tipTarget(e); if (t && t === tipFor && !t.contains(e.relatedTarget)) hideTip(); });
@@ -3406,7 +3428,7 @@ function initRoom(roomId) {
 
   // выпадающие меню в шапке: «Развлечения» и «Кто в комнате»
   function setMenu(btn, menu, open) {
-    menu.hidden = !open;
+    vis(menu, open);
     btn.setAttribute('aria-expanded', String(open));
     if (open) menu.querySelector('button')?.focus({ preventScroll: true });
   }
@@ -3414,20 +3436,20 @@ function initRoom(roomId) {
   document.addEventListener('click', e => {
     if (!e.target.closest('[data-people-more]')) return;
     e.stopImmediatePropagation();
-    $('#peopleMenu').hidden = !$('#peopleMenu').hidden;
+    vis($('#peopleMenu'), $('#peopleMenu').hidden || $('#peopleMenu').classList.contains('leaving'));
   });
   [['#funBtn', '#funMenu'], ['#peopleBtn', '#peopleMenu']].forEach(([b, m]) => {
     $(b).addEventListener('click', e => {
       e.stopPropagation();
-      $$('.pop-menu').forEach(x => { if (x !== $(m)) x.hidden = true; });
-      setMenu($(b), $(m), $(m).hidden);
+      $$('.pop-menu').forEach(x => { if (x !== $(m)) vis(x, false); });
+      setMenu($(b), $(m), $(m).hidden || $(m).classList.contains('leaving'));
     });
     $(m).addEventListener('keydown', e => { if (e.key === 'Escape') { setMenu($(b), $(m), false); $(b).focus(); } });
   });
   document.addEventListener('click', e => {
     // клик мимо меню или по пункту меню закрывает его
     for (const [b, m] of [['#funBtn', '#funMenu'], ['#peopleBtn', '#peopleMenu']]) {
-      if ($(m).hidden) continue;
+      if ($(m).hidden || $(m).classList.contains('leaving')) continue;
       if (!e.target.closest(m) || e.target.closest('#funMenu button')) setMenu($(b), $(m), false);
     }
   });
@@ -3436,12 +3458,12 @@ function initRoom(roomId) {
   function setSheet(open) {
     $('#filmsPanel').classList.toggle('open', open);
     $('#peekHead').setAttribute('aria-expanded', String(open));
-    $('#sheetScrim').hidden = !open;
+    vis($('#sheetScrim'), open);
   }
   $('#peekHead').addEventListener('click', () => setSheet(!$('#filmsPanel').classList.contains('open')));
   $('#sheetScrim').addEventListener('click', () => setSheet(false));
   $('#wheelAddBtn').addEventListener('click', () => {
-    setLp('films');
+    setLp('films', true);
     if (sheetMode()) setSheet(true);
     $('#quickSearch').scrollIntoView({ block: 'center', behavior: 'smooth' });
     $('#quickSearch').focus({ preventScroll: true });
@@ -3475,7 +3497,7 @@ function initRoom(roomId) {
 
   const qr = document.createElement('div');
   qr.id = 'quickResults';
-  qr.className = 'results quick-results';
+  qr.className = 'results quick-results fx';
   qr.hidden = true;
   document.body.append(qr);
   function placeQuick() {
@@ -3487,7 +3509,7 @@ function initRoom(roomId) {
     qr.style.maxHeight = `${Math.max(160, innerHeight - r.bottom - 20)}px`;
   }
   function showQuick(on) {
-    qr.hidden = !on;
+    vis(qr, on);
     $('#quickSearch').setAttribute('aria-expanded', String(on));
     placeQuick();
   }
@@ -3495,7 +3517,7 @@ function initRoom(roomId) {
   $('#quickSearch').addEventListener('input', e => {
     clearTimeout(quickTimer);
     const q = e.target.value.trim();
-    if (q.length < 2) { showQuick(false); qr.innerHTML = ''; return; }
+    if (q.length < 2) { showQuick(false); qr.hidden = true; qr.innerHTML = ''; return; }
     quickTimer = setTimeout(() => { showQuick(true); search(q, qr).then(placeQuick); }, 300);
   });
   $('#quickSearch').addEventListener('focus', () => { if (qr.innerHTML && $('#quickSearch').value.trim().length > 1) showQuick(true); });
@@ -3757,30 +3779,6 @@ function initRoom(roomId) {
 
   $('#resetBtn').addEventListener('click', () => api(`/rooms/${roomId}/reset`, { method: 'POST' }).catch(e => toast(e.message, true)));
 
-  // ---- поведение кнопок HUD (по мотивам навигации ALCHE и Notturno, style.css «HUD комнаты») ----
-  // подпись прокатывается при наведении: содержимое кнопки — в обёртку .tr, узлы переносятся, а не пересоздаются (счётчики во вкладках находятся по id)
-  $$('#modeSeg button, #lpTabs button, #autoWrap .check-text, #resetBtn').forEach(el => {
-    const tr = document.createElement('span'), inner = document.createElement('span');
-    tr.className = 'tr';
-    inner.append(...el.childNodes);
-    tr.append(inner);
-    el.append(tr);
-  });
-  // магнит: кнопка тянется за курсором на 2–3 px и отпускает пружиной (свойство translate — не мешает их transform)
-  const MAG = '.nav-btn, .people-count, .auto-check, .stage-actions .ghost, .react-bar > button, #addBtn, .np-replay';
-  let magEl = null;
-  const magTo = (el, x, y, duration, easing) => el.animate([{ translate: `${x.toFixed(1)}px ${y.toFixed(1)}px` }], { duration, easing, fill: 'forwards' });
-  const magOff = () => { if (magEl) magTo(magEl, 0, 0, 600, 'cubic-bezier(.34, 1.56, .64, 1)'); magEl = null; };
-  $('#room').addEventListener('pointermove', e => {
-    if (e.pointerType !== 'mouse' || reduceMotion) return;
-    const el = e.target.closest(MAG);
-    if (el !== magEl) magOff();
-    if (!el) return;
-    magEl = el;
-    const r = el.getBoundingClientRect();
-    magTo(el, ((e.clientX - r.left) / r.width - 0.5) * 6, ((e.clientY - r.top) / r.height - 0.5) * 4, 200, 'ease-out');
-  });
-  $('#room').addEventListener('pointerleave', magOff);
 
   $('#inviteBtn').addEventListener('click', async () => {
     const url = location.origin + '/r/' + roomId;
